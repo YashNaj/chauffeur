@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+- Builds with Xcode 26 again. 0.1.0 compiled only with Xcode 27, so `brew install` failed on Xcode 26.
+
 ## 0.1.0 — first public release
 
 - Drive the iOS Simulator from a coding agent: `snapshot`, `tap`, `type`, `scroll`, `wait`, `find`, `do`, `screenshot`,

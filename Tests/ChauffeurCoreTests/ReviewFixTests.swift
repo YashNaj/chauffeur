@@ -103,7 +103,7 @@ import Testing
 
     // I6: dev builds carry a build stamp, so a rebuilt CLI replaces an old daemon.
     @Test func devBuildsAreDistinguishable() {
-        #expect(Chauffeur.build(stamp: 1_700_000_000) == "0.1.0+1700000000")
+        #expect(Chauffeur.build(stamp: 1_700_000_000) == "0.1.1+1700000000")
         #expect(Chauffeur.build(stamp: 1_700_000_000) != Chauffeur.build(stamp: 1_700_000_001))
     }
 }

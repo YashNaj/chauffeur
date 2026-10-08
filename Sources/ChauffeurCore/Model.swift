@@ -1,7 +1,7 @@
 import Foundation
 
 public enum Chauffeur {
-    public static let version = "0.1.0"
+    public static let version = "0.1.1"
 
     /// Version plus the executable's build stamp: a rebuilt CLI must replace a daemon from an older build (I6).
     public static let buildID: String = {

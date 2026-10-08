@@ -31,6 +31,6 @@ import Testing
     }
 
     @Test func theReleaseVersionIsSet() {
-        #expect(Chauffeur.version == "0.1.0")
+        #expect(Chauffeur.version == "0.1.1")
     }
 }
