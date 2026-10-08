@@ -53,7 +53,8 @@ Public commits must not carry a personal email.
   `git config --local` commands.
 - CI checks the author and committer of every commit in a PR against the leak list, and fails on a match.
 - Commits carry no `Co-Authored-By` trailer for an AI assistant. That is the project's convention, stated in
-  `CONTRIBUTING.md` and `CLAUDE.md`.
+  `CONTRIBUTING.md` and `CLAUDE.md`, and the same CI check enforces it: a squash merge copies every commit message in
+  the PR into the commit on `main`, so one trailer in a PR would land there.
 
 ## 3. Compiler
 
