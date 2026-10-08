@@ -3,6 +3,7 @@ Package.swift
 Package.resolved
 README.md
 LICENSE
+server.json
 NOTICE
 CONTRIBUTING.md
 SECURITY.md

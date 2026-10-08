@@ -1,0 +1,33 @@
+{
+  "manifest_version": "0.3",
+  "name": "chauffeur",
+  "display_name": "chauffeur",
+  "version": "VERSION",
+  "description": "Drive the iOS Simulator from a coding agent, with every action verified.",
+  "long_description": "chauffeur reads the iOS Simulator's screen as a compact accessibility outline, taps and types through the simulator's HID, and verifies every action: changed, NO EFFECT, INTERCEPTED, NOT DELIVERED, UNVERIFIED, APP CRASHED or APP EXITED. Needs Apple silicon and Xcode 26 or 27 with a booted simulator.",
+  "author": { "name": "YashNaj", "url": "https://github.com/YashNaj" },
+  "repository": { "type": "git", "url": "https://github.com/YashNaj/chauffeur" },
+  "homepage": "https://github.com/YashNaj/chauffeur",
+  "documentation": "https://github.com/YashNaj/chauffeur#readme",
+  "license": "Apache-2.0",
+  "keywords": ["ios", "simulator", "xcode", "testing", "accessibility"],
+  "server": {
+    "type": "binary",
+    "entry_point": "server/chauffeur",
+    "mcp_config": {
+      "command": "${__dirname}/server/chauffeur",
+      "args": ["mcp"],
+      "env": {}
+    }
+  },
+  "tools": [
+    { "name": "snapshot", "description": "The screen as an outline with refs" },
+    { "name": "act", "description": "Tap, type, scroll, swipe or press a button, verified" },
+    { "name": "app", "description": "Install, launch, terminate or open a URL" },
+    { "name": "device", "description": "Appearance, location, permissions and push" },
+    { "name": "logs", "description": "The launched app's log and crash" },
+    { "name": "screenshot", "description": "A JPEG of the screen, 1 px = 1 pt" },
+    { "name": "doctor", "description": "Environment and input self-test" }
+  ],
+  "compatibility": { "platforms": ["darwin"] }
+}

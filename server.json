@@ -1,0 +1,16 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.YashNaj/chauffeur",
+  "title": "chauffeur",
+  "description": "Drive the iOS Simulator from a coding agent, with every action verified.",
+  "repository": { "url": "https://github.com/YashNaj/chauffeur", "source": "github" },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/YashNaj/chauffeur/releases/download/v0.1.0/chauffeur.mcpb",
+      "fileSha256": "0c64cea83a639c61c9accd28a2cd2d9d6c29ba082ff6e126d24e4d1c055870f5",
+      "transport": { "type": "stdio" }
+    }
+  ]
+}

@@ -30,7 +30,10 @@ chauffeur's tools or the device tools of Xcode 27's own MCP server (`xcrun mcpbr
 | False successes | 0 | 0 |
 
 [`docs/benchmark.md`](docs/benchmark.md) has the tasks, the per-task results and each failure, including chauffeur's.
-To see one task run both ways, watch [the race](docs/media/race.mp4).
+Here is one task (F4) run both ways with Sonnet: chauffeur on top, Xcode 27's MCP below. The two runs were recorded
+one after the other from the same start state, in real time. Watch the turn and cost counters.
+
+![The same task with chauffeur (top, 5 turns, $0.025) and Xcode 27's MCP (bottom, 14 turns, $0.206)](docs/media/race.gif)
 
 ## Quick start
 
@@ -108,13 +111,19 @@ Every action reports what it actually did, on its first line:
 
 ## Demos
 
-- [The race](docs/media/race.mp4): one task, chauffeur against Xcode 27's MCP, from the same start state.
-- [Crash detective](docs/media/crash.mp4): the agent taps Crash, reads `APP CRASHED` with the fatal line, fixes the
-  source, rebuilds and proves the fix.
-- [It won't lie to you](docs/media/honest.mp4): a disabled button gets `NO EFFECT`, and the agent says so.
-- [Accessibility audit](docs/a11y-audit.md): a prompt-only audit of Settings › General, checked by hand.
+**Crash detective.** The agent taps Crash and gets `APP CRASHED` with the fatal line. It fixes the source, rebuilds,
+reinstalls, and proves the button no longer crashes.
 
-All four are unedited runs, recorded with `demos/*.sh`.
+![Claude Code finds, fixes and verifies a crash with chauffeur](docs/media/crash.gif)
+
+The other demos:
+
+- **It won't lie to you:** the GIF at the top. A disabled button gets `NO EFFECT`, and the agent says so.
+- **The race:** under [Benchmark](#benchmark).
+- **[Accessibility audit](docs/a11y-audit.md):** a prompt-only audit of Settings › General, checked by hand.
+
+All of them are unedited runs, recorded with `demos/*.sh`. Full-quality MP4s, to download: [race](docs/media/race.mp4),
+[crash](docs/media/crash.mp4), [honest](docs/media/honest.mp4).
 
 ## Limits
 

@@ -20,13 +20,11 @@ func colour(_ kind: String, _ text: String) -> NSColor {
     if text.contains("NO EFFECT") || text.contains("UNVERIFIED") || text.contains("APP CRASHED") || text.contains("APP EXITED") { return .systemOrange }
     return NSColor(white: 0.75, alpha: 1)
 }
-for (i, r) in rows.enumerated() {
-    lines.append(((r[1] == "call" ? "› " : r[1] == "answer" ? "✓ " : "  ") + r[2], colour(r[1], r[2])))
+func frame(_ name: String, _ counters: String) throws {
     let image = NSImage(size: NSSize(width: w, height: h))
     image.lockFocus()
     NSColor(white: 0.08, alpha: 1).setFill(); NSRect(x: 0, y: 0, width: w, height: h).fill()
     (a[5] as NSString).draw(at: NSPoint(x: 24, y: h - 48), withAttributes: [.font: bold, .foregroundColor: NSColor.white])
-    let counters = "turns \(r[3])   tokens \(r[4])   $\(r[5])   \(r[0])s"
     (counters as NSString).draw(at: NSPoint(x: 24, y: h - 80), withAttributes: [.font: mono, .foregroundColor: NSColor.systemGreen])
     var y = h - 130
     for (text, c) in lines.suffix(12) {
@@ -36,12 +34,20 @@ for (i, r) in rows.enumerated() {
         y -= 60
     }
     image.unlockFocus()
-    let name = String(format: "%04d.png", i + 1)
     let rep = NSBitmapImageRep(data: image.tiffRepresentation!)!
     try rep.representation(using: .png, properties: [:])!.write(to: out.appendingPathComponent(name))
+}
+// Each frame starts at its event's time, so the panel stays in step with the recording: an empty frame covers the
+// agent's start-up, and same-instant events get a sliver each instead of pushing everything after them later.
+try frame("0000.png", "turns 0   tokens 0   $0.000   0s")
+concat += "file '0000.png'\nduration \(max(0.01, Double(rows.first?[0] ?? "0") ?? 0))\n"
+for (i, r) in rows.enumerated() {
+    lines.append(((r[1] == "call" ? "› " : r[1] == "answer" ? "✓ " : "  ") + r[2], colour(r[1], r[2])))
+    let name = String(format: "%04d.png", i + 1)
+    try frame(name, "turns \(r[3])   tokens \(r[4])   $\(r[5])   \(r[0])s")
     let now = Double(r[0]) ?? 0
     let next = i + 1 < rows.count ? (Double(rows[i + 1][0]) ?? now) : now + 4
-    concat += "file '\(name)'\nduration \(max(0.1, next - now))\n"
+    concat += "file '\(name)'\nduration \(max(0.01, next - now))\n"
 }
-if !rows.isEmpty { concat += "file '\(String(format: "%04d.png", rows.count))'\n" }
+concat += "file '\(String(format: "%04d.png", rows.count))'\n"
 try concat.write(to: out.appendingPathComponent("frames.txt"), atomically: true, encoding: .utf8)
