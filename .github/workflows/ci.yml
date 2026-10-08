@@ -1,26 +1,30 @@
 name: ci
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
 jobs:
   build-test:
+    name: build-test (Xcode ${{ matrix.xcode }})
     runs-on: macos-26
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        xcode: ["26"]
     steps:
       - uses: actions/checkout@v4
-      - name: Select the newest Xcode
+        with:
+          fetch-depth: 0
+      - name: Select Xcode ${{ matrix.xcode }}
         run: |
-          X=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          ls -d /Applications/Xcode*.app
+          X=$(ls -d /Applications/Xcode_${{ matrix.xcode }}*.app 2>/dev/null | sort -V | tail -1)
+          [ -n "$X" ] || { echo "::error::no Xcode ${{ matrix.xcode }} on this runner image"; exit 1; }
           sudo xcode-select -s "$X/Contents/Developer"; xcodebuild -version
-      - name: Leak check
-        run: scripts/check-public.sh .
-      - name: Allowlist and leak-check tests
-        run: bash scripts/tests/test-public.sh
-      - name: Build
-        run: swift build -c release
-      - name: Unit tests
-        run: swift test
-      - name: Benchmark verifier tests
-        run: python3 -I dogfood/test_verify.py
-      - name: README numbers match the benchmark
-        run: python3 -I scripts/check-readme-numbers.py README.md docs/benchmark.md && python3 -I scripts/tests/test_readme_numbers.py
-      - name: Demo tooling tests
-        run: python3 -I demos/lib/test_events.py
+      - name: Commits (no personal email, no AI co-author trailer)
+        if: github.event_name == 'pull_request'
+        run: scripts/check-commits.sh "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+      - name: Check
+        run: scripts/check.sh
