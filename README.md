@@ -4,10 +4,19 @@ Let your coding agent drive the iOS Simulator, and tell it the truth about what 
 
 ![chauffeur reporting NO EFFECT on a disabled button](docs/media/honest.gif)
 
+Coding agents can write your iOS app, but they can't tell whether it works. Point one at the Simulator and it will tap
+a disabled button, then report "Done, I submitted the form." Nothing happened, and the agent has no way of knowing.
+
+chauffeur fixes that. It hands the agent the screen as an outline it can reason about, taps through the simulator's
+own input system, and verifies every action against what actually changed. A tap that did nothing comes back as
+`NO EFFECT`. A tap an alert swallowed comes back as `INTERCEPTED`. A crash comes back as `APP CRASHED`, with the line
+that caused it. Your agent stops guessing and starts knowing.
+
 ## Benchmark
 
-There were 15 Simulator tasks, each run 3 times. The agent was Claude Code with Sonnet or Opus. It had either
-chauffeur's tools or the device tools of Xcode 27's own MCP server (`xcrun mcpbridge`), and nothing else.
+Xcode 27 ships its own MCP server for driving the Simulator, so I put the two head to head. I ran 15 tasks, 3 times
+each, with Claude Code on Sonnet and on Opus, giving the agent either chauffeur's tools or Xcode's (`xcrun mcpbridge`)
+and nothing else. That's 180 runs.
 
 **Sonnet**
 
@@ -29,9 +38,11 @@ chauffeur's tools or the device tools of Xcode 27's own MCP server (`xcrun mcpbr
 | Median wall time | 20 s | 38 s |
 | False successes | 0 | 0 |
 
-[`docs/benchmark.md`](docs/benchmark.md) has the tasks, the per-task results and each failure, including chauffeur's.
-Here is one task (F4) run both ways with Sonnet: chauffeur on top, Xcode 27's MCP below. The two runs were recorded
-one after the other from the same start state, in real time. Watch the turn and cost counters.
+With Opus, chauffeur verified every task. On both models it took less than half the turns, at a sixth to a seventh of
+the cost. Xcode couldn't answer any of the crash or log tasks; chauffeur answered all of them. I scored strictly, even
+against chauffeur, and every run is written up in [`docs/benchmark.md`](docs/benchmark.md).
+
+The same task, both ways, in real time. chauffeur is on top.
 
 ![The same task with chauffeur (top, 5 turns, $0.025) and Xcode 27's MCP (bottom, 14 turns, $0.206)](docs/media/race.gif)
 
