@@ -52,7 +52,8 @@ extension Snapshot {
 /// Line diff between two snapshots' bodies (spec §5.4).
 public enum Diff {
     public static func lines(from old: Snapshot, to new: Snapshot, limit: Int = 12) -> [String] {
-        let a = old.bodyLines(all: false), b = new.bodyLines(all: false)
+        let a = old.bodyLines(all: false)
+        let b = new.bodyLines(all: false)
         var lcs = Array(repeating: Array(repeating: 0, count: b.count + 1), count: a.count + 1)
         for i in stride(from: a.count - 1, through: 0, by: -1) {
             for j in stride(from: b.count - 1, through: 0, by: -1) {
@@ -60,11 +61,19 @@ public enum Diff {
             }
         }
         var out: [String] = []
-        var i = 0, j = 0
+        var i = 0
+        var j = 0
         while i < a.count || j < b.count {
-            if i < a.count, j < b.count, a[i] == b[j] { i += 1; j += 1 }
-            else if j < b.count, i == a.count || lcs[i][j + 1] > lcs[i + 1][j] { out.append("+ " + b[j]); j += 1 }
-            else { out.append("- " + a[i]); i += 1 }
+            if i < a.count, j < b.count, a[i] == b[j] {
+                i += 1
+                j += 1
+            } else if j < b.count, i == a.count || lcs[i][j + 1] > lcs[i + 1][j] {
+                out.append("+ " + b[j])
+                j += 1
+            } else {
+                out.append("- " + a[i])
+                i += 1
+            }
         }
         guard out.count > limit else { return out }
         // Cut: what appeared matters more than what went away, so additions go first.

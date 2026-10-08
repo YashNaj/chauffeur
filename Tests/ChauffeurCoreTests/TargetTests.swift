@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite struct TargetTests {
@@ -16,12 +17,18 @@ import Testing
 
     @Test func namesPreferTheBootedMatch() throws {
         #expect(try Target.match("iPhone 17 Pro", in: [a, b, c]).udid == "AAAA-1")
-        #expect(throws: ChauffeurError.self) { try Target.match("iPhone 17 Pro", in: [c, DeviceInfo(udid: "D", name: "iPhone 17 Pro", runtime: "iOS 26.2", state: "Shutdown")]) }
+        #expect(throws: ChauffeurError.self) {
+            try Target.match(
+                "iPhone 17 Pro",
+                in: [c, DeviceInfo(udid: "D", name: "iPhone 17 Pro", runtime: "iOS 26.2", state: "Shutdown")])
+        }
         #expect(throws: ChauffeurError.self) { try Target.match("Pixel", in: [a]) }
     }
 
     @Test func noneOrSeveralBooted() {
-        #expect(throws: ChauffeurError.noBootedSimulator) { try Target.resolve(flag: nil, env: nil, configUDID: nil, devices: [b]) }
+        #expect(throws: ChauffeurError.noBootedSimulator) {
+            try Target.resolve(flag: nil, env: nil, configUDID: nil, devices: [b])
+        }
         let a2 = DeviceInfo(udid: "EEEE-5", name: "iPad", runtime: "iOS 26.2", state: "Booted")
         #expect(throws: ChauffeurError.severalBooted([a.summary, a2.summary])) {
             try Target.resolve(flag: nil, env: nil, configUDID: nil, devices: [a, a2])
@@ -29,7 +36,8 @@ import Testing
     }
 
     @Test func configIsFoundFromSubdirectories() throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("chauffeur-target-\(UUID().uuidString)")
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "chauffeur-target-\(UUID().uuidString)")
         let sub = root.appendingPathComponent("a/b")
         try FileManager.default.createDirectory(at: sub, withIntermediateDirectories: true)
         try Target.writeConfig(udid: "BBBB-2", in: root)

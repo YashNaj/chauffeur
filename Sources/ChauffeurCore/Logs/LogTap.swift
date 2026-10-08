@@ -11,7 +11,10 @@ public struct LogLine: Equatable, Sendable {
     public var sender: String?
 
     public init(time: String, level: String, message: String, sender: String? = nil) {
-        self.time = time; self.level = level; self.message = message; self.sender = sender
+        self.time = time
+        self.level = level
+        self.message = message
+        self.sender = sender
     }
 
     public var isError: Bool { level == "error" || level == "fault" }
@@ -21,7 +24,9 @@ public struct LogLine: Equatable, Sendable {
         "\(time) [\(level)] " + (sender.map { "(\($0)) " } ?? "") + Perception.quote(message, limit: limit)
     }
 
-    public var json: JSON { ["time": .string(time), "level": .string(level), "message": .string(message), "sender": JSON(sender)] }
+    public var json: JSON {
+        ["time": .string(time), "level": .string(level), "message": .string(message), "sender": JSON(sender)]
+    }
 
     /// What an action result shows (spec §5.4): up to `limit` error/fault lines, the app's own before frameworks',
     /// the rest counted. `[]` when there are none.
@@ -47,7 +52,8 @@ public enum LogParser {
         guard (o["eventType"] as? String) == "logEvent", let message = o["eventMessage"] as? String else { return nil }
         let level = ((o["messageType"] as? String) ?? "default").lowercased()
         let bounded = message.unicodeScalars.count > 4000 ? String(message.unicodeScalars.prefix(4000)) : message
-        return LogLine(time: clock((o["timestamp"] as? String) ?? ""), level: level, message: bounded, sender: sender(o))
+        return LogLine(
+            time: clock((o["timestamp"] as? String) ?? ""), level: level, message: bounded, sender: sender(o))
     }
 
     /// `2026-10-06 22:24:53.430443-0700` → `22:24:53.430`.
@@ -60,7 +66,8 @@ public enum LogParser {
     static func sender(_ o: [String: Any]) -> String? {
         guard let senderPath = o["senderImagePath"] as? String, !senderPath.isEmpty else { return nil }
         if let processPath = o["processImagePath"] as? String,
-           senderPath.hasPrefix((processPath as NSString).deletingLastPathComponent + "/") {
+            senderPath.hasPrefix((processPath as NSString).deletingLastPathComponent + "/")
+        {
             return nil
         }
         return (senderPath as NSString).lastPathComponent
@@ -128,8 +135,13 @@ public final class LogTap: @unchecked Sendable {
     public func start(executable: String) -> Bool {
         if executable == self.executable { return true }
         stop()
-        let s = LogStream(udid: udid, arguments: ["--level", "info", "--style", "ndjson", "--predicate",
-                                                   Self.predicate(process: executable)]) { [weak self] object in
+        let s = LogStream(
+            udid: udid,
+            arguments: [
+                "--level", "info", "--style", "ndjson", "--predicate",
+                Self.predicate(process: executable),
+            ]
+        ) { [weak self] object in
             guard let line = LogParser.parse(object) else { return }
             self?.append(line)
         }
@@ -142,7 +154,10 @@ public final class LogTap: @unchecked Sendable {
     }
 
     public func stop() {
-        let s = lock.withLock { () -> LogStream? in defer { stream = nil }; return stream }
+        let s = lock.withLock { () -> LogStream? in
+            defer { stream = nil }
+            return stream
+        }
         s?.stop()
     }
 

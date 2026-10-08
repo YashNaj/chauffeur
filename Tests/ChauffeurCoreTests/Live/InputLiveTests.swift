@@ -1,6 +1,7 @@
 import ChauffeurBridge
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite(.enabled(if: Live.enabled), .serialized)
@@ -15,10 +16,12 @@ import Testing
         let home = try #require(waitForTree(ax) { element($0, "Show alert") != nil })
         let button = try #require(element(home, "Show alert"))
         #expect(Gestures.tap(transport, at: button.frame.center, screen: device.size))
-        _ = try #require(waitForTree(ax, timeout: 3) { element($0, "Fixture alert") != nil }, "\(transport.name) tap did not land")
+        _ = try #require(
+            waitForTree(ax, timeout: 3) { element($0, "Fixture alert") != nil }, "\(transport.name) tap did not land")
         // A just-presented alert drops touches for a few hundred ms even after its tree settles (measured
         // on iOS 26.2: tapping at settle+0 fails, settle+200 ms succeeds). Settle, then wait out that window.
-        let settled = Settle.wait(minMs: 150, capMs: 2000, clock: SystemClock()) { () -> (value: AXElement, hash: Int)? in
+        let settled = Settle.wait(minMs: 150, capMs: 2000, clock: SystemClock()) {
+            () -> (value: AXElement, hash: Int)? in
             ax.read().map { ($0, $0.hashValue) }
         }
         usleep(400_000)
@@ -50,7 +53,9 @@ import Testing
         #expect(Gestures.tap(digitizer, at: email.frame.center, screen: device.size))
         usleep(300_000)
         #expect(Keyboard(hid: hid).type("Ab@1.test_X"))
-        let typed = waitForTree(ax, timeout: 3) { $0.all.contains { $0.identifier == "email" && $0.value == "Ab@1.test_X" } }
+        let typed = waitForTree(ax, timeout: 3) {
+            $0.all.contains { $0.identifier == "email" && $0.value == "Ab@1.test_X" }
+        }
         #expect(typed != nil)
     }
 }

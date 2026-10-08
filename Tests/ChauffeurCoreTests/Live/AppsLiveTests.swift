@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite(.enabled(if: Live.enabled), .serialized)
@@ -9,10 +10,13 @@ import Testing
         let s = Session(udid: Live.udid!)
         defer { s.shutdown() }
         let installed = s.run(["install", app])
-        #expect(installed.exit == 0 && installed.text.contains("→ installed dev.chauffeur.fixture 0.1 (1)"), "\(installed.text)")
+        #expect(
+            installed.exit == 0 && installed.text.contains("→ installed dev.chauffeur.fixture 0.1 (1)"),
+            "\(installed.text)")
 
         let first = s.run(["launch", "dev.chauffeur.fixture"])
-        #expect(first.exit == 0 && first.text.hasPrefix("launch dev.chauffeur.fixture → running (pid "), "\(first.text)")
+        #expect(
+            first.exit == 0 && first.text.hasPrefix("launch dev.chauffeur.fixture → running (pid "), "\(first.text)")
         #expect(first.text.contains("\napp \"Fixture\""), "\(first.text)")
         let pid = try #require(s.app?.pid)
         #expect(s.logTap.executable == "Fixture")
@@ -22,9 +26,12 @@ import Testing
         #expect(s.app?.pid != pid && !Proc.isAlive(pid), "a relaunch must start a fresh process")
 
         let stopped = s.run(["terminate", "dev.chauffeur.fixture"])
-        #expect(stopped.exit == 0 && stopped.text.hasPrefix("terminate dev.chauffeur.fixture → stopped (pid "), "\(stopped.text)")
+        #expect(
+            stopped.exit == 0 && stopped.text.hasPrefix("terminate dev.chauffeur.fixture → stopped (pid "),
+            "\(stopped.text)")
         #expect(s.app == nil)
-        #expect(s.run(["terminate", "dev.chauffeur.fixture"]).text == "terminate dev.chauffeur.fixture → was not running")
+        #expect(
+            s.run(["terminate", "dev.chauffeur.fixture"]).text == "terminate dev.chauffeur.fixture → was not running")
 
         let missing = s.run(["launch", "com.does.not.exist"])
         #expect(missing.exit == 1 && missing.text.hasPrefix("com.does.not.exist is not installed"), "\(missing.text)")
@@ -67,8 +74,9 @@ import Testing
             _ = s.run(["wait", "Fixture", "--timeout", "5"])
             found = s.run(["find", "button:Fixture"])
         }
-        let ref = try #require(found.text.firstMatch(of: /\[(e\d+)\]/).map { String($0.1) },
-                               "\(found.text)\n\(s.run(["snapshot"]).text)")
+        let ref = try #require(
+            found.text.firstMatch(of: /\[(e\d+)\]/).map { String($0.1) },
+            "\(found.text)\n\(s.run(["snapshot"]).text)")
         _ = s.run(["tap", ref])
         let shown = s.run(["wait", "Show alert", "--timeout", "15"])
         #expect(shown.exit == 0, "\(shown.text)")

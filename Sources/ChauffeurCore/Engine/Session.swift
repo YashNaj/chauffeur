@@ -66,7 +66,8 @@ public final class Session {
         logTap = LogTap(udid: udid)
         simulatorBooted = { SimBoot.booted(udid: udid) }
         simulatorBootDate = { SimBoot.date(udid: udid) }
-        findCrashReport = { app in CrashFinder.find(bundle: app.bundle, pid: app.pid, udid: udid, since: app.launchedAt) }
+        findCrashReport = { app in CrashFinder.find(bundle: app.bundle, pid: app.pid, udid: udid, since: app.launchedAt)
+        }
         // A restarted daemon (upgrade, idle exit) keeps following an app that is still running.
         if let saved = TrackedApp.load(StatePaths.app(udid)) {
             if Proc.isAlive(saved.pid) { app = saved } else { TrackedApp.clear(StatePaths.app(udid)) }
@@ -116,7 +117,10 @@ public final class Session {
     /// launched app and its log stream must stay as they are.
     func drop() {
         touchLog.stop()
-        device = nil; ax = nil; hid = nil; transports = []
+        device = nil
+        ax = nil
+        hid = nil
+        transports = []
     }
 
     /// Polls the raw tree until it settles, completes it (bar sweep) and publishes a snapshot.
@@ -132,8 +136,9 @@ public final class Session {
         }
         if result.value == nil {
             let now = clock.nowMs()
-            let since = AXHealth.episodeStart(current: noTreeSinceMs, lastFailureMs: lastNoTreeMs,
-                                               attemptStartedMs: started, nowMs: now)
+            let since = AXHealth.episodeStart(
+                current: noTreeSinceMs, lastFailureMs: lastNoTreeMs,
+                attemptStartedMs: started, nowMs: now)
             noTreeSinceMs = since
             lastNoTreeMs = now
             let plan = heal(noTreeForMs: now - since, ax: ax, screen: device.size)
@@ -146,18 +151,24 @@ public final class Session {
         }
         guard let root = result.value else { throw ChauffeurError.noTree }
         noTreeSinceMs = nil
-        guard Geometry.orientation(root: root.frame, screen: device.size) == .portrait else { throw ChauffeurError.landscape }
+        guard Geometry.orientation(root: root.frame, screen: device.size) == .portrait else {
+            throw ChauffeurError.landscape
+        }
         return (publish(ax.complete(root), size: device.size), result)
     }
 
     /// Diagnoses a missing tree and applies the cure: flags back on, and a poisoned bridge restarted (at most once a minute).
     func heal(noTreeForMs: Int, ax: AXProvider, screen: Size) -> AXHealth.Plan {
-        guard noTreeForMs >= AXHealth.patienceMs else { return AXHealth.Plan(enableFlags: [], restartBridge: false, relaunchApp: false) }
-        let flagsOff = (try? SimCtl.run(["spawn", udid, "defaults", "read", AXSettings.domain]).out).map(AXSettings.off) ?? []
+        guard noTreeForMs >= AXHealth.patienceMs else {
+            return AXHealth.Plan(enableFlags: [], restartBridge: false, relaunchApp: false)
+        }
+        let flagsOff =
+            (try? SimCtl.run(["spawn", udid, "defaults", "read", AXSettings.domain]).out).map(AXSettings.off) ?? []
         let probe = ax.probe(center: Point(x: screen.w / 2, y: screen.h / 2))
-        let plan = AXHealth.plan(noTreeForMs: noTreeForMs, frontmostIsEmptyApp: probe.frontmostIsEmptyApp,
-                                 screenAnswers: probe.screenAnswers, flagsOff: flagsOff,
-                                 msSinceBridgeRestart: bridgeRestartedMs.map { clock.nowMs() - $0 })
+        let plan = AXHealth.plan(
+            noTreeForMs: noTreeForMs, frontmostIsEmptyApp: probe.frontmostIsEmptyApp,
+            screenAnswers: probe.screenAnswers, flagsOff: flagsOff,
+            msSinceBridgeRestart: bridgeRestartedMs.map { clock.nowMs() - $0 })
         if !plan.enableFlags.isEmpty { _ = try? ensureAccessibility() }
         if plan.restartBridge { _ = restartBridge() }
         return plan
@@ -181,7 +192,10 @@ public final class Session {
     /// rev increases only when what the agent can see changed.
     private func publish(_ root: AXElement, size: Size) -> Snapshot {
         var snap = Perception.build(root: root, size: size, previous: last?.kind, refs: &refs, rev: rev)
-        if snap.hash != last?.hash { rev += 1; lastChangeMs = clock.nowMs() }
+        if snap.hash != last?.hash {
+            rev += 1
+            lastChangeMs = clock.nowMs()
+        }
         snap.rev = rev
         last = snap
         return snap
@@ -214,18 +228,27 @@ public final class Session {
         // A crash since the previous command must be noticed before this command can stop following the app
         // (launch, install, terminate and permission changes all do) and so hide it.
         let noticed = Self.watched.contains(command) ? detectCrash() : nil
-        var output = guarded { commandHook?(command); return try dispatch(command, Array(argv.dropFirst())) }
-        if Self.watched.contains(command) { output = annotate(output, since: cursor, logs: Self.logged.contains(command), actionCursor: previousActionCursor, noticed: noticed) }
-        if command != "do" { record(traceArgs ?? argv, output, ms: clock.nowMs() - started) }  // a batch traces its commands
+        var output = guarded {
+            commandHook?(command)
+            return try dispatch(command, Array(argv.dropFirst()))
+        }
+        if Self.watched.contains(command) {
+            output = annotate(
+                output, since: cursor, logs: Self.logged.contains(command), actionCursor: previousActionCursor,
+                noticed: noticed)
+        }
+        // a batch traces its commands
+        if command != "do" { record(traceArgs ?? argv, output, ms: clock.nowMs() - started) }
         return output
     }
 
     /// Appends the command to the trace when this session keeps one.
     func record(_ args: [String], _ output: Output, ms: Int) {
         guard let traceFile else { return }
-        let entry = TraceEntry(time: Trace.timestamp(Date()), udid: udid, args: args, exit: output.exit, ms: ms,
-                               result: String(output.text.prefix { $0 != "\n" }), target: traceTarget.map(TraceTarget.init),
-                               app: app?.bundle ?? crash?.app.bundle)
+        let entry = TraceEntry(
+            time: Trace.timestamp(Date()), udid: udid, args: args, exit: output.exit, ms: ms,
+            result: String(output.text.prefix { $0 != "\n" }), target: traceTarget.map(TraceTarget.init),
+            app: app?.bundle ?? crash?.app.bundle)
         Trace.append(entry, to: traceFile)
     }
 
@@ -278,13 +301,16 @@ public final class Session {
     }
 
     func snapshotCommand(_ argv: [String]) throws -> Output {
-        let a = try Args(argv, flags: ["--all", "--screenshot"], usage: "usage: chauffeur snapshot [--all] [--screenshot]")
+        let a = try Args(
+            argv, flags: ["--all", "--screenshot"], usage: "usage: chauffeur snapshot [--all] [--screenshot]")
         try a.done()
         let snap = try observe(minMs: 0, capMs: 1500).snapshot
         let text = snap.render(all: a.flag("--all"))
         guard a.flag("--screenshot"), let device else { return Output(text, data: snap.json(all: a.flag("--all"))) }
         let shot = try capture(screen: device.size, zoom: nil)
-        return Output(text + "\nscreenshot → " + shot.line, data: snap.json(all: a.flag("--all")).merging(["screenshot": shot.json]))
+        return Output(
+            text + "\nscreenshot → " + shot.line,
+            data: snap.json(all: a.flag("--all")).merging(["screenshot": shot.json]))
     }
 
     func findCommand(_ argv: [String]) throws -> Output {
@@ -293,11 +319,13 @@ public final class Session {
         let snap = try observe(minMs: 0, capMs: 1500).snapshot
         let hits = snap.find(query)
         guard !hits.isEmpty else {
-            return Output("no match for \(Perception.quote(query)) on: \(snap.header)\nrun snapshot to see the screen", exit: 4,
-                          data: ["matches": [], "screen": .string(snap.header)])
+            return Output(
+                "no match for \(Perception.quote(query)) on: \(snap.header)\nrun snapshot to see the screen", exit: 4,
+                data: ["matches": [], "screen": .string(snap.header)])
         }
-        return Output(hits.map { snap.line($0, all: false).trimmingCharacters(in: .whitespaces) }.joined(separator: "\n"),
-                      data: ["matches": .array(hits.map { $0.json(all: false) })])
+        return Output(
+            hits.map { snap.line($0, all: false).trimmingCharacters(in: .whitespaces) }.joined(separator: "\n"),
+            data: ["matches": .array(hits.map { $0.json(all: false) })])
     }
 
     /// Waits stay below the client's reply timeout, so a long wait can't look like a dead daemon (C1).
@@ -307,8 +335,9 @@ public final class Session {
     }
 
     func waitCommand(_ argv: [String]) throws -> Output {
-        var a = try Args(argv, flags: ["--gone"], options: ["--timeout"],
-                         usage: "usage: chauffeur wait \"<query>\" [--gone] [--timeout <s>]")
+        var a = try Args(
+            argv, flags: ["--gone"], options: ["--timeout"],
+            usage: "usage: chauffeur wait \"<query>\" [--gone] [--timeout <s>]")
         let gone = a.flag("--gone")
         let timeout = Self.waitTimeout(try a.number("--timeout", in: 0...86_400))
         guard let query = a.text() else { throw ChauffeurError.usage(a.usage) }
@@ -320,18 +349,27 @@ public final class Session {
                 lastHeader = snap.header
                 let hits = snap.find(query)
                 let elapsed = clock.nowMs() - start
-                if gone && hits.isEmpty { return Output("gone after \(elapsed)ms", data: ["gone": true, "elapsedMs": JSON(elapsed)]) }
+                if gone && hits.isEmpty {
+                    return Output("gone after \(elapsed)ms", data: ["gone": true, "elapsedMs": JSON(elapsed)])
+                }
                 if !gone && !hits.isEmpty {
-                    return Output("found after \(elapsed)ms\n" + hits.map { snap.line($0, all: false).trimmingCharacters(in: .whitespaces) }.joined(separator: "\n"),
-                                  data: ["found": true, "elapsedMs": JSON(elapsed), "matches": .array(hits.map { $0.json(all: false) })])
+                    return Output(
+                        "found after \(elapsed)ms\n"
+                            + hits.map { snap.line($0, all: false).trimmingCharacters(in: .whitespaces) }.joined(
+                                separator: "\n"),
+                        data: [
+                            "found": true, "elapsedMs": JSON(elapsed),
+                            "matches": .array(hits.map { $0.json(all: false) }),
+                        ])
                 }
             } catch ChauffeurError.noTree, ChauffeurError.blind {
                 // app still launching; keep waiting
             }
             if Double(clock.nowMs() - start) >= timeout * 1000 {
-                return Output((gone ? "still present" : "not found") + " after \(Geometry.fmt(timeout))s: "
-                              + Perception.quote(query) + "\nscreen: " + lastHeader, exit: 4,
-                              data: [gone ? "gone" : "found": false, "screen": .string(lastHeader)])
+                return Output(
+                    (gone ? "still present" : "not found") + " after \(Geometry.fmt(timeout))s: "
+                        + Perception.quote(query) + "\nscreen: " + lastHeader, exit: 4,
+                    data: [gone ? "gone" : "found": false, "screen": .string(lastHeader)])
             }
             clock.sleep(ms: 100)
         }

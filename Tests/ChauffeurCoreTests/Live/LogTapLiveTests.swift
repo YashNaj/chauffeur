@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite(.enabled(if: Live.enabled), .serialized)
@@ -15,7 +16,9 @@ import Testing
         let cursor = tap.cursor
         #expect(s.run(["tap", try ref(s, "Show alert")]).exit == 0)
         let deadline = Date().addingTimeInterval(3)
-        while Date() < deadline, !tap.since(cursor).contains(where: { $0.message == "fixture: show alert" }) { usleep(100_000) }
+        while Date() < deadline, !tap.since(cursor).contains(where: { $0.message == "fixture: show alert" }) {
+            usleep(100_000)
+        }
         let line = try #require(tap.since(cursor).first { $0.message == "fixture: show alert" }, "\(tap.since(cursor))")
         #expect(line.level == "info" && line.sender == nil)
         #expect(s.run(["tap", try ref(s, "button:OK")]).exit == 0)

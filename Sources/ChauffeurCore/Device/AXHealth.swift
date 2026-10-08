@@ -18,8 +18,10 @@ public enum AXHealth {
     ///   as when it started while app accessibility was off).
     /// - screenAnswers: a hit-test at the screen's centre returns an element. A poisoned bridge still answers it while
     ///   frontmost returns nothing; an app that is still launching has nothing there yet.
-    public static func plan(noTreeForMs: Int, frontmostIsEmptyApp: Bool, screenAnswers: Bool, flagsOff: [String],
-                            msSinceBridgeRestart: Int?) -> Plan {
+    public static func plan(
+        noTreeForMs: Int, frontmostIsEmptyApp: Bool, screenAnswers: Bool, flagsOff: [String],
+        msSinceBridgeRestart: Int?
+    ) -> Plan {
         guard noTreeForMs >= patienceMs else { return Plan(enableFlags: [], restartBridge: false, relaunchApp: false) }
         let relaunch = frontmostIsEmptyApp || !flagsOff.isEmpty
         let restart = !relaunch && screenAnswers && (msSinceBridgeRestart.map { $0 >= restartEveryMs } ?? true)
@@ -35,15 +37,19 @@ public enum AXHealth {
 
     public static func message(_ plan: Plan, recovered: Bool) -> String {
         if plan.restartBridge {
-            return recovered ? "the simulator's accessibility bridge had stopped answering; chauffeur restarted it"
+            return recovered
+                ? "the simulator's accessibility bridge had stopped answering; chauffeur restarted it"
                 : "no accessibility tree even after restarting the simulator's accessibility bridge. Run: chauffeur doctor"
         }
         if plan.relaunchApp {
-            let flags = plan.enableFlags.isEmpty ? ""
+            let flags =
+                plan.enableFlags.isEmpty
+                ? ""
                 : " App accessibility was off (\(plan.enableFlags.joined(separator: ", ")), as an Xcode device session leaves it); chauffeur turned it back on."
             return "the app in front shows no accessibility tree. If it has finished launching, it started while app "
                 + "accessibility was off." + flags + " relaunch it: chauffeur launch <bundle>"
         }
-        return "no accessibility tree yet (app still launching, or nothing in the foreground). Retry, or run: chauffeur doctor"
+        return
+            "no accessibility tree yet (app still launching, or nothing in the foreground). Retry, or run: chauffeur doctor"
     }
 }

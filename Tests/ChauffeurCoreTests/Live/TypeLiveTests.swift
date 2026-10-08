@@ -1,12 +1,14 @@
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite(.enabled(if: Live.enabled), .serialized)
 @MainActor struct TypeLiveTests {
     @Test func formFlow() throws {
         try Live.launchFixture()
-        let s = Session(udid: Live.udid!); defer { s.shutdown() }
+        let s = Session(udid: Live.udid!)
+        defer { s.shutdown() }
         #expect(s.run(["wait", "Show alert", "--timeout", "15"]).exit == 0)
         #expect(s.run(["tap", try ref(s, "tab:Form")]).exit == 0)
 
@@ -38,7 +40,8 @@ import Testing
         #expect(s.run(["wait", "Show alert", "--timeout", "15"]).exit == 0)
         let form = s.run(["tap", try ref(s, "tab:Form")])
         #expect(form.exit == 0, "\(form.text)")
-        let email = try ref(s, "textfield:email"), agree = try ref(s, "switch:Agree")
+        let email = try ref(s, "textfield:email")
+        let agree = try ref(s, "switch:Agree")
         let r = s.run(["do", "type \(email) \"dogfood@example.com\"; tap \(agree)"])
         #expect(r.text.contains("value=off") && r.text.contains("value=on"), "\(r.text)")
     }

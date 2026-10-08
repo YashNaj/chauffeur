@@ -16,13 +16,19 @@ public enum Chauffeur {
 public struct Point: Equatable, Hashable, Sendable {
     public var x: Double
     public var y: Double
-    public init(x: Double, y: Double) { self.x = x; self.y = y }
+    public init(x: Double, y: Double) {
+        self.x = x
+        self.y = y
+    }
 }
 
 public struct Size: Equatable, Hashable, Sendable {
     public var w: Double
     public var h: Double
-    public init(w: Double, h: Double) { self.w = w; self.h = h }
+    public init(w: Double, h: Double) {
+        self.w = w
+        self.h = h
+    }
 }
 
 /// A frame in points. Encodes as `[x, y, w, h]`, the format of the M0 fixtures.
@@ -32,7 +38,12 @@ public struct Rect: Equatable, Hashable, Sendable, Codable {
     public var w: Double
     public var h: Double
 
-    public init(x: Double, y: Double, w: Double, h: Double) { self.x = x; self.y = y; self.w = w; self.h = h }
+    public init(x: Double, y: Double, w: Double, h: Double) {
+        self.x = x
+        self.y = y
+        self.w = w
+        self.h = h
+    }
 
     public var maxX: Double { x + w }
     public var maxY: Double { y + h }
@@ -44,13 +55,17 @@ public struct Rect: Equatable, Hashable, Sendable, Codable {
 
     public init(from decoder: any Decoder) throws {
         var c = try decoder.unkeyedContainer()
-        self.init(x: try c.decode(Double.self), y: try c.decode(Double.self),
-                  w: try c.decode(Double.self), h: try c.decode(Double.self))
+        self.init(
+            x: try c.decode(Double.self), y: try c.decode(Double.self),
+            w: try c.decode(Double.self), h: try c.decode(Double.self))
     }
 
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.unkeyedContainer()
-        try c.encode(x); try c.encode(y); try c.encode(w); try c.encode(h)
+        try c.encode(x)
+        try c.encode(y)
+        try c.encode(w)
+        try c.encode(h)
     }
 }
 
@@ -68,12 +83,22 @@ public struct AXElement: Codable, Hashable, Sendable {
     public var frame: Rect
     public var children: [AXElement]
 
-    public init(role: String, subrole: String? = nil, label: String? = nil, value: String? = nil,
-                identifier: String? = nil, title: String? = nil, placeholder: String? = nil,
-                enabled: Bool = true, hidden: Bool = false, frame: Rect, children: [AXElement] = []) {
-        self.role = role; self.subrole = subrole; self.label = label; self.value = value
-        self.identifier = identifier; self.title = title; self.placeholder = placeholder
-        self.enabled = enabled; self.hidden = hidden; self.frame = frame; self.children = children
+    public init(
+        role: String, subrole: String? = nil, label: String? = nil, value: String? = nil,
+        identifier: String? = nil, title: String? = nil, placeholder: String? = nil,
+        enabled: Bool = true, hidden: Bool = false, frame: Rect, children: [AXElement] = []
+    ) {
+        self.role = role
+        self.subrole = subrole
+        self.label = label
+        self.value = value
+        self.identifier = identifier
+        self.title = title
+        self.placeholder = placeholder
+        self.enabled = enabled
+        self.hidden = hidden
+        self.frame = frame
+        self.children = children
     }
 
     /// This element and all descendants, depth first.

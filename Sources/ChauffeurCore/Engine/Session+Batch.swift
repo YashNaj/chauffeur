@@ -15,12 +15,14 @@ extension Session {
         let commands = try Batch.parse(script)
         guard !commands.isEmpty else { throw ChauffeurError.usage("the do script has no commands\n" + a.usage) }
         guard commands.count <= Batch.maxCommands else {
-            throw ChauffeurError.usage("a do script runs at most \(Batch.maxCommands) commands; this one has \(commands.count)")
+            throw ChauffeurError.usage(
+                "a do script runs at most \(Batch.maxCommands) commands; this one has \(commands.count)")
         }
         // Check every name first, so a typo in the third command does not leave the first two done.
         for command in commands where !Self.batchable.contains(command[0]) {
-            throw ChauffeurError.usage("\(Perception.quote(command[0])) cannot run inside do; it runs: "
-                                       + Self.batchable.sorted().joined(separator: ", "))
+            throw ChauffeurError.usage(
+                "\(Perception.quote(command[0])) cannot run inside do; it runs: "
+                    + Self.batchable.sorted().joined(separator: ", "))
         }
         let start = clock.nowMs()
         var parts: [String] = []
@@ -36,7 +38,10 @@ extension Session {
             }
             let out = runOne(command)
             parts.append(tag + " " + out.text)
-            results.append(["argv": JSON(Self.shown(command)), "exit": JSON(Int(out.exit)), "text": .string(out.text), "data": out.data ?? .null])
+            results.append([
+                "argv": JSON(Self.shown(command)), "exit": JSON(Int(out.exit)), "text": .string(out.text),
+                "data": out.data ?? .null,
+            ])
             if out.exit != 0 {
                 exit = out.exit
                 let notRun = commands[(i + 1)...].map { Batch.render(Self.shown($0)) }.joined(separator: "; ")
@@ -44,7 +49,8 @@ extension Session {
                 break
             }
         }
-        return Output(parts.joined(separator: "\n"), exit: exit,
-                      data: ["results": .array(results), "total": JSON(commands.count)])
+        return Output(
+            parts.joined(separator: "\n"), exit: exit,
+            data: ["results": .array(results), "total": JSON(commands.count)])
     }
 }

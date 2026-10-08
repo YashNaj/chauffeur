@@ -1,4 +1,5 @@
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite struct GeometryTests {
@@ -14,7 +15,8 @@ import Testing
         let left = Geometry.refusal(for: Point(x: 3, y: 400), screen: screen, allowEdge: false)
         #expect(left?.contains("3pt from the left edge") == true)
         #expect(left?.contains("--edge") == true)
-        #expect(Geometry.refusal(for: Point(x: 200, y: 870), screen: screen, allowEdge: false)?.contains("bottom") == true)
+        #expect(
+            Geometry.refusal(for: Point(x: 200, y: 870), screen: screen, allowEdge: false)?.contains("bottom") == true)
         #expect(Geometry.refusal(for: Point(x: 3, y: 400), screen: screen, allowEdge: true) == nil)
     }
 

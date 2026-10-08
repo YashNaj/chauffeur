@@ -1,12 +1,14 @@
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite(.enabled(if: Live.enabled), .serialized)
 @MainActor struct ScrollLiveTests {
     @Test func scrollUntilAndTheEnd() throws {
         try Live.launchFixture()
-        let s = Session(udid: Live.udid!); defer { s.shutdown() }
+        let s = Session(udid: Live.udid!)
+        defer { s.shutdown() }
         #expect(s.run(["wait", "Long list", "--timeout", "15"]).exit == 0)
         #expect(s.run(["tap", try ref(s, "button:Long list")]).exit == 0)
         #expect(s.run(["wait", "Row 1", "--timeout", "5"]).exit == 0)

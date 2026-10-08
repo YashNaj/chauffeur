@@ -40,9 +40,11 @@ extension Session {
         let url = resolvePath(raw)
         var isDirectory: ObjCBool = false
         guard url.pathExtension == "app", FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
-              isDirectory.boolValue else {
-            return Output("install: \(url.path) is not an .app directory. Build for the simulator, then install "
-                          + "Build/Products/Debug-iphonesimulator/<App>.app", exit: 1)
+            isDirectory.boolValue
+        else {
+            return Output(
+                "install: \(url.path) is not an .app directory. Build for the simulator, then install "
+                    + "Build/Products/Debug-iphonesimulator/<App>.app", exit: 1)
         }
         guard let bundle = SimApps.bundle(at: url) else {
             return Output("install: \(url.lastPathComponent) has no Info.plist with a bundle id", exit: 1)
@@ -51,11 +53,14 @@ extension Session {
         release(bundle.identifier)  // installing replaces, and so ends, a running copy
         let start = clock.nowMs()
         let r = try SimCtl.run(["install", udid, url.path], timeout: 300)
-        guard r.status == 0 else { return Output("install \(url.lastPathComponent) → FAILED: \(SimCtl.message(r))", exit: 1) }
+        guard r.status == 0 else {
+            return Output("install \(url.lastPathComponent) → FAILED: \(SimCtl.message(r))", exit: 1)
+        }
         let seconds = String(format: "%.1f", Double(clock.nowMs() - start) / 1000)
-        return Output("install \(url.lastPathComponent) → installed \(bundle.identifier) \(bundle.version) in \(seconds)s\n"
-                      + "next: chauffeur launch \(bundle.identifier)",
-                      data: ["bundle": .string(bundle.identifier), "version": .string(bundle.version), "path": .string(url.path)])
+        return Output(
+            "install \(url.lastPathComponent) → installed \(bundle.identifier) \(bundle.version) in \(seconds)s\n"
+                + "next: chauffeur launch \(bundle.identifier)",
+            data: ["bundle": .string(bundle.identifier), "version": .string(bundle.version), "path": .string(url.path)])
     }
 
     /// A cold launch took 5–13 s on iOS 27 on an 8 GB host (M2 dogfood); launch returns as soon as the app is in front.
@@ -68,7 +73,8 @@ extension Session {
         _ = try connect()
         let info = try SimCtl.run(["appinfo", udid, bundle], timeout: 30)
         guard info.status == 0, let appInfo = SimApps.appInfo(info.out) else {
-            return Output("\(bundle) is not installed on this simulator. Install it first: chauffeur install <path.app>", exit: 1)
+            return Output(
+                "\(bundle) is not installed on this simulator. Install it first: chauffeur install <path.app>", exit: 1)
         }
         // What was in front before: until it is replaced, the launch has not shown anything yet.
         let previous = try? observe(minMs: 0, capMs: 500).snapshot.kind
@@ -83,22 +89,27 @@ extension Session {
         guard r.status == 0, let pid = SimApps.launchedPID(r.out) else {
             return Output("launch \(bundle) → FAILED: \(SimCtl.message(r))", exit: 1)
         }
-        var tracked = TrackedApp(bundle: bundle, executable: appInfo.executable, displayName: appInfo.displayName,
-                                 pid: pid, launchedAt: Date())
+        var tracked = TrackedApp(
+            bundle: bundle, executable: appInfo.executable, displayName: appInfo.displayName,
+            pid: pid, launchedAt: Date())
         track(tracked)
         crash = nil  // a new launch supersedes an old crash
-        let stale = Self.staleKind(previous: previous, relaunched: [appInfo.displayName] + (relaunching.map { [$0.displayName] } ?? []))
+        let stale = Self.staleKind(
+            previous: previous, relaunched: [appInfo.displayName] + (relaunching.map { [$0.displayName] } ?? []))
         let front = try waitForApp(capMs: Self.launchWaitMs, notShowing: stale)
         let after = String(format: "%.1fs", Double(front.waitedMs) / 1000)
         var lines: [String]
         var exit: Int32 = 0
         if !Self.showsLaunchedApp(front.snapshot.kind, stale: stale) {
             let alive = isAlive(pid)
-            lines = [alive
-                ? "launch \(bundle) → UNVERIFIED: pid \(pid) is running, but after \(after) the accessibility tree still shows \(Self.describe(front.snapshot.kind))"
-                : "launch \(bundle) → FAILED: pid \(pid) exited during launch",
-                     alive ? "hint: run: chauffeur wait \"<text on its first screen>\"; if it never appears, run: chauffeur doctor"
-                           : "hint: run: chauffeur logs"]
+            lines = [
+                alive
+                    ? "launch \(bundle) → UNVERIFIED: pid \(pid) is running, but after \(after) the accessibility tree still shows \(Self.describe(front.snapshot.kind))"
+                    : "launch \(bundle) → FAILED: pid \(pid) exited during launch",
+                alive
+                    ? "hint: run: chauffeur wait \"<text on its first screen>\"; if it never appears, run: chauffeur doctor"
+                    : "hint: run: chauffeur logs",
+            ]
             exit = alive ? 3 : 1
         } else {
             // A localized display name differs from Info.plist: follow what the screen calls it.
@@ -109,13 +120,20 @@ extension Session {
             lines = ["launch \(bundle) → running (pid \(pid)) after \(after)", front.snapshot.header]
         }
         if !reenabled.isEmpty {
-            lines.append("note: turned the simulator's accessibility back on (\(reenabled.joined(separator: ", ")) were off, "
-                         + "as an Xcode device-interaction session leaves them); apps launched while they were off need a relaunch")
+            lines.append(
+                "note: turned the simulator's accessibility back on (\(reenabled.joined(separator: ", ")) were off, "
+                    + "as an Xcode device-interaction session leaves them); apps launched while they were off need a relaunch"
+            )
         }
-        if !following { lines.append("note: the app's log stream did not attach; logs are unavailable until the next launch") }
-        return Output(lines.joined(separator: "\n"), exit: exit,
-                      data: ["bundle": .string(bundle), "pid": JSON(Int(pid)), "waitedMs": JSON(front.waitedMs),
-                             "screen": .string(front.snapshot.header)])
+        if !following {
+            lines.append("note: the app's log stream did not attach; logs are unavailable until the next launch")
+        }
+        return Output(
+            lines.joined(separator: "\n"), exit: exit,
+            data: [
+                "bundle": .string(bundle), "pid": JSON(Int(pid)), "waitedMs": JSON(front.waitedMs),
+                "screen": .string(front.snapshot.header),
+            ])
     }
 
     /// Turns on the accessibility flags an app needs at launch to serve its tree; returns the ones that were off.
@@ -169,23 +187,30 @@ extension Session {
 
     func openCommand(_ argv: [String]) throws -> Output {
         var a = try Args(argv, usage: "usage: chauffeur open <url>")
-        guard let url = a.next(), let scheme = URL(string: url)?.scheme, !scheme.isEmpty else { throw ChauffeurError.usage(a.usage) }
+        guard let url = a.next(), let scheme = URL(string: url)?.scheme, !scheme.isEmpty else {
+            throw ChauffeurError.usage(a.usage)
+        }
         try a.done()
-        return try actWithoutTouch("open \(Perception.quote(url, limit: 120))", capMs: 3000,
-                                   note: "the URL was delivered; nothing visible changed in 3s",
-                                   hints: ["the app may handle this link without a visible change; run snapshot to check"]) {
+        return try actWithoutTouch(
+            "open \(Perception.quote(url, limit: 120))", capMs: 3000,
+            note: "the URL was delivered; nothing visible changed in 3s",
+            hints: ["the app may handle this link without a visible change; run snapshot to check"]
+        ) {
             let r = try SimCtl.run(["openurl", udid, url], timeout: 30)
             guard r.status != 0 else { return nil }
             // iOS 26.2 exits 194 with OSStatus -10814 (kLSApplicationNotFoundErr); earlier plans measured 115.
-            return r.status == 115 || r.err.contains("-10814") ? "no installed app handles \(Perception.escape(scheme)): URLs" : SimCtl.message(r)
+            return r.status == 115 || r.err.contains("-10814")
+                ? "no installed app handles \(Perception.escape(scheme)): URLs" : SimCtl.message(r)
         }
     }
 
     /// An action with no touch evidence (a URL, a hardware button): a settled screen change is `changed`, a change on
     /// an unsettled screen is unattributed, and no change is UNVERIFIED with `note` (spec §6.2, last row).
     /// `perform` returns nil when the action was sent, or why it could not be.
-    func actWithoutTouch(_ label: String, capMs: Int, note: String, hints: [String],
-                         perform: () throws -> String?) throws -> Output {
+    func actWithoutTouch(
+        _ label: String, capMs: Int, note: String, hints: [String],
+        perform: () throws -> String?
+    ) throws -> Output {
         let (before, settled) = try baseline()
         if let failure = try perform() { return Output("\(label) → FAILED: \(failure)", exit: 1) }
         // The accessibility tree can lag the screen (SpringBoard after `button home` took over a second to show up), so
@@ -198,8 +223,10 @@ extension Session {
         if after.hash != before.hash { (after, settle) = try observe(minMs: 150, capMs: 1500) }
         let outcome: Outcome = after.hash == before.hash ? .unverified : settled ? .changed : .unattributed
         var report = ActionReport(
-            action: label, outcome: outcome, evidence: .unavailable, settledMs: settle.elapsedMs, settled: settle.settled,
-            revBefore: before.rev, revAfter: after.rev, diff: outcome == .changed ? Diff.lines(from: before, to: after) : [],
+            action: label, outcome: outcome, evidence: .unavailable, settledMs: settle.elapsedMs,
+            settled: settle.settled,
+            revBefore: before.rev, revAfter: after.rev,
+            diff: outcome == .changed ? Diff.lines(from: before, to: after) : [],
             transport: "none", retriedFrom: nil,
             hints: outcome == .unverified ? hints : Verifier.hints(outcome: outcome, target: nil), capMs: capMs)
         report.note = note

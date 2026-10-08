@@ -15,12 +15,27 @@ public enum JSON: Equatable, Sendable {
         return nil
     }
 
-    public var string: String? { if case .string(let s) = self { return s }; return nil }
-    public var bool: Bool? { if case .bool(let b) = self { return b }; return nil }
-    public var number: Double? { if case .number(let n) = self { return n }; return nil }
+    public var string: String? {
+        if case .string(let s) = self { return s }
+        return nil
+    }
+    public var bool: Bool? {
+        if case .bool(let b) = self { return b }
+        return nil
+    }
+    public var number: Double? {
+        if case .number(let n) = self { return n }
+        return nil
+    }
     public var int: Int? { number.flatMap { $0.rounded() == $0 && abs($0) < 9.0e15 ? Int($0) : nil } }
-    public var array: [JSON]? { if case .array(let a) = self { return a }; return nil }
-    public var object: [String: JSON]? { if case .object(let o) = self { return o }; return nil }
+    public var array: [JSON]? {
+        if case .array(let a) = self { return a }
+        return nil
+    }
+    public var object: [String: JSON]? {
+        if case .object(let o) = self { return o }
+        return nil
+    }
 
     public init(_ value: String?) { self = value.map { .string($0) } ?? .null }
     public init(_ value: Int) { self = .number(Double(value)) }
@@ -82,7 +97,8 @@ extension JSON: Codable {
 }
 
 extension JSON: ExpressibleByStringLiteral, ExpressibleByIntegerLiteral, ExpressibleByFloatLiteral,
-    ExpressibleByBooleanLiteral, ExpressibleByArrayLiteral, ExpressibleByDictionaryLiteral, ExpressibleByNilLiteral {
+    ExpressibleByBooleanLiteral, ExpressibleByArrayLiteral, ExpressibleByDictionaryLiteral, ExpressibleByNilLiteral
+{
     public init(stringLiteral value: String) { self = .string(value) }
     public init(integerLiteral value: Int) { self = .number(Double(value)) }
     public init(floatLiteral value: Double) { self = .number(value) }

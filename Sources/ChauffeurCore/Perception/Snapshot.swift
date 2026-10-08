@@ -8,7 +8,10 @@ public struct Identity: Hashable, Sendable {
     public var ordinal: Int
 
     public init(role: String, key: String, ancestor: String?, ordinal: Int) {
-        self.role = role; self.key = key; self.ancestor = ancestor; self.ordinal = ordinal
+        self.role = role
+        self.key = key
+        self.ancestor = ancestor
+        self.ordinal = ordinal
     }
 }
 
@@ -56,7 +59,8 @@ public struct Snapshot: Sendable {
         let tail = "\(Geometry.fmt(size.w))×\(Geometry.fmt(size.h))pt \(orientation.rawValue) · rev \(rev)"
         switch kind {
         case .app(let name):
-            return "app \(Perception.quote(name))" + (title.map { " · screen \(Perception.quote($0))" } ?? "") + " · " + tail
+            return "app \(Perception.quote(name))" + (title.map { " · screen \(Perception.quote($0))" } ?? "") + " · "
+                + tail
         case .springboard:
             return "SpringBoard · " + tail
         case .systemAlert(let over):
@@ -69,7 +73,8 @@ public struct Snapshot: Sendable {
         if let name = n.name { parts.append(Perception.quote(name)) }
         if let ref = n.ref { parts.append("[\(ref)]") }
         if let v = n.value {
-            parts.append(["switch", "checkbox", "tab", "radio"].contains(n.role) ? "value=\(v)" : "value=\(Perception.quote(v))")
+            parts.append(
+                ["switch", "checkbox", "tab", "radio"].contains(n.role) ? "value=\(v)" : "value=\(Perception.quote(v))")
         }
         if !n.enabled { parts.append("disabled") }
         if all {
@@ -101,8 +106,10 @@ public struct Snapshot: Sendable {
         var o: [String: JSON] = [
             "size": [JSON(size.w), JSON(size.h)], "orientation": .string(orientation.rawValue), "rev": JSON(rev),
             "nodes": .array(nodes.map { $0.json(all: all) }),
-            "offscreen": ["above": JSON(offscreen.above), "below": JSON(offscreen.below),
-                          "left": JSON(offscreen.left), "right": JSON(offscreen.right)],
+            "offscreen": [
+                "above": JSON(offscreen.above), "below": JSON(offscreen.below),
+                "left": JSON(offscreen.left), "right": JSON(offscreen.right),
+            ],
         ]
         switch kind {
         case .app(let name):

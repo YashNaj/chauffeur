@@ -11,7 +11,9 @@ enum UnixSocket {
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
         let bytes = Array(path.utf8)
-        guard bytes.count < MemoryLayout.size(ofValue: addr.sun_path) else { throw Failure(description: "socket path too long: \(path)") }
+        guard bytes.count < MemoryLayout.size(ofValue: addr.sun_path) else {
+            throw Failure(description: "socket path too long: \(path)")
+        }
         withUnsafeMutableBytes(of: &addr.sun_path) { $0.copyBytes(from: bytes) }
         return addr
     }
@@ -39,11 +41,19 @@ enum UnixSocket {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw errno("socket") }
         let bound = withUnsafePointer(to: &addr) {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                bind(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
+            }
         }
-        guard bound == 0 else { close(fd); throw errno("bind \(path)") }
+        guard bound == 0 else {
+            close(fd)
+            throw errno("bind \(path)")
+        }
         chmod(path, 0o600)
-        guard Darwin.listen(fd, 16) == 0 else { close(fd); throw errno("listen") }
+        guard Darwin.listen(fd, 16) == 0 else {
+            close(fd)
+            throw errno("listen")
+        }
         return fd
     }
 
@@ -52,9 +62,14 @@ enum UnixSocket {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw errno("socket") }
         let connected = withUnsafePointer(to: &addr) {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
+            }
         }
-        guard connected == 0 else { close(fd); throw errno("connect \(path)") }
+        guard connected == 0 else {
+            close(fd)
+            throw errno("connect \(path)")
+        }
         setTimeout(fd, timeout)
         return fd
     }

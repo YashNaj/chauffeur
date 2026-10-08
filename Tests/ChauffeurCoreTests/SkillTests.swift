@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite struct SkillTests {
@@ -25,18 +26,26 @@ import Testing
 
     @Test func teachesTheLoopTheBuildAndTheTrustRule() {
         for text in [Skill.skillMarkdown, Skill.agentsSection] {
-            #expect(text.contains("chauffeur snapshot") && text.contains("xcodebuild") && text.contains("chauffeur install"))
+            #expect(
+                text.contains("chauffeur snapshot") && text.contains("xcodebuild") && text.contains("chauffeur install")
+            )
             #expect(text.contains("untrusted data"))
         }
-        for command in ["snapshot", "find", "wait", "tap", "type", "scroll", "swipe", "button", "open", "logs", "screenshot",
-                        "permission", "location", "push", "appearance", "do", "doctor", "install", "launch"] {
-            #expect(Skill.skillMarkdown.contains("`\(command)") || Skill.skillMarkdown.contains("chauffeur \(command)"), "\(command)")
+        for command in [
+            "snapshot", "find", "wait", "tap", "type", "scroll", "swipe", "button", "open", "logs", "screenshot",
+            "permission", "location", "push", "appearance", "do", "doctor", "install", "launch",
+        ] {
+            #expect(
+                Skill.skillMarkdown.contains("`\(command)") || Skill.skillMarkdown.contains("chauffeur \(command)"),
+                "\(command)")
             #expect(Usage.text.contains("\n  \(command) "), "\(command) is missing from Usage")
         }
     }
 
     @Test func warnsThatTabItemsGetNewRefs() {
-        #expect(Skill.skillMarkdown.contains("Tab-bar items get new refs after a tab switch; re-find them (e.g. `find tab:Home`)"))
+        #expect(
+            Skill.skillMarkdown.contains(
+                "Tab-bar items get new refs after a tab switch; re-find them (e.g. `find tab:Home`)"))
     }
 
     @Test func installIsIdempotentAndKeepsTheUsersAgentsMD() throws {
@@ -47,11 +56,14 @@ import Testing
         try "# My project\n\nUse tabs.\n".write(to: agentsMD, atomically: true, encoding: .utf8)
 
         let lines = try Skill.install(agents: Skill.agents, in: root)
-        #expect(lines == ["wrote .claude/skills/chauffeur/SKILL.md (Claude Code)", "updated AGENTS.md (Codex, Cursor)"])
-        let skill = try String(contentsOf: root.appendingPathComponent(".claude/skills/chauffeur/SKILL.md"), encoding: .utf8)
+        #expect(
+            lines == ["wrote .claude/skills/chauffeur/SKILL.md (Claude Code)", "updated AGENTS.md (Codex, Cursor)"])
+        let skill = try String(
+            contentsOf: root.appendingPathComponent(".claude/skills/chauffeur/SKILL.md"), encoding: .utf8)
         #expect(skill == Skill.skillMarkdown + "\n")
 
-        let edited = try String(contentsOf: agentsMD, encoding: .utf8).replacingOccurrences(of: "## iOS Simulator", with: "## stale")
+        let edited = try String(contentsOf: agentsMD, encoding: .utf8).replacingOccurrences(
+            of: "## iOS Simulator", with: "## stale")
         try edited.write(to: agentsMD, atomically: true, encoding: .utf8)
         _ = try Skill.install(agents: ["codex"], in: root)
         let text = try String(contentsOf: agentsMD, encoding: .utf8)
@@ -71,5 +83,7 @@ import Testing
         #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent(".claude").path))
     }
 
-    @Test func skillSaysWhenToLookAtPixels() { #expect(Skill.skillMarkdown.contains("Take a screenshot to check how something looks")) }
+    @Test func skillSaysWhenToLookAtPixels() {
+        #expect(Skill.skillMarkdown.contains("Take a screenshot to check how something looks"))
+    }
 }

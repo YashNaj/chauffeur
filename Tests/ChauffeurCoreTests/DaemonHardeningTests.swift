@@ -1,12 +1,14 @@
 import Darwin
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 /// M1 review minors folded into M2: request udid/cwd, state-dir checks, daemon status by socket.
 @Suite struct DaemonHardeningTests {
     @Test func requestsFromOlderClientsStillGetTheVersionHandshake() throws {
-        let old = try JSONDecoder().decode(Request.self, from: Data(#"{"version":"0.0.1-old","args":["snapshot"]}"#.utf8))
+        let old = try JSONDecoder().decode(
+            Request.self, from: Data(#"{"version":"0.0.1-old","args":["snapshot"]}"#.utf8))
         #expect(old.udid == nil && old.cwd == nil)
         let (out, exitAfter) = Daemon.respond(to: old, serving: "AAAA-1") { _ in Output("ran") }
         #expect(out.exit == Daemon.versionMismatchExit && exitAfter)
@@ -15,7 +17,10 @@ import Testing
     @Test func aDaemonRefusesRequestsForAnotherSimulator() {
         var ran = false
         let wrong = Request(version: Chauffeur.buildID, args: ["tap", "e1"], udid: "AF7CFC76-OTHER", cwd: "/tmp")
-        let (out, exitAfter) = Daemon.respond(to: wrong, serving: "AF7CFC76-936D") { _ in ran = true; return Output("x") }
+        let (out, exitAfter) = Daemon.respond(to: wrong, serving: "AF7CFC76-936D") { _ in
+            ran = true
+            return Output("x")
+        }
         #expect(out.exit == 1 && !exitAfter && !ran)
         #expect(out.text.hasPrefix("this daemon serves AF7CFC76-936D, not AF7CFC76-OTHER"))
         let right = Request(version: Chauffeur.buildID, args: ["tap"], udid: "af7cfc76-936d", cwd: nil)
@@ -62,7 +67,10 @@ import Testing
         defer { try? FileManager.default.removeItem(at: StatePaths.pidfile(udid)) }
         #expect(Doctor.daemonStatus(udid).running == false)  // a live pid in the pidfile is not enough
         let listener = try UnixSocket.listen(path: StatePaths.socket(udid).path)
-        defer { close(listener); unlink(StatePaths.socket(udid).path) }
+        defer {
+            close(listener)
+            unlink(StatePaths.socket(udid).path)
+        }
         let status = Doctor.daemonStatus(udid)
         #expect(status.running && status.pid == getpid())
     }

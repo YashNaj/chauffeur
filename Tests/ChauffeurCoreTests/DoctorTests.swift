@@ -1,4 +1,5 @@
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite struct DoctorTests {
@@ -12,7 +13,8 @@ import Testing
     @Test func raisedLevelWithoutADaemonIsFlagged() {
         let stale = Doctor.levelCheck(level: "debug", daemonRunning: false, udid: "U")
         #expect(stale.status == .warn)
-        #expect(stale.text.contains("xcrun simctl spawn U log config --mode level:default --subsystem com.apple.BackBoard"))
+        #expect(
+            stale.text.contains("xcrun simctl spawn U log config --mode level:default --subsystem com.apple.BackBoard"))
         #expect(Doctor.levelCheck(level: "debug", daemonRunning: true, udid: "U").status == .ok)
         #expect(Doctor.levelCheck(level: "info", daemonRunning: false, udid: "U").status == .ok)
         #expect(Doctor.levelCheck(level: nil, daemonRunning: false, udid: "U").status == .warn)

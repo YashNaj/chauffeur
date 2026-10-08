@@ -19,8 +19,10 @@ public struct Settled<T> {
 
 /// Polls until two consecutive reads hash the same and `minMs` has passed (spec §6.3).
 public enum Settle {
-    public static func wait<T>(minMs: Int = 150, capMs: Int, pollMs: Int = 75, clock: some SettleClock,
-                               read: () -> (value: T, hash: Int)?) -> Settled<T> {
+    public static func wait<T>(
+        minMs: Int = 150, capMs: Int, pollMs: Int = 75, clock: some SettleClock,
+        read: () -> (value: T, hash: Int)?
+    ) -> Settled<T> {
         let start = clock.nowMs()
         var previous: (value: T, hash: Int)?
         var lastGood: T?

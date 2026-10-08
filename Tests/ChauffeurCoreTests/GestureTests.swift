@@ -1,4 +1,5 @@
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite @MainActor struct GestureTests {
@@ -35,7 +36,10 @@ import Testing
         let s = Session(udid: "ZZ000000-TEST")
         let snap = snapshot()
         for bad in ["1,2,abc", "nan,5", "inf,1", "1", "a,b", "1,2,3", "1,"] {
-            #expect(throws: ChauffeurError.usage("expected a ref like e4 or a point like 201,344; got \(Perception.quote(bad))")) {
+            #expect(
+                throws: ChauffeurError.usage(
+                    "expected a ref like e4 or a point like 201,344; got \(Perception.quote(bad))")
+            ) {
                 try s.aim(bad, in: snap)
             }
         }

@@ -3,7 +3,8 @@ import Foundation
 
 let argv = Array(CommandLine.arguments.dropFirst())
 if argv.first == "daemon" {
-    guard let a = try? Args(Array(argv.dropFirst()), options: ["--udid"], usage: ""), let udid = a.option("--udid") else {
+    guard let a = try? Args(Array(argv.dropFirst()), options: ["--udid"], usage: ""), let udid = a.option("--udid")
+    else {
         print("usage: chauffeur daemon --udid <udid> (started automatically; you should not need this)")
         exit(64)
     }

@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite struct ShellTests {
@@ -39,7 +40,11 @@ import Testing
             """
         let devices = try SimCtl.parseDevices(Data(json.utf8))
         #expect(devices.count == 2)
-        #expect(devices[0] == DeviceInfo(udid: "AF7CFC76-936D-4E67-98F7-102C682E7ECD", name: "iPhone 17 Pro", runtime: "iOS 26.2", state: "Booted"))
+        #expect(
+            devices[0]
+                == DeviceInfo(
+                    udid: "AF7CFC76-936D-4E67-98F7-102C682E7ECD", name: "iPhone 17 Pro", runtime: "iOS 26.2",
+                    state: "Booted"))
         #expect(devices[0].booted && !devices[1].booted)
         #expect(devices[1].summary == "iPhone 18 Pro (iOS 27.0) 4474DB35-730B-4017-AAB3-367700816901 Shutdown")
     }

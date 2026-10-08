@@ -1,11 +1,13 @@
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 /// Spec §5.4 and §6.8: action results carry new error lines; a vanished app is APP CRASHED, once.
 @Suite @MainActor struct AnnotateTests {
-    let fixture = TrackedApp(bundle: "dev.chauffeur.fixture", executable: "Fixture", displayName: "Fixture", pid: 4321,
-                             launchedAt: Date())
+    let fixture = TrackedApp(
+        bundle: "dev.chauffeur.fixture", executable: "Fixture", displayName: "Fixture", pid: 4321,
+        launchedAt: Date())
 
     /// A session whose launched app is `fixture`, with no simulator, no waiting and a fake liveness check.
     func session(alive: Bool, report: CrashReport? = nil) -> Session {
@@ -20,7 +22,8 @@ import Testing
         return s
     }
 
-    let tapped = Output("tap e5 \"Crash\" → changed · settled 610ms · rev 3→4\n+ button \"Phone\" [e9]\n- button \"Crash\" [e5]")
+    let tapped = Output(
+        "tap e5 \"Crash\" → changed · settled 610ms · rev 3→4\n+ button \"Phone\" [e9]\n- button \"Crash\" [e5]")
 
     @Test func actionsGetTheirNewErrorLines() {
         let s = session(alive: true)
@@ -31,7 +34,8 @@ import Testing
         let out = s.annotate(Output("tap e2 \"Save\" → changed · settled 200ms · rev 1→2"), since: cursor, logs: true)
         #expect(out.text == "tap e2 \"Save\" → changed · settled 200ms · rev 1→2\nlogs: [error] \"save failed\"")
         #expect(out.exit == 0 && out.data?["logs"]?.array?.count == 1)
-        #expect(s.annotate(Output("app \"Fixture\" · rev 2"), since: cursor, logs: false).text == "app \"Fixture\" · rev 2")
+        #expect(
+            s.annotate(Output("app \"Fixture\" · rev 2"), since: cursor, logs: false).text == "app \"Fixture\" · rev 2")
     }
 
     @Test func aVanishedAppIsACrashReportedOnce() {
@@ -40,13 +44,14 @@ import Testing
         s.logTap.append(LogLine(time: "t", level: "fault", message: "fixture: crashing"))
         let out = s.annotate(tapped, since: cursor, logs: true)
         #expect(out.exit == 5)
-        #expect(out.text == """
-            tap e5 "Crash" → changed · settled 610ms · rev 3→4
-            APP CRASHED: dev.chauffeur.fixture (pid 4321) · crash report not written yet (macOS can take a minute)
-            reason: "fixture: crashing"
-            logs: [fault] "fixture: crashing"
-            hint: after fixing it, rebuild, chauffeur install <path.app>, then chauffeur launch dev.chauffeur.fixture
-            """)
+        #expect(
+            out.text == """
+                tap e5 "Crash" → changed · settled 610ms · rev 3→4
+                APP CRASHED: dev.chauffeur.fixture (pid 4321) · crash report not written yet (macOS can take a minute)
+                reason: "fixture: crashing"
+                logs: [fault] "fixture: crashing"
+                hint: after fixing it, rebuild, chauffeur install <path.app>, then chauffeur launch dev.chauffeur.fixture
+                """)
         #expect(out.data?["crash"]?["pid"]?.int == 4321)
         #expect(s.app == nil && s.crash?.app == fixture)
         #expect(s.annotate(Output("app \"SpringBoard\""), since: cursor, logs: false) == Output("app \"SpringBoard\""))
@@ -72,7 +77,10 @@ import Testing
     @Test func aReadReportIsShownWithItsFrames() throws {
         let report = try #require(CrashReport.parse(try Fixtures.crash("Fixture-sample"), path: "/r/Fixture.ips"))
         let out = session(alive: false, report: report).annotate(tapped, since: 0, logs: true)
-        #expect(out.text.contains("APP CRASHED: dev.chauffeur.fixture (pid 4321) · EXC_BREAKPOINT (SIGTRAP)\nreport: /r/Fixture.ips\n  libswiftCore.dylib"))
+        #expect(
+            out.text.contains(
+                "APP CRASHED: dev.chauffeur.fixture (pid 4321) · EXC_BREAKPOINT (SIGTRAP)\nreport: /r/Fixture.ips\n  libswiftCore.dylib"
+            ))
     }
 
     @Test func endingTheAppOnPurposeIsNotACrash() {
@@ -136,22 +144,31 @@ import Testing
             """
         let boot = SimBoot.parse(ps, udid: "af7cfc76-936d-4e67-98f7-102c682e7ecd")
         var parts = DateComponents()
-        parts.year = 2026; parts.month = 10; parts.day = 7; parts.hour = 1; parts.minute = 13; parts.second = 54
+        parts.year = 2026
+        parts.month = 10
+        parts.day = 7
+        parts.hour = 1
+        parts.minute = 13
+        parts.second = 54
         #expect(boot == Calendar.current.date(from: parts))
         #expect(SimBoot.parse(ps, udid: "ZZZZ") == nil)
     }
 
     /// The next command after a crash must say so, even when it is the one that stops following the app.
     @Test func aCrashBetweenCommandsIsReportedByTheNextCommandThatEndsTheApp() throws {
-        for command in [["terminate", "dev.chauffeur.fixture"], ["launch", "dev.chauffeur.fixture"],
-                        ["install", "/no/such/Fixture.app"], ["permission", "grant", "location", "dev.chauffeur.fixture"]] {
+        for command in [
+            ["terminate", "dev.chauffeur.fixture"], ["launch", "dev.chauffeur.fixture"],
+            ["install", "/no/such/Fixture.app"], ["permission", "grant", "location", "dev.chauffeur.fixture"],
+        ] {
             let s = session(alive: false)
             defer { try? FileManager.default.removeItem(at: StatePaths.artifacts(s.udid)) }
             s.logTap.append(LogLine(time: "t", level: "fault", message: "fixture: crashing"))
             // These commands stop following the app (`release`) as soon as they run; that must not hide the crash.
             s.commandHook = { _ in s.release("dev.chauffeur.fixture") }
             let out = s.run(command)
-            #expect(out.exit == 5 && out.text.contains("APP CRASHED: dev.chauffeur.fixture (pid 4321)"), "\(command): \(out.text)")
+            #expect(
+                out.exit == 5 && out.text.contains("APP CRASHED: dev.chauffeur.fixture (pid 4321)"),
+                "\(command): \(out.text)")
             #expect(out.text.contains("[fault] \"fixture: crashing\""), "\(command)")
             #expect(s.crash?.app == fixture, "\(command)")
         }
@@ -159,7 +176,8 @@ import Testing
         defer { try? FileManager.default.removeItem(at: StatePaths.artifacts(s.udid)) }
         s.commandHook = { _ in s.release("dev.chauffeur.fixture") }
         _ = s.run(["terminate", "dev.chauffeur.fixture"])
-        #expect(try s.logsCommand([]).text.contains("\nAPP EXITED: dev.chauffeur.fixture (pid 4321)"))  // no fault line logged
+        // no fault line logged
+        #expect(try s.logsCommand([]).text.contains("\nAPP EXITED: dev.chauffeur.fixture (pid 4321)"))
     }
 
     @Test func logsShowsTheReportOnceMacOSHasWrittenIt() throws {
@@ -169,10 +187,14 @@ import Testing
         defer { try? FileManager.default.removeItem(at: StatePaths.artifacts(s.udid)) }
         s.findCrashReport = { _ in written ? report : nil }
         s.logTap.append(LogLine(time: "22:31:04.120", level: "fault", message: "fixture: crashing"))
-        #expect(s.annotate(tapped, since: 0, logs: true).text.contains("APP CRASHED: dev.chauffeur.fixture (pid 4321) · crash report not written yet"))
+        #expect(
+            s.annotate(tapped, since: 0, logs: true).text.contains(
+                "APP CRASHED: dev.chauffeur.fixture (pid 4321) · crash report not written yet"))
         written = true
         let logs = try s.logsCommand(["--level", "error"])
-        #expect(logs.text.hasPrefix("logs · dev.chauffeur.fixture (pid 4321, not running) · 1 of 1 lines (latest, errors only)"))
+        #expect(
+            logs.text.hasPrefix(
+                "logs · dev.chauffeur.fixture (pid 4321, not running) · 1 of 1 lines (latest, errors only)"))
         #expect(logs.text.contains("\n22:31:04.120 [fault] \"fixture: crashing\"\n"))
         #expect(logs.text.contains("\nreport: /r/Fixture.ips\n"))
         #expect(logs.data?["crash"]?["report"]?.string == "/r/Fixture.ips")
@@ -192,16 +214,19 @@ import Testing
         s.lastActionLogCursor = s.logTap.cursor
         for i in 1...3 { s.logTap.append(LogLine(time: "t", level: "error", message: "line \(i)")) }
         let out = try s.logsCommand(["--since-last", "--last", "2"])
-        #expect(out.text.contains("2 of 3 lines (since the last action)") && !out.text.contains("line 1"), "\(out.text)")
+        #expect(
+            out.text.contains("2 of 3 lines (since the last action)") && !out.text.contains("line 1"), "\(out.text)")
     }
     /// Final review I3: a fatal line from an earlier launch, or a framework's fault, must not make an outside kill a crash.
     @Test func onlyThisLaunchsOwnFatalLinesMakeACrash() {
         let s = session(alive: false)
         defer { try? FileManager.default.removeItem(at: StatePaths.artifacts(s.udid)) }
-        s.logTap.append(LogLine(time: "t", level: "default", message: "Fixture/FixtureApp.swift:57: Fatal error: fixture crash", sender: "libswiftCore"))
+        s.logTap.append(
+            LogLine(
+                time: "t", level: "default", message: "Fixture/FixtureApp.swift:57: Fatal error: fixture crash",
+                sender: "libswiftCore"))
         s.appLogCursor = s.logTap.cursor  // the relaunch
         s.logTap.append(LogLine(time: "t", level: "fault", message: "UIKit fault", sender: "UIKitCore"))
         #expect(s.annotate(Output("ok"), since: 0, logs: false).text.contains("APP EXITED"))
     }
 }
-

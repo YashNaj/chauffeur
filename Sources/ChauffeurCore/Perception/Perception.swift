@@ -4,11 +4,14 @@ import Foundation
 public enum Perception {
     /// Roles that get refs.
     public static let actionable: Set<String> = [
-        "button", "tab", "radio", "textfield", "securefield", "searchfield", "switch", "checkbox", "menu", "link", "slider", "cell",
+        "button", "tab", "radio", "textfield", "securefield", "searchfield", "switch", "checkbox", "menu", "link",
+        "slider", "cell",
     ]
     static let textEntry: Set<String> = ["textfield", "securefield", "searchfield"]
 
-    public static func build(root: AXElement, size: Size, previous: ScreenKind?, refs: inout RefTable, rev: Int) -> Snapshot {
+    public static func build(root: AXElement, size: Size, previous: ScreenKind?, refs: inout RefTable, rev: Int)
+        -> Snapshot
+    {
         var builder = Builder(screen: Rect(x: 0, y: 0, w: size.w, h: size.h), refs: refs)
         builder.children(of: root, depth: 0, ancestor: nil, parentName: nil)
         refs = builder.refs
@@ -29,9 +32,14 @@ public enum Perception {
 
         var hasher = Hasher()
         for n in nodes {
-            hasher.combine(n.role); hasher.combine(n.name); hasher.combine(n.value); hasher.combine(n.enabled)
-            hasher.combine(Int(n.frame.x.rounded())); hasher.combine(Int(n.frame.y.rounded()))
-            hasher.combine(Int(n.frame.w.rounded())); hasher.combine(Int(n.frame.h.rounded()))
+            hasher.combine(n.role)
+            hasher.combine(n.name)
+            hasher.combine(n.value)
+            hasher.combine(n.enabled)
+            hasher.combine(Int(n.frame.x.rounded()))
+            hasher.combine(Int(n.frame.y.rounded()))
+            hasher.combine(Int(n.frame.w.rounded()))
+            hasher.combine(Int(n.frame.h.rounded()))
         }
         hasher.combine(builder.offscreen)
 
@@ -152,18 +160,25 @@ private struct Builder {
         identity.ordinal = ordinals[base, default: 0]
         ordinals[base] = identity.ordinal + 1
         let ref = Perception.actionable.contains(role) ? refs.ref(for: identity, name: name) : nil
-        nodes.append(Node(role: role, name: name, value: Perception.value(e, role: role, name: name),
-                          identifier: e.identifier, enabled: e.enabled, frame: e.frame, depth: depth,
-                          identity: identity, ref: ref))
+        nodes.append(
+            Node(
+                role: role, name: name, value: Perception.value(e, role: role, name: name),
+                identifier: e.identifier, enabled: e.enabled, frame: e.frame, depth: depth,
+                identity: identity, ref: ref))
         children(of: e, depth: depth + 1, ancestor: name ?? ancestor, parentName: name)
     }
 
     /// Counts the named things inside an off-screen element, by the side it lies on.
     mutating func count(offscreen e: AXElement) {
         let n = max(1, e.all.filter { !$0.hidden && Perception.name($0, role: Perception.role($0)) != nil }.count)
-        if e.frame.y >= screen.maxY { offscreen.below += n }
-        else if e.frame.maxY <= screen.y { offscreen.above += n }
-        else if e.frame.x >= screen.maxX { offscreen.right += n }
-        else { offscreen.left += n }
+        if e.frame.y >= screen.maxY {
+            offscreen.below += n
+        } else if e.frame.maxY <= screen.y {
+            offscreen.above += n
+        } else if e.frame.x >= screen.maxX {
+            offscreen.right += n
+        } else {
+            offscreen.left += n
+        }
     }
 }

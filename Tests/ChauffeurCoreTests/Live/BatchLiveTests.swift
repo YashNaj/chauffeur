@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite(.enabled(if: Live.enabled), .serialized)
@@ -18,7 +19,9 @@ import Testing
         #expect(s.run(["tap", try ref(s, "tab:Home")]).exit == 0)
 
         let stopped = s.run(["do", "wait \"No such thing\" --timeout 1; tap \(form)"])
-        #expect(stopped.exit == 4 && stopped.text.hasSuffix("stopped at [1/2] (exit 4); not run: tap \(form)"), "\(stopped.text)")
+        #expect(
+            stopped.exit == 4 && stopped.text.hasSuffix("stopped at [1/2] (exit 4); not run: tap \(form)"),
+            "\(stopped.text)")
         #expect(s.run(["find", "Show alert"]).exit == 0, "the second command did not run: Home is still in front")
     }
 }

@@ -6,7 +6,8 @@ extension Session {
         let parts = text.split(separator: ",", omittingEmptySubsequences: false)
             .map { Double($0.trimmingCharacters(in: .whitespaces)) }
         guard parts.count == 4, let x = parts[0], let y = parts[1], let w = parts[2], let h = parts[3],
-              [x, y, w, h].allSatisfy(\.isFinite), w > 0, h > 0 else { return nil }
+            [x, y, w, h].allSatisfy(\.isFinite), w > 0, h > 0
+        else { return nil }
         return Rect(x: x, y: y, w: w, h: h)
     }
 
@@ -24,7 +25,8 @@ extension Session {
                 zoom = r
                 subject = " " + [r.x, r.y, r.w, r.h].map(Geometry.fmt).joined(separator: ",")
             } else {
-                throw ChauffeurError.usage("--zoom expects a ref like e4 or x,y,w,h in points, got \(Perception.quote(z))\n" + a.usage)
+                throw ChauffeurError.usage(
+                    "--zoom expects a ref like e4 or x,y,w,h in points, got \(Perception.quote(z))\n" + a.usage)
             }
         }
         let shot = try capture(screen: device.size, zoom: zoom)
@@ -42,13 +44,17 @@ extension Session {
             let r = plan.region
             if r.x == 0 && r.y == 0 && plan.pxPerPt == 1 { return "\(path) · \(size) · 1 px = 1 pt" }
             let d = Screenshot.density(plan.pxPerPt)
-            return "\(path) · \(size) · region \(Geometry.fmt(r.x)),\(Geometry.fmt(r.y)),\(Geometry.fmt(r.w)),\(Geometry.fmt(r.h)) pt "
+            return
+                "\(path) · \(size) · region \(Geometry.fmt(r.x)),\(Geometry.fmt(r.y)),\(Geometry.fmt(r.w)),\(Geometry.fmt(r.h)) pt "
                 + "at \(d) px/pt: point = (\(Geometry.fmt(r.x)) + x/\(d), \(Geometry.fmt(r.y)) + y/\(d))"
         }
 
         var json: JSON {
-            ["path": .string(path), "width": JSON(plan.width), "height": JSON(plan.height), "bytes": JSON(bytes),
-             "pxPerPt": JSON(plan.pxPerPt), "region": [JSON(plan.region.x), JSON(plan.region.y), JSON(plan.region.w), JSON(plan.region.h)]]
+            [
+                "path": .string(path), "width": JSON(plan.width), "height": JSON(plan.height), "bytes": JSON(bytes),
+                "pxPerPt": JSON(plan.pxPerPt),
+                "region": [JSON(plan.region.x), JSON(plan.region.y), JSON(plan.region.w), JSON(plan.region.h)],
+            ]
         }
     }
 
@@ -64,7 +70,8 @@ extension Session {
             throw ChauffeurError.failed("screenshot failed: " + SimCtl.message(r))
         }
         guard let plan = ShotPlan.make(imageW: image.width, imageH: image.height, screen: screen, zoom: zoom) else {
-            throw ChauffeurError.failed("the zoom region is outside the screen (\(Geometry.fmt(screen.w))×\(Geometry.fmt(screen.h)) pt)")
+            throw ChauffeurError.failed(
+                "the zoom region is outside the screen (\(Geometry.fmt(screen.w))×\(Geometry.fmt(screen.h)) pt)")
         }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")

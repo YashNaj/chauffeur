@@ -17,7 +17,8 @@ public final class TouchLog: @unchecked Sendable {
     }
 
     public static func currentLevel(udid: String) -> String? {
-        let r = try? SimCtl.run(["spawn", udid, "log", "config", "--status", "--subsystem", BackBoardLevel.subsystem], timeout: 15)
+        let r = try? SimCtl.run(
+            ["spawn", udid, "log", "config", "--status", "--subsystem", BackBoardLevel.subsystem], timeout: 15)
         return r.flatMap { BackBoardLevel.parse($0.out) }
     }
 
@@ -28,13 +29,22 @@ public final class TouchLog: @unchecked Sendable {
     public func start() throws {
         if isAttached { return }
         stop()  // a stream that never attached: end it and restore the level before trying again
-        guard let current = Self.currentLevel(udid: udid) else { throw ChauffeurError.bridge("cannot read the BackBoard log level") }
+        guard let current = Self.currentLevel(udid: udid) else {
+            throw ChauffeurError.bridge("cannot read the BackBoard log level")
+        }
         let prior = PriorLevel.choose(saved: PriorLevel.load(levelFile), current: current)
         PriorLevel.save(prior, to: levelFile)
         restoreLevel = prior
-        try SimCtl.run(["spawn", udid, "log", "config", "--mode", "level:debug", "--subsystem", BackBoardLevel.subsystem], timeout: 15)
-        let s = LogStream(udid: udid, arguments: ["--level", "debug", "--style", "ndjson", "--predicate",
-                                                   #"process == "backboardd" AND category == "TouchEvents""#]) { [weak self] object in
+        try SimCtl.run(
+            ["spawn", udid, "log", "config", "--mode", "level:debug", "--subsystem", BackBoardLevel.subsystem],
+            timeout: 15)
+        let s = LogStream(
+            udid: udid,
+            arguments: [
+                "--level", "debug", "--style", "ndjson", "--predicate",
+                #"process == "backboardd" AND category == "TouchEvents""#,
+            ]
+        ) { [weak self] object in
             guard let message = object["eventMessage"] as? String else { return }
             self?.consume(message)
         }
@@ -46,10 +56,15 @@ public final class TouchLog: @unchecked Sendable {
     }
 
     public func stop() {
-        let s = lock.withLock { () -> LogStream? in defer { stream = nil }; return stream }
+        let s = lock.withLock { () -> LogStream? in
+            defer { stream = nil }
+            return stream
+        }
         s?.stop()
         if let level = restoreLevel {
-            let r = try? SimCtl.run(["spawn", udid, "log", "config", "--mode", "level:\(level)", "--subsystem", BackBoardLevel.subsystem], timeout: 15)
+            let r = try? SimCtl.run(
+                ["spawn", udid, "log", "config", "--mode", "level:\(level)", "--subsystem", BackBoardLevel.subsystem],
+                timeout: 15)
             // Keep the saved level when the restore failed, so the next daemon can still put it back.
             if PriorLevel.restored(status: r?.status ?? -1, levelAfter: Self.currentLevel(udid: udid), prior: level) {
                 PriorLevel.clear(levelFile)

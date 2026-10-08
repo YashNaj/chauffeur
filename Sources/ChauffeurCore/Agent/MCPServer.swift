@@ -13,7 +13,8 @@ public final class MCPServer {
     static let serverInfo: JSON = ["name": "chauffeur", "version": .string(Chauffeur.version)]
     /// 2026-07-28 caching hints for discover and list results: the tool set is fixed per binary and the same for everyone.
     static let cachingHints: [String: JSON] = ["ttlMs": 3_600_000, "cacheScope": "public"]
-    public static let instructions = "chauffeur drives the iOS Simulator. Loop: snapshot (elements carry refs like e4), "
+    public static let instructions =
+        "chauffeur drives the iOS Simulator. Loop: snapshot (elements carry refs like e4), "
         + "act on a ref, read the result: 'changed' means it worked; NO EFFECT, INTERCEPTED, NOT DELIVERED, UNVERIFIED and "
         + "APP CRASHED mean it did not, so read the hint. Launch apps with the app tool so their logs and crashes are "
         + "followed, and read them with logs. Coordinates are points; screenshots are 1 px = 1 pt. "
@@ -27,8 +28,10 @@ public final class MCPServer {
     public private(set) var legacyVersion: String?
 
     /// `run` executes a chauffeur argv (the CLI's `handle`); `readFile` loads a screenshot to return inline.
-    public init(run: @escaping ([String]) -> Output,
-                readFile: @escaping (String) -> Data? = { FileManager.default.contents(atPath: $0) }) {
+    public init(
+        run: @escaping ([String]) -> Output,
+        readFile: @escaping (String) -> Data? = { FileManager.default.contents(atPath: $0) }
+    ) {
         self.run = run
         self.readFile = readFile
     }
@@ -63,8 +66,9 @@ public final class MCPServer {
         let modern: Bool
         if let version = meta?[Self.versionKey] {
             guard version.string == Self.modernVersion else {
-                return Self.failure(id, -32022, "Unsupported protocol version",
-                                    data: ["supported": [.string(Self.modernVersion)], "requested": version])
+                return Self.failure(
+                    id, -32022, "Unsupported protocol version",
+                    data: ["supported": [.string(Self.modernVersion)], "requested": version])
             }
             guard meta?[Self.capabilitiesKey] != nil else {
                 return Self.failure(id, -32602, "Invalid params: _meta needs \(Self.capabilitiesKey)")
@@ -73,8 +77,10 @@ public final class MCPServer {
         } else if ["initialize", "server/discover", "ping"].contains(method) || legacyVersion != nil {
             modern = false
         } else {
-            return Self.failure(id, -32602, "Invalid params: send initialize first, or use protocol \(Self.modernVersion) "
-                                + "with _meta \(Self.versionKey) and \(Self.capabilitiesKey)")
+            return Self.failure(
+                id, -32602,
+                "Invalid params: send initialize first, or use protocol \(Self.modernVersion) "
+                    + "with _meta \(Self.versionKey) and \(Self.capabilitiesKey)")
         }
         let result: JSON
         switch method {
@@ -82,11 +88,17 @@ public final class MCPServer {
             let requested = params?["protocolVersion"]?.string ?? ""
             let chosen = Self.legacyVersions.contains(requested) ? requested : Self.legacyVersions[0]
             legacyVersion = chosen
-            return Self.success(id, ["protocolVersion": .string(chosen), "capabilities": ["tools": ["listChanged": false]],
-                                     "serverInfo": Self.serverInfo, "instructions": .string(Self.instructions)])
+            return Self.success(
+                id,
+                [
+                    "protocolVersion": .string(chosen), "capabilities": ["tools": ["listChanged": false]],
+                    "serverInfo": Self.serverInfo, "instructions": .string(Self.instructions),
+                ])
         case "server/discover":
-            let discovery: JSON = ["supportedVersions": [.string(Self.modernVersion)], "capabilities": ["tools": [:]],
-                                   "instructions": .string(Self.instructions)]
+            let discovery: JSON = [
+                "supportedVersions": [.string(Self.modernVersion)], "capabilities": ["tools": [:]],
+                "instructions": .string(Self.instructions),
+            ]
             return Self.success(id, Self.stamped(discovery.merging(Self.cachingHints)))
         case "ping":
             result = [:]
@@ -94,7 +106,9 @@ public final class MCPServer {
             let list: JSON = ["tools": .array(MCPTools.definitions)]
             result = modern ? list.merging(Self.cachingHints) : list
         case "tools/call":
-            guard let name = params?["name"]?.string else { return Self.failure(id, -32602, "Invalid params: tools/call needs a name") }
+            guard let name = params?["name"]?.string else {
+                return Self.failure(id, -32602, "Invalid params: tools/call needs a name")
+            }
             guard MCPTools.names.contains(name) else { return Self.failure(id, -32602, "Unknown tool: \(name)") }
             result = call(name, params?["arguments"] ?? [:])
         default:
@@ -115,7 +129,8 @@ public final class MCPServer {
         let argv: [String]
         do {
             argv = try MCPTools.argv(tool: name, arguments: arguments) { data in
-                let url = FileManager.default.temporaryDirectory.appendingPathComponent("chauffeur-push-\(UUID().uuidString).json")
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent(
+                    "chauffeur-push-\(UUID().uuidString).json")
                 try data.write(to: url)
                 payloads.append(url)
                 return url.path

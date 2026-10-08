@@ -54,7 +54,10 @@ public final class LogStream: @unchecked Sendable {
         p.standardError = FileHandle.nullDevice
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let chunk = handle.availableData
-            if chunk.isEmpty { handle.readabilityHandler = nil; return }
+            if chunk.isEmpty {
+                handle.readabilityHandler = nil
+                return
+            }
             self?.ingest(chunk)
         }
         lock.withLock { reader = NDJSONReader() }
@@ -71,7 +74,10 @@ public final class LogStream: @unchecked Sendable {
     }
 
     public func stop() {
-        let p = lock.withLock { () -> Process? in defer { process = nil }; return process }
+        let p = lock.withLock { () -> Process? in
+            defer { process = nil }
+            return process
+        }
         if let p, p.isRunning { p.terminate() }
     }
 

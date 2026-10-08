@@ -42,8 +42,15 @@ struct HomeView: View {
                 Text("Last action: \(lastAction)").accessibilityIdentifier("lastAction")
             }
             Section("Actions") {
-                Button("Show alert") { showAlert = true; events.info("fixture: show alert") }
-                Button("Request location") { lastAction = "location"; location.ask(); events.info("fixture: request location") }
+                Button("Show alert") {
+                    showAlert = true
+                    events.info("fixture: show alert")
+                }
+                Button("Request location") {
+                    lastAction = "location"
+                    location.ask()
+                    events.info("fixture: request location")
+                }
                 Button("Request notifications") {
                     lastAction = "notifications"
                     UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) { _, _ in }
@@ -54,7 +61,10 @@ struct HomeView: View {
                     lastAction = "logged errors"
                     for i in 1...4 { events.error("fixture: error \(i, privacy: .public)") }
                 }
-                Button("Crash", role: .destructive) { events.fault("fixture: crashing"); fatalError("fixture crash") }
+                Button("Crash", role: .destructive) {
+                    events.fault("fixture: crashing")
+                    fatalError("fixture crash")
+                }
             }
         }
         .navigationTitle("Fixture")
@@ -68,7 +78,10 @@ struct HomeView: View {
                 .onChange(of: filter) { _, new in lastAction = "filter \(new)" }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button { lastAction = "toolbar add"; events.info("fixture: toolbar add") } label: {
+                Button {
+                    lastAction = "toolbar add"
+                    events.info("fixture: toolbar add")
+                } label: {
                     Image(systemName: "plus")
                 }
                 .accessibilityLabel("Add")
@@ -102,8 +115,11 @@ struct FormView: View {
                 .accessibilityIdentifier("email")
             SecureField("Password", text: $password).accessibilityIdentifier("password")
             Toggle("Agree to terms", isOn: $agree)
-            Button("Submit") { submitted = email; events.info("fixture: submit \(email, privacy: .public)") }
-                .disabled(email.isEmpty || password.isEmpty || !agree)
+            Button("Submit") {
+                submitted = email
+                events.info("fixture: submit \(email, privacy: .public)")
+            }
+            .disabled(email.isEmpty || password.isEmpty || !agree)
             if !submitted.isEmpty {
                 Text("Submitted: \(submitted)").accessibilityIdentifier("submitted")
             }

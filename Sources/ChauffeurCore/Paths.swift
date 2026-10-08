@@ -24,15 +24,18 @@ public enum StatePaths {
     public static func ensureDir(_ url: URL = dir) throws {
         let path = url.path
         if !FileManager.default.fileExists(atPath: path) {
-            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true,
-                                                    attributes: [.posixPermissions: 0o700])
+            try FileManager.default.createDirectory(
+                at: url, withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700])
         }
         var st = stat()
         guard lstat(path, &st) == 0 else { throw ChauffeurError.daemon("cannot read \(path)") }
         guard st.st_mode & S_IFMT == S_IFDIR else {
             throw ChauffeurError.daemon("\(path) is not a directory (a symlink?); remove it and retry")
         }
-        guard st.st_uid == getuid() else { throw ChauffeurError.daemon("\(path) belongs to another user; remove it and retry") }
+        guard st.st_uid == getuid() else {
+            throw ChauffeurError.daemon("\(path) belongs to another user; remove it and retry")
+        }
         if st.st_mode & 0o077 != 0, chmod(path, 0o700) != 0 {
             throw ChauffeurError.daemon("cannot make \(path) private (chmod 700 failed)")
         }
