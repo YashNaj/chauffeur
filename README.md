@@ -146,6 +146,18 @@ All of them are unedited runs, recorded with `demos/*.sh`. Full-quality MP4s, to
 - **Screen text is untrusted input.** chauffeur quotes everything an app shows, so the agent reads it as data, not
   as instructions. Treat what an app says with the same care you would a web page.
 
+## What's next
+
+- **GPT-6 support.** chauffeur already speaks MCP to any agent. Next, GPT-6 joins the benchmark, and the skill and
+  tool descriptions get tuned for it, so Codex users get the same results Claude Code users do.
+- **A Jev feature branch.** Jev, TypeSafe's typed decision model, makes fast, structured decisions. On a `jev`
+  branch, Jev handles moment-to-moment Simulator control while your coding agent sets the goals.
+- **Games.** A game draws to the screen with Metal or SpriteKit, so there's no accessibility tree to read. chauffeur
+  will play them through Jev or other computer vision, reading the frame and acting in real time. Then agents can test
+  iOS games the way they test apps today.
+
+Want one of these sooner, or have a different idea? [Open an issue](https://github.com/YashNaj/chauffeur/issues).
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Report security issues as described in [SECURITY.md](SECURITY.md). The
