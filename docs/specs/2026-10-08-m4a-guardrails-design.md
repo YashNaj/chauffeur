@@ -32,8 +32,9 @@ mode with 0 compiler warnings. M4a keeps it that way. It is not a cleanup.
 Until now the private working repo was the source of truth, and `scripts/export-public.sh` and `scripts/sync-public.sh`
 copied an allowlisted tree into the public repo. From M4a on:
 
-- **Final sync.** Before anything else, confirm the public tree matches what the allowlist selects from the private
-  repo's `main`. Anything missing is synced once, through `sync-public.sh`, before it is retired.
+- **Final sync.** Before anything else, compare the public tree with what the allowlist selects from the private
+  repo's `main`. The public repo is already ahead (the 0.1.1 hotfix was made there), so differences are resolved by
+  hand, file by file, never by running `sync-public.sh` over the public tree.
 - **Retired:** `scripts/export-public.sh`, `scripts/sync-public.sh`, `scripts/select-public.py`,
   `scripts/public-files.txt`, and the allowlist half of `scripts/tests/test-public.sh`.
 - **Kept:** `scripts/check-public.sh` (the leak check), its tests, and the pre-commit hook that runs it. A public repo
@@ -133,7 +134,7 @@ Live simulator tests stay out of `check.sh`; they need a booted simulator. `CONT
 
 Applied with `gh api` by the owner, recorded in `CONTRIBUTING.md`:
 
-- **Branch protection on `main`:** PRs required; the `build-test` check required; 1 approving review required; stale
+- **Branch protection on `main`:** PRs required; the `build-test` checks required; 1 approving review required; stale
   approvals dismissed on new commits; linear history; no force pushes; no deletion.
 - **The owner can bypass** (`enforce_admins: false`). With two people, one being away must not stop urgent fixes, and
   macOS runners can be unavailable (see §10). Every bypass gets a comment on the PR saying why.
@@ -157,18 +158,25 @@ Applied with `gh api` by the owner, recorded in `CONTRIBUTING.md`:
     flows, third-party apps), and enough runs to make the difference with Xcode's MCP statistically clear.
   - **Later:** GPT-6 and Codex, the Jev branch, games.
 
-## 10. CI availability
+## 10. CI covers the Xcode we don't develop on
 
-On launch day every CI run was cancelled after 15 minutes: GitHub could not assign a `macos-26` arm64 runner
-("The job was not acquired by Runner of type hosted", with a capacity notice). A required check that never runs blocks
-every PR.
+**What happened.** On launch day every CI run was cancelled after 15 minutes: GitHub could not assign a `macos-26`
+arm64 runner ("The job was not acquired by Runner of type hosted", with a capacity notice). When a re-run finally got
+a runner, it failed to compile on Xcode 26.6 (Swift 6.2): Swift 6.4 inferred a type that Swift 6.2 did not. Both of us
+develop on Xcode 27, so 0.1.0 shipped unbuildable on Xcode 26, which the README says is supported. 0.1.1 fixed it.
 
-- The plan's first task re-runs CI and records whether runners are available. If runs complete, nothing changes.
-- If they still don't, the workflow falls back to the next runner image that has Xcode 26 or later, as long as the
-  full `check.sh` passes on it. A self-hosted runner is ruled out: a public repo would run strangers' PR code on a
-  personal Mac.
-- If no hosted image works, the owner's bypass (§8) applies, and each PR records the local `check.sh` result in its
-  description until CI recovers.
+**What follows from it:**
+
+- **CI is the only place the oldest supported Xcode is tested.** The `build-test` job pins the newest Xcode 26 on its
+  runner image instead of picking whatever is newest, and the job is named for it (`build-test (Xcode 26)`). If the
+  image also has Xcode 27, a second matrix entry builds and tests with it.
+- **A release needs a green CI run on its exact commit.** The release steps in `CONTRIBUTING.md` say so, and a local
+  `check.sh` pass doesn't substitute, because it runs on the wrong Xcode.
+- **Runner availability.** Runs completed again by the evening of launch day, so the first plan task only confirms
+  they still do. If they stop, the workflow falls back to another hosted image with Xcode 26, as long as `check.sh`
+  passes on it. A self-hosted runner is ruled out: a public repo would run strangers' PR code on a personal Mac. If no
+  hosted image works, the owner's bypass (§8) applies to PRs, each recording its local `check.sh` result, but releases
+  wait for CI.
 
 ## Testing
 
