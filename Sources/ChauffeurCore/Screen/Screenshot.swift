@@ -24,16 +24,20 @@ public struct ShotPlan: Equatable, Sendable {
         let full = Rect(x: 0, y: 0, w: Double(imageW) / scale, h: Double(imageH) / scale)
         var region = full
         if let zoom {
-            let x0 = max(zoom.x, 0), y0 = max(zoom.y, 0)
-            let x1 = min(zoom.maxX, full.w), y1 = min(zoom.maxY, full.h)
+            let x0 = max(zoom.x, 0)
+            let y0 = max(zoom.y, 0)
+            let x1 = min(zoom.maxX, full.w)
+            let y1 = min(zoom.maxY, full.h)
             guard x1 > x0, y1 > y0 else { return nil }
             region = Rect(x: x0, y: y0, w: x1 - x0, h: y1 - y0)
         }
         let density = min(zoom == nil ? 1 : scale, maxEdge / max(region.w, region.h))
-        let crop = Rect(x: (region.x * scale).rounded(), y: (region.y * scale).rounded(),
-                        w: (region.w * scale).rounded(), h: (region.h * scale).rounded())
-        return ShotPlan(crop: crop, width: max(1, Int((region.w * density).rounded())),
-                        height: max(1, Int((region.h * density).rounded())), pxPerPt: density, region: region)
+        let crop = Rect(
+            x: (region.x * scale).rounded(), y: (region.y * scale).rounded(),
+            w: (region.w * scale).rounded(), h: (region.h * scale).rounded())
+        return ShotPlan(
+            crop: crop, width: max(1, Int((region.w * density).rounded())),
+            height: max(1, Int((region.h * density).rounded())), pxPerPt: density, region: region)
     }
 }
 
@@ -48,9 +52,11 @@ public enum Screenshot {
     public static func render(_ image: CGImage, _ plan: ShotPlan) -> CGImage? {
         let c = plan.crop
         guard let cropped = image.cropping(to: CGRect(x: c.x, y: c.y, width: c.w, height: c.h)),
-              let space = CGColorSpace(name: CGColorSpace.sRGB),
-              let context = CGContext(data: nil, width: plan.width, height: plan.height, bitsPerComponent: 8, bytesPerRow: 0,
-                                      space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return nil }
+            let space = CGColorSpace(name: CGColorSpace.sRGB),
+            let context = CGContext(
+                data: nil, width: plan.width, height: plan.height, bitsPerComponent: 8, bytesPerRow: 0,
+                space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)
+        else { return nil }
         context.interpolationQuality = .high
         context.draw(cropped, in: CGRect(x: 0, y: 0, width: plan.width, height: plan.height))
         return context.makeImage()
@@ -58,8 +64,11 @@ public enum Screenshot {
 
     /// Writes a JPEG and returns its size in bytes.
     public static func writeJPEG(_ image: CGImage, to url: URL, quality: Double = 0.8) -> Int? {
-        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.jpeg" as CFString, 1, nil) else { return nil }
-        CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary)
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.jpeg" as CFString, 1, nil) else {
+            return nil
+        }
+        CGImageDestinationAddImage(
+            destination, image, [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary)
         guard CGImageDestinationFinalize(destination) else { return nil }
         return (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? nil
     }

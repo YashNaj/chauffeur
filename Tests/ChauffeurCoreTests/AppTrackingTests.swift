@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite @MainActor struct AppTrackingTests {
@@ -7,13 +8,16 @@ import Testing
 
     func snapshot(app name: String) -> Snapshot {
         var refs = RefTable()
-        let root = AXElement(role: "AXApplication", label: name, frame: Rect(x: 0, y: 0, w: 402, h: 874), children: [
-            AXElement(role: "AXButton", label: "OK", frame: Rect(x: 100, y: 400, w: 200, h: 44)),
-        ])
+        let root = AXElement(
+            role: "AXApplication", label: name, frame: Rect(x: 0, y: 0, w: 402, h: 874),
+            children: [
+                AXElement(role: "AXButton", label: "OK", frame: Rect(x: 100, y: 400, w: 200, h: 44))
+            ])
         return Perception.build(root: root, size: Size(w: 402, h: 874), previous: nil, refs: &refs, rev: 1)
     }
 
-    let fixture = TrackedApp(bundle: "dev.chauffeur.fixture", executable: "Fixture", displayName: "Fixture", pid: 4321, launchedAt: Date())
+    let fixture = TrackedApp(
+        bundle: "dev.chauffeur.fixture", executable: "Fixture", displayName: "Fixture", pid: 4321, launchedAt: Date())
 
     @Test func theLaunchedAppIsExpectedOnlyWhileItIsInFront() {
         let s = Session(udid: Self.fakeUDID())

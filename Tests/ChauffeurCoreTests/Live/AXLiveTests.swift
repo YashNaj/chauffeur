@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 @MainActor
@@ -60,7 +61,9 @@ func waitForTree(_ ax: AXProvider, timeout: Double = 15, _ condition: (AXElement
         defer { s.shutdown() }
         #expect(s.run(["wait", "Show alert", "--timeout", "30"]).exit == 0)
         let ax = s.restartBridge()
-        #expect(ax?.read().map { !$0.frame.isEmpty } == true, "the provider healing re-polls with must read after a restart")
+        #expect(
+            ax?.read().map { !$0.frame.isEmpty } == true, "the provider healing re-polls with must read after a restart"
+        )
     }
 
     /// Final review I5, seen live 2026-10-07: an app started (outside chauffeur) while the flags were off has no tree.
@@ -75,11 +78,13 @@ func waitForTree(_ ax: AXProvider, timeout: Double = 15, _ condition: (AXElement
         let s = Session(udid: udid)
         defer { s.shutdown() }
         var out = s.run(["snapshot"])
-        for _ in 0..<8 where !out.text.contains("relaunch it") { usleep(700_000); out = s.run(["snapshot"]) }
+        for _ in 0..<8 where !out.text.contains("relaunch it") {
+            usleep(700_000)
+            out = s.run(["snapshot"])
+        }
         #expect(out.text.contains("relaunch it: chauffeur launch <bundle>"), "\(out.text)")
         #expect(s.bridgeRestartedMs == nil)
         let relaunched = s.run(["launch", "dev.chauffeur.fixture"])
         #expect(relaunched.exit == 0 && relaunched.text.contains("app \"Fixture\""), "\(relaunched.text)")
     }
 }
-

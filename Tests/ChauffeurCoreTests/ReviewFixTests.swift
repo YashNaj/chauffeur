@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 /// Regression tests for the final-review findings (C1, I1–I6).
@@ -22,7 +23,10 @@ import Testing
         let oldInode = try #require(UnixSocket.inode(path))
         close(old)
         let new = try UnixSocket.listen(path: path)  // successor rebinds the same path
-        defer { close(new); unlink(path) }
+        defer {
+            close(new)
+            unlink(path)
+        }
         UnixSocket.unlink(path, ifInode: oldInode)
         #expect(FileManager.default.fileExists(atPath: path))
         UnixSocket.unlink(path, ifInode: try #require(UnixSocket.inode(path)))
@@ -47,25 +51,34 @@ import Testing
 
     // I1: a change on a screen that was already changing is not credited to the action.
     @Test func changeOnAnUnsettledScreenIsUnattributed() {
-        #expect(Verifier.classify(treeChanged: true, evidence: .app("x"), expectedApp: nil, systemFrontmost: false,
-                                  retried: false, baselineSettled: false) == .unattributed)
-        #expect(Verifier.classify(treeChanged: true, evidence: .app("x"), expectedApp: nil, systemFrontmost: false,
-                                  retried: false, baselineSettled: true) == .changed)
-        let r = ActionReport(action: "tap e1", outcome: .unattributed, evidence: .app("x"), settledMs: 1500, settled: false,
-                             revBefore: 1, revAfter: 2, diff: [], transport: "digitizer", retriedFrom: nil,
-                             hints: Verifier.hints(outcome: .unattributed, target: nil), capMs: 1500)
+        #expect(
+            Verifier.classify(
+                treeChanged: true, evidence: .app("x"), expectedApp: nil, systemFrontmost: false,
+                retried: false, baselineSettled: false) == .unattributed)
+        #expect(
+            Verifier.classify(
+                treeChanged: true, evidence: .app("x"), expectedApp: nil, systemFrontmost: false,
+                retried: false, baselineSettled: true) == .changed)
+        let r = ActionReport(
+            action: "tap e1", outcome: .unattributed, evidence: .app("x"), settledMs: 1500, settled: false,
+            revBefore: 1, revAfter: 2, diff: [], transport: "digitizer", retriedFrom: nil,
+            hints: Verifier.hints(outcome: .unattributed, target: nil), capMs: 1500)
         #expect(r.render().hasPrefix("tap e1 → UNVERIFIED: the screen was already changing"))
         #expect(r.exitCode == 3)
     }
 
     func field(_ value: String) -> Node {
-        Node(role: "textfield", name: "f", value: value, identifier: nil, enabled: true, frame: Rect(x: 0, y: 0, w: 10, h: 10),
-             depth: 0, identity: Identity(role: "textfield", key: "f", ancestor: nil, ordinal: 0), ref: "e1")
+        Node(
+            role: "textfield", name: "f", value: value, identifier: nil, enabled: true,
+            frame: Rect(x: 0, y: 0, w: 10, h: 10),
+            depth: 0, identity: Identity(role: "textfield", key: "f", ancestor: nil, ordinal: 0), ref: "e1")
     }
 
     // I2: typed text must actually have been added.
     @Test func typingIntoAPrefilledFieldNeedsNewText() {
-        #expect(TypeCheck.verify(typed: "a", before: field("banana"), after: field("banana"), submitted: false) == .mismatch("banana"))
+        #expect(
+            TypeCheck.verify(typed: "a", before: field("banana"), after: field("banana"), submitted: false)
+                == .mismatch("banana"))
         #expect(TypeCheck.verify(typed: "a", before: field("banana"), after: field("bananaa"), submitted: false) == .ok)
         #expect(TypeCheck.verify(typed: "x", before: field("x"), after: field("x"), submitted: false) == .mismatch("x"))
     }

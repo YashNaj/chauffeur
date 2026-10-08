@@ -9,7 +9,10 @@ public struct TraceTarget: Codable, Equatable, Sendable {
     public var id: String?
 
     public init(ref: String?, role: String, name: String?, id: String?) {
-        self.ref = ref; self.role = role; self.name = name; self.id = id
+        self.ref = ref
+        self.role = role
+        self.name = name
+        self.id = id
     }
 
     public init(_ node: Node) { self.init(ref: node.ref, role: node.role, name: node.name, id: node.identifier) }
@@ -30,10 +33,18 @@ public struct TraceEntry: Codable, Equatable, Sendable {
     /// The launched app at the time.
     public var app: String?
 
-    public init(time: String, udid: String, args: [String], exit: Int32, ms: Int, result: String,
-                target: TraceTarget?, app: String?) {
-        self.time = time; self.udid = udid; self.args = args; self.exit = exit; self.ms = ms
-        self.result = result; self.target = target; self.app = app
+    public init(
+        time: String, udid: String, args: [String], exit: Int32, ms: Int, result: String,
+        target: TraceTarget?, app: String?
+    ) {
+        self.time = time
+        self.udid = udid
+        self.args = args
+        self.exit = exit
+        self.ms = ms
+        self.result = result
+        self.target = target
+        self.app = app
     }
 }
 
@@ -55,7 +66,8 @@ public enum Trace {
         guard var line = try? encoder.encode(entry) else { return }
         line.append(0x0A)
         if let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int,
-           size + line.count > rotateBytes {
+            size + line.count > rotateBytes
+        {
             let old = url.appendingPathExtension("1")
             try? FileManager.default.removeItem(at: old)
             try? FileManager.default.moveItem(at: url, to: old)

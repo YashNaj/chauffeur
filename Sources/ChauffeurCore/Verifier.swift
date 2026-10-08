@@ -23,12 +23,15 @@ public enum Outcome: Equatable, Sendable {
 public enum Verifier {
     /// What a NO EFFECT screenshot shows: the target's row widened to the screen, 120 pt above and below, on screen.
     public static func evidenceRegion(target: Rect, screen: Size) -> Rect {
-        let y = max(0, target.y - 120), maxY = min(screen.h, target.maxY + 120)
+        let y = max(0, target.y - 120)
+        let maxY = min(screen.h, target.maxY + 120)
         return Rect(x: 0, y: y, w: screen.w, h: maxY - y)
     }
 
-    public static func classify(treeChanged: Bool, evidence: Evidence, expectedApp: String?,
-                                systemFrontmost: Bool, retried: Bool, baselineSettled: Bool = true) -> Outcome {
+    public static func classify(
+        treeChanged: Bool, evidence: Evidence, expectedApp: String?,
+        systemFrontmost: Bool, retried: Bool, baselineSettled: Bool = true
+    ) -> Outcome {
         if treeChanged { return baselineSettled ? .changed : .unattributed }
         switch evidence {
         case .unavailable:
@@ -48,9 +51,13 @@ public enum Verifier {
         case .noEffect:
             guard let target else { return ["nothing at that point reacted; run snapshot and act on a ref"] }
             let ref = target.ref ?? "it"
-            if !target.enabled { return ["\(ref) is disabled; fill in or select whatever it depends on first, then retry"] }
-            return ["the app received the touch but its accessibility tree did not change; \(ref) may need a "
-                    + "long press (--long 1), or the change is not exposed to accessibility (run snapshot)"]
+            if !target.enabled {
+                return ["\(ref) is disabled; fill in or select whatever it depends on first, then retry"]
+            }
+            return [
+                "the app received the touch but its accessibility tree did not change; \(ref) may need a "
+                    + "long press (--long 1), or the change is not exposed to accessibility (run snapshot)"
+            ]
         case .intercepted:
             return ["something else is on top of the app; run snapshot to see what"]
         case .notDelivered:
@@ -58,7 +65,9 @@ public enum Verifier {
         case .unverified:
             return ["touch log unavailable, so delivery is unknown; run `chauffeur doctor`"]
         case .unattributed:
-            return ["wait for the screen to settle (chauffeur wait …), run snapshot, and check whether the action is still needed"]
+            return [
+                "wait for the screen to settle (chauffeur wait …), run snapshot, and check whether the action is still needed"
+            ]
         case .changed, .retry:
             return []
         }
@@ -84,11 +93,22 @@ public struct ActionReport: Sendable {
     /// A screenshot around the target, taken on NO EFFECT: the tree can miss a change the pixels show.
     public var evidenceShot: String?
 
-    public init(action: String, outcome: Outcome, evidence: Evidence, settledMs: Int, settled: Bool, revBefore: Int,
-                revAfter: Int, diff: [String], transport: String, retriedFrom: String?, hints: [String], capMs: Int) {
-        self.action = action; self.outcome = outcome; self.evidence = evidence; self.settledMs = settledMs
-        self.settled = settled; self.revBefore = revBefore; self.revAfter = revAfter; self.diff = diff
-        self.transport = transport; self.retriedFrom = retriedFrom; self.hints = hints; self.capMs = capMs
+    public init(
+        action: String, outcome: Outcome, evidence: Evidence, settledMs: Int, settled: Bool, revBefore: Int,
+        revAfter: Int, diff: [String], transport: String, retriedFrom: String?, hints: [String], capMs: Int
+    ) {
+        self.action = action
+        self.outcome = outcome
+        self.evidence = evidence
+        self.settledMs = settledMs
+        self.settled = settled
+        self.revBefore = revBefore
+        self.revAfter = revAfter
+        self.diff = diff
+        self.transport = transport
+        self.retriedFrom = retriedFrom
+        self.hints = hints
+        self.capMs = capMs
     }
 
     public var exitCode: Int32 { outcome == .changed ? 0 : 3 }
@@ -98,7 +118,8 @@ public struct ActionReport: Sendable {
         var head: String
         switch outcome {
         case .changed:
-            head = "\(action) → changed · " + (settled ? "settled \(settledMs)ms" : "still changing at \(cap)")
+            head =
+                "\(action) → changed · " + (settled ? "settled \(settledMs)ms" : "still changing at \(cap)")
                 + " · rev \(revBefore)→\(revAfter)"
             if let from = retriedFrom { head += " · via \(transport) after \(from) showed no touch" }
         case .noEffect:
@@ -106,15 +127,19 @@ public struct ActionReport: Sendable {
         case .intercepted(let by):
             head = "\(action) → INTERCEPTED by \(by) · nothing changed"
         case .notDelivered, .retry:
-            head = "\(action) → NOT DELIVERED · " + (retriedFrom != nil ? "retried via \(transport) · " : "") + "still no touch"
+            head =
+                "\(action) → NOT DELIVERED · " + (retriedFrom != nil ? "retried via \(transport) · " : "")
+                + "still no touch"
         case .unverified:
             head = "\(action) → UNVERIFIED: no visible change (\(note ?? "touch log unavailable"))"
         case .unattributed:
-            head = "\(action) → UNVERIFIED: the screen was already changing before the action, so the change can't be credited to it"
+            head =
+                "\(action) → UNVERIFIED: the screen was already changing before the action, so the change can't be credited to it"
         }
         var tail = hints.map { "hint: " + $0 }
         if outcome == .noEffect, let shot = evidenceShot {
-            tail.insert("screen: \(shot) (look before retrying: some changes, like checkmarks, never reach the tree)", at: 0)
+            tail.insert(
+                "screen: \(shot) (look before retrying: some changes, like checkmarks, never reach the tree)", at: 0)
         }
         return ([head] + diff + tail).joined(separator: "\n")
     }
@@ -172,7 +197,8 @@ public enum TypeVerdict: Equatable, Sendable {
 public enum TypeCheck {
     public static func verify(typed: String, before: Node, after: Node?, submitted: Bool) -> TypeVerdict {
         guard let after else { return submitted ? .ok : .fieldGone }
-        let old = before.value ?? "", new = after.value ?? ""
+        let old = before.value ?? ""
+        let new = after.value ?? ""
         if before.role == "securefield" {
             let added = new.filter { $0 == "•" }.count - old.filter { $0 == "•" }.count
             return added == typed.count ? .ok : .mismatch(new)
@@ -191,14 +217,20 @@ public struct TypeReport: Sendable {
     public var settledMs: Int
 
     public init(action: String, method: String, verdict: TypeVerdict, value: String?, settledMs: Int) {
-        self.action = action; self.method = method; self.verdict = verdict; self.value = value; self.settledMs = settledMs
+        self.action = action
+        self.method = method
+        self.verdict = verdict
+        self.value = value
+        self.settledMs = settledMs
     }
 
     public var exitCode: Int32 { verdict == .ok ? 0 : 3 }
 
     public var json: JSON {
-        var o: [String: JSON] = ["action": .string(action), "method": .string(method), "value": JSON(value),
-                                 "settledMs": JSON(settledMs)]
+        var o: [String: JSON] = [
+            "action": .string(action), "method": .string(method), "value": JSON(value),
+            "settledMs": JSON(settledMs),
+        ]
         switch verdict {
         case .ok:
             o["verdict"] = "ok"

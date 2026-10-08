@@ -1,16 +1,21 @@
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite @MainActor struct CLITests {
     final class Recorder: @unchecked Sendable { var calls: [(String, [String])] = [] }
 
-    func env(booted: [DeviceInfo], cwd: URL = FileManager.default.temporaryDirectory, recorder: Recorder = Recorder(),
-             vars: [String: String] = [:]) -> CLI.Environment {
-        CLI.Environment(env: vars, cwd: cwd, devices: { booted }, send: { udid, args in
-            recorder.calls.append((udid, args))
-            return Output("from daemon")
-        })
+    func env(
+        booted: [DeviceInfo], cwd: URL = FileManager.default.temporaryDirectory, recorder: Recorder = Recorder(),
+        vars: [String: String] = [:]
+    ) -> CLI.Environment {
+        CLI.Environment(
+            env: vars, cwd: cwd, devices: { booted },
+            send: { udid, args in
+                recorder.calls.append((udid, args))
+                return Output("from daemon")
+            })
     }
 
     let a = DeviceInfo(udid: "AAAA-1", name: "iPhone 17 Pro", runtime: "iOS 26.2", state: "Booted")
@@ -42,10 +47,12 @@ import Testing
 
     @Test func jsonWrapsTheSameResult() {
         let rec = Recorder()
-        let e = CLI.Environment(env: [:], cwd: FileManager.default.temporaryDirectory, devices: { [a] }, send: { udid, args in
-            rec.calls.append((udid, args))
-            return Output("tap e4 → changed", exit: 0, data: ["outcome": "changed"])
-        })
+        let e = CLI.Environment(
+            env: [:], cwd: FileManager.default.temporaryDirectory, devices: { [a] },
+            send: { udid, args in
+                rec.calls.append((udid, args))
+                return Output("tap e4 → changed", exit: 0, data: ["outcome": "changed"])
+            })
         let out = CLI.handle(["tap", "--json", "e4"], e)
         #expect(out.text == #"{"data":{"outcome":"changed"},"exit":0,"text":"tap e4 → changed"}"#)
         #expect(rec.calls[0].1 == ["tap", "e4"])
@@ -57,7 +64,8 @@ import Testing
         let rec = Recorder()
         let out = CLI.handle(["launch", "dev.x", "--args", "--json", "--udid", "-v"], env(booted: [a], recorder: rec))
         #expect(out == Output("from daemon"))  // --json after --args belongs to the app: no JSON wrapping
-        #expect(rec.calls[0].0 == "AAAA-1" && rec.calls[0].1 == ["launch", "dev.x", "--args", "--json", "--udid", "-v"])
+        #expect(
+            rec.calls[0].0 == "AAAA-1" && rec.calls[0].1 == ["launch", "dev.x", "--args", "--json", "--udid", "-v"])
     }
 
     @Test func badDoctorFlagIsAUsageError() {

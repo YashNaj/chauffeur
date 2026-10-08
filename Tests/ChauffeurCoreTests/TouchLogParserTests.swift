@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite struct TouchLogParserTests {
@@ -11,10 +12,14 @@ import Testing
             FC3B97C5: (touchStream|filterDetachedTouches); contextID: 0xFC3B97C5; clientPort: 0x4F0F
         }
         """
-    static let streamDown = "Digitizer token: 0xFC3B97C5; down; move; subevents: [path: 0; {603, 690}; down; move; touchID: 0x1; {603, 690}]"
-    static let appDown = "Digitizer token: 0xA214404D; down; move; sgp; behavior: foreground; subevents: [path: 0; {201, 230}; down; move; touchID: 0x1; {201, 230}]"
-    static let appUp = "Digitizer token: 0xA214404D; move (not touching!); up; sgp; behavior: foreground; subevents: [path: 0; {201, 230}; move (not touching!); up; touchID: 0x1; {201, 230}]"
-    static let springBoardDown = "Digitizer token: 0x819D95C8; down; move; sgp; subevents: [path: 0; {201, 30}; down; move; touchID: 0x2; {201, 30}]"
+    static let streamDown =
+        "Digitizer token: 0xFC3B97C5; down; move; subevents: [path: 0; {603, 690}; down; move; touchID: 0x1; {603, 690}]"
+    static let appDown =
+        "Digitizer token: 0xA214404D; down; move; sgp; behavior: foreground; subevents: [path: 0; {201, 230}; down; move; touchID: 0x1; {201, 230}]"
+    static let appUp =
+        "Digitizer token: 0xA214404D; move (not touching!); up; sgp; behavior: foreground; subevents: [path: 0; {201, 230}; move (not touching!); up; touchID: 0x1; {201, 230}]"
+    static let springBoardDown =
+        "Digitizer token: 0x819D95C8; down; move; sgp; subevents: [path: 0; {201, 30}; down; move; touchID: 0x2; {201, 30}]"
 
     @Test func tapIntoAnApp() {
         var p = TouchLogParser()
@@ -42,7 +47,9 @@ import Testing
 
     @Test func ownersAreLearnedFromAnyMessage() {
         var p = TouchLogParser()
-        _ = p.consume("adding latent: <BKTouchDestination: 0x600000c62b50; (hitTest); contextID: 0xA214404D; clientPort: 0x1DA33; inheritedSceneHostSettings: <identifier: sceneID:com.apple.Preferences-default; touchBehavior: foreground>; externalReferences: 1>")
+        _ = p.consume(
+            "adding latent: <BKTouchDestination: 0x600000c62b50; (hitTest); contextID: 0xA214404D; clientPort: 0x1DA33; inheritedSceneHostSettings: <identifier: sceneID:com.apple.Preferences-default; touchBehavior: foreground>; externalReferences: 1>"
+        )
         let r = p.consume(Self.appDown)!
         #expect(p.evidence([r]) == .app("com.apple.Preferences"))
     }
@@ -57,7 +64,8 @@ import Testing
         #expect(PriorLevel.choose(saved: "info", current: "debug") == "info")
         #expect(PriorLevel.choose(saved: nil, current: "default") == "default")
         #expect(PriorLevel.choose(saved: nil, current: "debug") == "default")  // leftover from an unknown crash
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("chauffeur-test-\(UUID().uuidString).level")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "chauffeur-test-\(UUID().uuidString).level")
         PriorLevel.save("info", to: url)
         #expect(PriorLevel.load(url) == "info")
         PriorLevel.clear(url)

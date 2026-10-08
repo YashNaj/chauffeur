@@ -1,10 +1,12 @@
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite struct BatchTests {
     @Test func semicolonsSplitCommandsButNotQuotedText() throws {
-        #expect(try Batch.parse(#"tap e4; type e5 "hello; world" --submit; scroll down"#)
+        #expect(
+            try Batch.parse(#"tap e4; type e5 "hello; world" --submit; scroll down"#)
                 == [["tap", "e4"], ["type", "e5", "hello; world", "--submit"], ["scroll", "down"]])
         #expect(try Batch.parse("tap e1\ntap e2") == [["tap", "e1"], ["tap", "e2"]])
         #expect(try Batch.parse(";; tap e1 ;") == [["tap", "e1"]])

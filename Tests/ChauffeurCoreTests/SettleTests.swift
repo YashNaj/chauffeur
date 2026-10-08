@@ -1,4 +1,5 @@
 import Testing
+
 @testable import ChauffeurCore
 
 final class FakeClock: SettleClock {
@@ -11,7 +12,8 @@ final class FakeClock: SettleClock {
     func run(_ hashes: [Int?], minMs: Int = 150, capMs: Int = 1500) -> (Settled<Int>, FakeClock) {
         let clock = FakeClock()
         var i = 0
-        let result = Settle.wait(minMs: minMs, capMs: capMs, pollMs: 75, clock: clock) { () -> (value: Int, hash: Int)? in
+        let result = Settle.wait(minMs: minMs, capMs: capMs, pollMs: 75, clock: clock) {
+            () -> (value: Int, hash: Int)? in
             defer { i += 1 }
             let h = hashes[min(i, hashes.count - 1)]
             return h.map { (value: i, hash: $0) }

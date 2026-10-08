@@ -14,23 +14,29 @@ extension Session {
             throw ChauffeurError.usage(a.usage)
         }
         if service == "notifications" {
-            return Output("permission \(action) notifications → not possible: simctl cannot change notification permission. "
-                          + "Let the app ask, then tap Allow on the prompt (snapshot shows it as a system alert)", exit: 1)
+            return Output(
+                "permission \(action) notifications → not possible: simctl cannot change notification permission. "
+                    + "Let the app ask, then tap Allow on the prompt (snapshot shows it as a system alert)", exit: 1)
         }
         guard Self.privacyServices.contains(service) else {
-            throw ChauffeurError.usage("unknown service \(Perception.quote(service)); one of: "
-                                       + Self.privacyServices.sorted().joined(separator: ", ") + "\n" + a.usage)
+            throw ChauffeurError.usage(
+                "unknown service \(Perception.quote(service)); one of: "
+                    + Self.privacyServices.sorted().joined(separator: ", ") + "\n" + a.usage)
         }
         let bundle = a.positionals.isEmpty ? nil : try bundleArgument(&a)
         try a.done()
-        if action != "reset" && bundle == nil { throw ChauffeurError.usage("\(action) needs the app's bundle id\n" + a.usage) }
+        if action != "reset" && bundle == nil {
+            throw ChauffeurError.usage("\(action) needs the app's bundle id\n" + a.usage)
+        }
         _ = try connect()
         // "Some permission changes will terminate the application" (simctl help privacy): if that is the launched app,
         // its exit is expected, not a crash.
         let tracked = (bundle ?? app?.bundle).flatMap { release($0) }
         let r = try SimCtl.run(["privacy", udid, action, service] + (bundle.map { [$0] } ?? []), timeout: 30)
         let note = tracked.flatMap { afterPermissionChange($0, waitMs: 1000) }
-        guard r.status == 0 else { return Output("permission \(action) \(service) → FAILED: \(SimCtl.message(r))", exit: 1) }
+        guard r.status == 0 else {
+            return Output("permission \(action) \(service) → FAILED: \(SimCtl.message(r))", exit: 1)
+        }
         let done = ["grant": "granted", "revoke": "revoked", "reset": "reset"][action] ?? action
         let head = "permission \(action) \(service)" + (bundle.map { " \($0)" } ?? "") + " → \(done)"
         return Output(([head] + [note].compactMap { $0 }).joined(separator: "\n"))
@@ -44,7 +50,8 @@ extension Session {
             track(tracked)
             return nil
         }
-        return "note: the change ended \(tracked.bundle) (pid \(tracked.pid)); relaunch it: chauffeur launch \(tracked.bundle)"
+        return
+            "note: the change ended \(tracked.bundle) (pid \(tracked.pid)); relaunch it: chauffeur launch \(tracked.bundle)"
     }
 
     func locationCommand(_ argv: [String]) throws -> Output {
@@ -60,9 +67,12 @@ extension Session {
             // simctl itself accepts 91,0: check the range here.
             let parts = value.split(separator: ",", omittingEmptySubsequences: false)
                 .map { Double($0.trimmingCharacters(in: .whitespaces)) }
-            guard parts.count == 2, let lat = parts[0], let lon = parts[1], (-90...90).contains(lat), (-180...180).contains(lon) else {
-                throw ChauffeurError.usage("location expects latitude,longitude in degrees (-90…90, -180…180), got "
-                                           + Perception.quote(value) + "\n" + a.usage)
+            guard parts.count == 2, let lat = parts[0], let lon = parts[1], (-90...90).contains(lat),
+                (-180...180).contains(lon)
+            else {
+                throw ChauffeurError.usage(
+                    "location expects latitude,longitude in degrees (-90…90, -180…180), got "
+                        + Perception.quote(value) + "\n" + a.usage)
             }
             args = ["set", "\(lat),\(lon)"]
             shown = "set to \(lat),\(lon)"
@@ -92,7 +102,9 @@ extension Session {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return "the payload is not a JSON object"
         }
-        guard object["aps"] is [String: Any] else { return #"the payload needs an "aps" object, e.g. {"aps":{"alert":"Hi"}}"# }
+        guard object["aps"] is [String: Any] else {
+            return #"the payload needs an "aps" object, e.g. {"aps":{"alert":"Hi"}}"#
+        }
         return nil
     }
 
@@ -101,13 +113,17 @@ extension Session {
         guard let mode = a.next(), mode == "light" || mode == "dark" else { throw ChauffeurError.usage(a.usage) }
         try a.done()
         _ = try connect()
-        let before = try SimCtl.run(["ui", udid, "appearance"], timeout: 30).out.trimmingCharacters(in: .whitespacesAndNewlines)
+        let before = try SimCtl.run(["ui", udid, "appearance"], timeout: 30).out.trimmingCharacters(
+            in: .whitespacesAndNewlines)
         let r = try SimCtl.run(["ui", udid, "appearance", mode], timeout: 30)
         guard r.status == 0 else { return Output("appearance \(mode) → FAILED: \(SimCtl.message(r))", exit: 1) }
-        let after = try SimCtl.run(["ui", udid, "appearance"], timeout: 30).out.trimmingCharacters(in: .whitespacesAndNewlines)
+        let after = try SimCtl.run(["ui", udid, "appearance"], timeout: 30).out.trimmingCharacters(
+            in: .whitespacesAndNewlines)
         guard after == mode else {
-            return Output("appearance \(mode) → UNVERIFIED: the simulator now reports \(Perception.quote(after))", exit: 3)
+            return Output(
+                "appearance \(mode) → UNVERIFIED: the simulator now reports \(Perception.quote(after))", exit: 3)
         }
-        return Output("appearance → \(mode)" + (before == mode ? " (it already was)" : " (was \(Perception.escape(before)))"))
+        return Output(
+            "appearance → \(mode)" + (before == mode ? " (it already was)" : " (was \(Perception.escape(before)))"))
     }
 }

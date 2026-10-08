@@ -15,11 +15,14 @@ private final class Box<T>: @unchecked Sendable {
 
 public enum Shell {
     /// Runs a process, capturing stdout and stderr. Kills it after `timeout` seconds (decision 9: never hang).
-    public static func run(_ path: String, _ args: [String], stdin: String? = nil, timeout: Double = 30) -> ProcessResult {
+    public static func run(_ path: String, _ args: [String], stdin: String? = nil, timeout: Double = 30)
+        -> ProcessResult
+    {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
         process.arguments = args
-        let out = Pipe(), err = Pipe()
+        let out = Pipe()
+        let err = Pipe()
         process.standardOutput = out
         process.standardError = err
         let input = Pipe()
@@ -30,7 +33,8 @@ public enum Shell {
             return ProcessResult(status: -1, out: "", timedOut: false, err: "cannot run \(path): \(error)")
         }
         // Readers start only once the process exists: if it cannot start, no thread is left blocked on a pipe.
-        let outData = Box(Data()), errData = Box(Data())
+        let outData = Box(Data())
+        let errData = Box(Data())
         let reads = DispatchGroup()
         for (handle, box) in [(out.fileHandleForReading, outData), (err.fileHandleForReading, errData)] {
             reads.enter()
@@ -49,8 +53,9 @@ public enum Shell {
             return ProcessResult(status: -1, out: "", timedOut: true)
         }
         _ = reads.wait(timeout: .now() + 2)
-        return ProcessResult(status: process.terminationStatus, out: String(decoding: outData.value, as: UTF8.self),
-                             timedOut: false, err: String(decoding: errData.value, as: UTF8.self))
+        return ProcessResult(
+            status: process.terminationStatus, out: String(decoding: outData.value, as: UTF8.self),
+            timedOut: false, err: String(decoding: errData.value, as: UTF8.self))
     }
 }
 
@@ -67,7 +72,10 @@ public struct DeviceInfo: Equatable, Sendable {
     public var state: String
 
     public init(udid: String, name: String, runtime: String, state: String) {
-        self.udid = udid; self.name = name; self.runtime = runtime; self.state = state
+        self.udid = udid
+        self.name = name
+        self.runtime = runtime
+        self.state = state
     }
 
     public var booted: Bool { state == "Booted" }
@@ -81,7 +89,10 @@ public enum SimCtl {
         for raw in r.err.split(separator: "\n") {
             let line = raw.trimmingCharacters(in: .whitespaces)
             if line.isEmpty || line.hasPrefix("An error was encountered processing the command")
-                || line.hasPrefix("Underlying error") || lines.contains(line) { continue }
+                || line.hasPrefix("Underlying error") || lines.contains(line)
+            {
+                continue
+            }
             lines.append(line)
         }
         guard !lines.isEmpty else { return "simctl exited \(r.status)" }
@@ -91,7 +102,10 @@ public enum SimCtl {
     @discardableResult
     public static func run(_ args: [String], stdin: String? = nil, timeout: Double = 30) throws -> ProcessResult {
         let r = Shell.run("/usr/bin/xcrun", ["simctl"] + args, stdin: stdin, timeout: timeout)
-        if r.timedOut { throw ChauffeurError.simulatorServiceUnresponsive(command: "simctl " + args.prefix(2).joined(separator: " ")) }
+        if r.timedOut {
+            throw ChauffeurError.simulatorServiceUnresponsive(
+                command: "simctl " + args.prefix(2).joined(separator: " "))
+        }
         return r
     }
 
@@ -101,7 +115,12 @@ public enum SimCtl {
 
     public static func parseDevices(_ json: Data) throws -> [DeviceInfo] {
         struct Listing: Decodable {
-            struct Device: Decodable { var udid: String; var name: String; var state: String; var isAvailable: Bool? }
+            struct Device: Decodable {
+                var udid: String
+                var name: String
+                var state: String
+                var isAvailable: Bool?
+            }
             var devices: [String: [Device]]
         }
         let listing = try JSONDecoder().decode(Listing.self, from: json)

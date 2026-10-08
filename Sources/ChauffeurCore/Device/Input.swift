@@ -48,13 +48,18 @@ public enum Gestures {
     }
 
     /// A straight drag in `steps` moves, `stepMs` apart. Needs a transport that supports moves.
-    public static func drag(_ t: TouchTransport, from a: Point, to b: Point, screen: Size, steps: Int = 12, stepMs: Int = 16) -> Bool {
+    public static func drag(
+        _ t: TouchTransport, from a: Point, to b: Point, screen: Size, steps: Int = 12, stepMs: Int = 16
+    ) -> Bool {
         guard t.supportsMove else { return false }
         var ok = t.touch(Geometry.normalised(a, screen: screen), .down)
         for i in 1...steps {
             let f = Double(i) / Double(steps)
             usleep(UInt32(stepMs) * 1000)
-            ok = t.touch(Geometry.normalised(Point(x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f), screen: screen), .move) && ok
+            ok =
+                t.touch(
+                    Geometry.normalised(Point(x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f), screen: screen),
+                    .move) && ok
         }
         return t.touch(Geometry.normalised(b, screen: screen), .up) && ok
     }
@@ -63,7 +68,8 @@ public enum Gestures {
 /// Hardware buttons (spec §5.1): home, lock and Siri are Indigo button events; volume is the HID consumer page.
 public enum HardwareButton: String, CaseIterable, Sendable {
     case home, lock, siri
-    case volumeUp = "volume-up", volumeDown = "volume-down"
+    case volumeUp = "volume-up"
+    case volumeDown = "volume-down"
 
     /// IndigoHIDMessageForButton event source (idb's ButtonEventSource values).
     public var source: UInt32? {
@@ -98,7 +104,9 @@ public enum Keys {
     public static func usage(for c: Character) -> (usage: UInt32, shift: Bool)? {
         let letters = Array("abcdefghijklmnopqrstuvwxyz")
         if let i = letters.firstIndex(of: c) { return (0x04 + UInt32(i), false) }
-        if c.isUppercase, let lower = c.lowercased().first, let i = letters.firstIndex(of: lower) { return (0x04 + UInt32(i), true) }
+        if c.isUppercase, let lower = c.lowercased().first, let i = letters.firstIndex(of: lower) {
+            return (0x04 + UInt32(i), true)
+        }
         if let i = Array("1234567890").firstIndex(of: c) { return (0x1E + UInt32(i), false) }
         if let i = Array("!@#$%^&*()").firstIndex(of: c) { return (0x1E + UInt32(i), true) }
         let table: [Character: (UInt32, Bool)] = [

@@ -102,7 +102,8 @@ public enum Skill {
         if agents.contains("claude") {
             let dir = root.appendingPathComponent(".claude/skills/\(name)", isDirectory: true)
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            try skillMarkdown.appending("\n").write(to: dir.appendingPathComponent("SKILL.md"), atomically: true, encoding: .utf8)
+            try skillMarkdown.appending("\n").write(
+                to: dir.appendingPathComponent("SKILL.md"), atomically: true, encoding: .utf8)
             written.append("wrote .claude/skills/chauffeur/SKILL.md (Claude Code)")
         }
         let readers = agents.filter { $0 == "codex" || $0 == "cursor" }
@@ -110,8 +111,9 @@ public enum Skill {
             let url = root.appendingPathComponent("AGENTS.md")
             let existing = try? String(contentsOf: url, encoding: .utf8)
             try merged(agentsMD: existing, section: agentsSection).write(to: url, atomically: true, encoding: .utf8)
-            written.append((existing == nil ? "wrote" : "updated") + " AGENTS.md ("
-                           + readers.map(\.capitalized).joined(separator: ", ") + ")")
+            written.append(
+                (existing == nil ? "wrote" : "updated") + " AGENTS.md ("
+                    + readers.map(\.capitalized).joined(separator: ", ") + ")")
         }
         return written
     }
@@ -120,7 +122,8 @@ public enum Skill {
     static func merged(agentsMD existing: String?, section: String) -> String {
         guard var text = existing, !text.isEmpty else { return section + "\n" }
         if let start = text.range(of: beginMarker),
-           let stop = text.range(of: endMarker, range: start.upperBound..<text.endIndex) {
+            let stop = text.range(of: endMarker, range: start.upperBound..<text.endIndex)
+        {
             text.replaceSubrange(start.lowerBound..<stop.upperBound, with: section)
             return text
         }

@@ -24,7 +24,8 @@ public enum Batch {
         }
         for c in script {
             if escaped {
-                if quote == "\"" && c != "\"" && c != "\\" { word.append("\\") }  // "\n" in double quotes stays as typed
+                // "\n" in double quotes stays as typed
+                if quote == "\"" && c != "\"" && c != "\\" { word.append("\\") }
                 word.append(c)
                 escaped = false
                 continue
@@ -40,11 +41,17 @@ public enum Batch {
                 continue
             }
             switch c {
-            case "\\": escaped = true; inWord = true
-            case "\"", "'": quote = c; inWord = true
+            case "\\":
+                escaped = true
+                inWord = true
+            case "\"", "'":
+                quote = c
+                inWord = true
             case ";", "\n": endCommand()
             case " ", "\t": endWord()
-            default: word.append(c); inWord = true
+            default:
+                word.append(c)
+                inWord = true
             }
         }
         if let quote { throw ChauffeurError.usage("unterminated \(quote) quote in the do script") }

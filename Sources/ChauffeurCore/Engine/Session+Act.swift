@@ -36,8 +36,10 @@ extension Session {
     }
 
     /// Sends a gesture and reports what really happened (spec §6.2).
-    func act(_ label: String, target: Node?, before: Snapshot, baselineSettled: Bool = true, capMs: Int = 1500,
-             needsMove: Bool = false, gesture: (TouchTransport) -> Bool) throws -> ActionReport {
+    func act(
+        _ label: String, target: Node?, before: Snapshot, baselineSettled: Bool = true, capMs: Int = 1500,
+        needsMove: Bool = false, gesture: (TouchTransport) -> Bool
+    ) throws -> ActionReport {
         let all = try transportsReady()
         let order = (all[preferred...] + all[..<preferred]).filter { !needsMove || $0.supportsMove }
         guard !order.isEmpty else { throw ChauffeurError.bridge("no input transport supports this gesture") }
@@ -48,12 +50,15 @@ extension Session {
             let cursor = touchLog.cursor
             let sent = gesture(transport)
             let (after, settle) = try observe(minMs: 150, capMs: capMs)
-            let evidence: Evidence = !touchLog.isAttached ? .unavailable
+            let evidence: Evidence =
+                !touchLog.isAttached
+                ? .unavailable
                 : sent ? touchLog.evidence(since: cursor, waitMs: 200) : .none
-            var outcome = Verifier.classify(treeChanged: after.hash != before.hash, evidence: evidence,
-                                            expectedApp: expectedApp(on: before),
-                                            systemFrontmost: before.kind.isSystem, retried: retriedFrom != nil,
-                                            baselineSettled: baselineSettled)
+            var outcome = Verifier.classify(
+                treeChanged: after.hash != before.hash, evidence: evidence,
+                expectedApp: expectedApp(on: before),
+                systemFrontmost: before.kind.isSystem, retried: retriedFrom != nil,
+                baselineSettled: baselineSettled)
             if outcome == .retry {
                 if index + 1 < order.count {
                     retriedFrom = transport.name
@@ -62,16 +67,22 @@ extension Session {
                 }
                 outcome = .notDelivered
             }
-            if !sent { hid = nil; transports = [] }  // rebuild the HID client next time
+            if !sent {
+                hid = nil
+                transports = []
+            }  // rebuild the HID client next time
             if outcome != .notDelivered, let i = all.firstIndex(where: { $0 === transport }) { preferred = i }
             var report = ActionReport(
-                action: label, outcome: outcome, evidence: evidence, settledMs: settle.elapsedMs, settled: settle.settled,
+                action: label, outcome: outcome, evidence: evidence, settledMs: settle.elapsedMs,
+                settled: settle.settled,
                 revBefore: before.rev, revAfter: after.rev,
                 diff: outcome == .changed ? Diff.lines(from: before, to: after) : [],
                 transport: transport.name, retriedFrom: retriedFrom,
                 hints: Verifier.hints(outcome: outcome, target: target), capMs: capMs)
             if outcome == .noEffect, let frame = target?.frame,
-               let shot = try? capture(screen: before.size, zoom: Verifier.evidenceRegion(target: frame, screen: before.size)) {
+                let shot = try? capture(
+                    screen: before.size, zoom: Verifier.evidenceRegion(target: frame, screen: before.size))
+            {
                 report.evidenceShot = shot.path
             }
             return report
@@ -84,19 +95,24 @@ extension Session {
             let node = try snap.resolve(ref: target, refs: refs)
             traceTarget = node
             let f = node.frame
-            let x0 = max(f.x, 0), y0 = max(f.y, 0)
+            let x0 = max(f.x, 0)
+            let y0 = max(f.y, 0)
             let visible = Rect(x: x0, y: y0, w: min(f.maxX, snap.size.w) - x0, h: min(f.maxY, snap.size.h) - y0)
-            return (Geometry.tapPoint(role: node.role, frame: visible), node,
-                    target + (node.name.map { " " + Perception.quote($0) } ?? ""))
+            return (
+                Geometry.tapPoint(role: node.role, frame: visible), node,
+                target + (node.name.map { " " + Perception.quote($0) } ?? "")
+            )
         }
         guard let point = Self.point(target) else {
-            throw ChauffeurError.usage("expected a ref like e4 or a point like 201,344; got \(Perception.quote(target))")
+            throw ChauffeurError.usage(
+                "expected a ref like e4 or a point like 201,344; got \(Perception.quote(target))")
         }
         return (point, nil, "(\(Geometry.fmt(point.x)),\(Geometry.fmt(point.y)))")
     }
 
     func tapCommand(_ argv: [String]) throws -> Output {
-        var a = try Args(argv, flags: ["--edge"], options: ["--long"], usage: "usage: chauffeur tap <ref|x,y> [--long <s>] [--edge]")
+        var a = try Args(
+            argv, flags: ["--edge"], options: ["--long"], usage: "usage: chauffeur tap <ref|x,y> [--long <s>] [--edge]")
         let holdMs = try a.number("--long", in: 0.05...30).map { Int($0 * 1000) } ?? 50
         let allowEdge = a.flag("--edge")
         guard let target = a.next() else { throw ChauffeurError.usage(a.usage) }
@@ -123,11 +139,13 @@ extension Session {
                 report.evidenceShot = nil
                 return Output(report.render(), exit: report.exitCode, data: report.json)
             }
-            var second = try act("tap \(aimed.label)", target: aimed.node, before: again, baselineSettled: settledAgain) {
+            var second = try act("tap \(aimed.label)", target: aimed.node, before: again, baselineSettled: settledAgain)
+            {
                 Gestures.tap($0, at: aimed.point, screen: device.size, holdMs: holdMs)
             }
             if second.outcome == .changed {
-                second.hints.append("the first touch reached the app but the switch ignored it; chauffeur tapped once more")
+                second.hints.append(
+                    "the first touch reached the app but the switch ignored it; chauffeur tapped once more")
             }
             report = second
         }
@@ -149,9 +167,15 @@ extension Session {
             let evidence = touchLog.evidence(since: cursor, waitMs: 500)
             let ms = clock.nowMs() - start
             switch evidence {
-            case .app(let bundle): lines.append("✓ \(transport.name): delivered to \(bundle) in \(ms)ms"); anyDelivered = true
-            case .system: lines.append("✓ \(transport.name): delivered to system UI in \(ms)ms"); anyDelivered = true
-            case .none: lines.append("✗ \(transport.name): " + (sent ? "sent, but no touch reached the simulator" : "send failed"))
+            case .app(let bundle):
+                lines.append("✓ \(transport.name): delivered to \(bundle) in \(ms)ms")
+                anyDelivered = true
+            case .system:
+                lines.append("✓ \(transport.name): delivered to system UI in \(ms)ms")
+                anyDelivered = true
+            case .none:
+                lines.append(
+                    "✗ \(transport.name): " + (sent ? "sent, but no touch reached the simulator" : "send failed"))
             case .unavailable: lines.append("? \(transport.name): touch log stopped")
             }
             usleep(300_000)
@@ -167,7 +191,9 @@ extension Session {
         let (before, settled) = try baseline()
         let field = try before.resolve(ref: ref, refs: refs)
         guard Perception.textEntry.contains(field.role) else {
-            return Output("\(ref) is a \(field.role), not a text field; type needs a textfield, securefield or searchfield ref", exit: 1)
+            return Output(
+                "\(ref) is a \(field.role), not a text field; type needs a textfield, securefield or searchfield ref",
+                exit: 1)
         }
         let secure = field.role == "securefield"
         let label = "type \(ref)" + (secure ? " (\(text.count) characters)" : " " + Perception.quote(text))
@@ -180,7 +206,9 @@ extension Session {
         }
         switch focus.outcome {
         case .notDelivered, .intercepted:
-            return Output("\(label) → not typed: focusing the field failed\n" + focus.render(), exit: 3, data: ["focus": focus.json])
+            return Output(
+                "\(label) → not typed: focusing the field failed\n" + focus.render(), exit: 3,
+                data: ["focus": focus.json])
         default:
             break
         }
@@ -195,7 +223,9 @@ extension Session {
         } else {
             method = "paste"
             let copied = try SimCtl.run(["pbcopy", udid], stdin: text, timeout: 15)
-            guard copied.status == 0 else { return Output("\(label) → not typed: simctl pbcopy exited \(copied.status)", exit: 1) }
+            guard copied.status == 0 else {
+                return Output("\(label) → not typed: simctl pbcopy exited \(copied.status)", exit: 1)
+            }
             sent = keyboard.press(Keys.v, modifiers: [Keys.command])
         }
         defer {
@@ -203,28 +233,36 @@ extension Session {
             if secure && method == "paste" { _ = try? SimCtl.run(["pbcopy", udid], stdin: "", timeout: 15) }
         }
         guard sent else {
-            return Output("\(label) → NOT DELIVERED: key events failed to send\nhint: input transport unhealthy — run `chauffeur doctor --live`", exit: 3)
+            return Output(
+                "\(label) → NOT DELIVERED: key events failed to send\nhint: input transport unhealthy — run `chauffeur doctor --live`",
+                exit: 3)
         }
 
         // Verify the text before Return, so a submit that navigates away can't hide a failed entry (I2).
         let (typed, settle) = try observe(minMs: 150, capMs: 1500)
         let now = typed.node(identity: field.identity)
-        let verdict = TypeCheck.verify(typed: text, before: focused.node(identity: field.identity) ?? field,
-                                       after: now, submitted: false)
-        let report = TypeReport(action: label, method: method, verdict: verdict, value: now?.value, settledMs: settle.elapsedMs)
+        let verdict = TypeCheck.verify(
+            typed: text, before: focused.node(identity: field.identity) ?? field,
+            after: now, submitted: false)
+        let report = TypeReport(
+            action: label, method: method, verdict: verdict, value: now?.value, settledMs: settle.elapsedMs)
         guard submit, verdict == .ok else { return Output(report.render(), exit: report.exitCode, data: report.json) }
 
         guard keyboard.press(Keys.returnKey) else {
-            return Output(report.render() + "\nsubmit → NOT DELIVERED: Return failed to send", exit: 3,
-                          data: report.json.merging(["submit": "notDelivered"]))
+            return Output(
+                report.render() + "\nsubmit → NOT DELIVERED: Return failed to send", exit: 3,
+                data: report.json.merging(["submit": "notDelivered"]))
         }
         let after = try observe(minMs: 150, capMs: 1500).snapshot
         let changed = after.hash != typed.hash
-        let submitted = changed
-            ? "submit → changed · rev \(typed.rev)→\(after.rev)\n" + Diff.lines(from: typed, to: after).joined(separator: "\n")
+        let submitted =
+            changed
+            ? "submit → changed · rev \(typed.rev)→\(after.rev)\n"
+                + Diff.lines(from: typed, to: after).joined(separator: "\n")
             : "submit → NO EFFECT · nothing changed after Return"
-        return Output(report.render() + "\n" + submitted, exit: changed ? 0 : 3,
-                      data: report.json.merging(["submit": changed ? "changed" : "noEffect"]))
+        return Output(
+            report.render() + "\n" + submitted, exit: changed ? 0 : 3,
+            data: report.json.merging(["submit": changed ? "changed" : "noEffect"]))
     }
 
     /// What the trace keeps of `type` into a secure field: everything but the text.
@@ -235,11 +273,18 @@ extension Session {
     /// A `type` command line with its text hidden, for the trace and for batch reports: the text may be a password and
     /// it is only known to be harmless once the field resolves to a non-secure one. Lenient: it never throws.
     nonisolated static func provisionalType(_ argv: [String]) -> [String] {
-        var submit = false, dataOnly = false
+        var submit = false
+        var dataOnly = false
         var words: [String] = []
         for token in argv.dropFirst() {
-            if !dataOnly, token == "--" { dataOnly = true; continue }
-            if !dataOnly, token.hasPrefix("--"), token.count > 2 { if token == "--submit" { submit = true }; continue }
+            if !dataOnly, token == "--" {
+                dataOnly = true
+                continue
+            }
+            if !dataOnly, token.hasPrefix("--"), token.count > 2 {
+                if token == "--submit" { submit = true }
+                continue
+            }
             words.append(token)
         }
         var out = ["type"] + (submit ? ["--submit"] : []) + ["--"]
@@ -255,8 +300,9 @@ extension Session {
     }
 
     func scrollCommand(_ argv: [String]) throws -> Output {
-        var a = try Args(argv, options: ["--in", "--until"],
-                         usage: "usage: chauffeur scroll <up|down|left|right> [--in <ref>] [--until \"<query>\"]")
+        var a = try Args(
+            argv, options: ["--in", "--until"],
+            usage: "usage: chauffeur scroll <up|down|left|right> [--in <ref>] [--until \"<query>\"]")
         let inRef = a.option("--in")
         let until = a.option("--until")
         guard let direction = a.next() else { throw ChauffeurError.usage(a.usage) }
@@ -265,33 +311,41 @@ extension Session {
         var (snap, settled) = try baseline()
         let container = try inRef.map { try snap.resolve(ref: $0, refs: refs) }
         traceTarget = container
-        let region = container.map { ScrollPlan.region($0.frame, screen: device.size) } ?? ScrollPlan.defaultRegion(screen: device.size)
+        let region =
+            container.map { ScrollPlan.region($0.frame, screen: device.size) }
+            ?? ScrollPlan.defaultRegion(screen: device.size)
         guard let drag = ScrollPlan.drag(direction, in: region) else { throw ChauffeurError.usage(a.usage) }
         // A drag that starts or ends at an edge triggers system gestures (I5).
         for p in [drag.from, drag.to] {
             if let refusal = Geometry.refusal(for: p, screen: device.size, allowEdge: false) {
-                return Output("scroll \(direction) refused: \(refusal); the visible part of the region is too small", exit: 1)
+                return Output(
+                    "scroll \(direction) refused: \(refusal); the visible part of the region is too small", exit: 1)
             }
         }
 
         if let until, let hit = snap.find(until).first {
-            return Output("found \(snap.line(hit, all: false).trimmingCharacters(in: .whitespaces)) after 0 scrolls",
-                          data: ["found": hit.json(all: false), "scrolls": 0])
+            return Output(
+                "found \(snap.line(hit, all: false).trimmingCharacters(in: .whitespaces)) after 0 scrolls",
+                data: ["found": hit.json(all: false), "scrolls": 0])
         }
         for n in 1...(until == nil ? 1 : 15) {
-            var report = try act("scroll \(direction)", target: nil, before: snap, baselineSettled: settled, needsMove: true) {
+            var report = try act(
+                "scroll \(direction)", target: nil, before: snap, baselineSettled: settled, needsMove: true
+            ) {
                 Gestures.drag($0, from: drag.from, to: drag.to, screen: device.size)
             }
             if report.outcome == .noEffect { report.hints = ["nothing moved: already at the end in that direction"] }
             guard let until else { return Output(report.render(), exit: report.exitCode, data: report.json) }
             let after = last ?? snap
             if let hit = after.find(until).first {
-                return Output("found \(after.line(hit, all: false).trimmingCharacters(in: .whitespaces)) after \(n) scroll\(n == 1 ? "" : "s") \(direction)",
-                              data: ["found": hit.json(all: false), "scrolls": JSON(n)])
+                return Output(
+                    "found \(after.line(hit, all: false).trimmingCharacters(in: .whitespaces)) after \(n) scroll\(n == 1 ? "" : "s") \(direction)",
+                    data: ["found": hit.json(all: false), "scrolls": JSON(n)])
             }
             if report.outcome != .changed {
-                return Output("reached the end after \(n - 1) scrolls \(direction); no match for \(Perception.quote(until))\n"
-                              + report.render(), exit: 4, data: report.json.merging(["found": .null, "scrolls": JSON(n - 1)]))
+                return Output(
+                    "reached the end after \(n - 1) scrolls \(direction); no match for \(Perception.quote(until))\n"
+                        + report.render(), exit: 4, data: report.json.merging(["found": .null, "scrolls": JSON(n - 1)]))
             }
             snap = after
             settled = true  // the previous scroll's observe settled before we got here

@@ -11,8 +11,10 @@ public struct Args {
     public let rest: [String]
     public let usage: String
 
-    public init(_ argv: [String], flags allowedFlags: Set<String> = [], options allowedOptions: Set<String> = [],
-                restOption: String? = nil, usage: String) throws {
+    public init(
+        _ argv: [String], flags allowedFlags: Set<String> = [], options allowedOptions: Set<String> = [],
+        restOption: String? = nil, usage: String
+    ) throws {
         var positionals: [String] = []
         var flags: Set<String> = []
         var options: [String: String] = [:]
@@ -22,12 +24,29 @@ public struct Args {
         while i < argv.count {
             let token = argv[i]
             i += 1
-            if dataOnly { positionals.append(token); continue }
-            if token == "--" { dataOnly = true; continue }
-            if let restOption, token == restOption { rest = Array(argv[i...]); break }
-            guard token.hasPrefix("--"), token.count > 2 else { positionals.append(token); continue }
-            if allowedFlags.contains(token) { flags.insert(token); continue }
-            guard allowedOptions.contains(token) else { throw ChauffeurError.usage("unknown option \(token)\n\(usage)") }
+            if dataOnly {
+                positionals.append(token)
+                continue
+            }
+            if token == "--" {
+                dataOnly = true
+                continue
+            }
+            if let restOption, token == restOption {
+                rest = Array(argv[i...])
+                break
+            }
+            guard token.hasPrefix("--"), token.count > 2 else {
+                positionals.append(token)
+                continue
+            }
+            if allowedFlags.contains(token) {
+                flags.insert(token)
+                continue
+            }
+            guard allowedOptions.contains(token) else {
+                throw ChauffeurError.usage("unknown option \(token)\n\(usage)")
+            }
             guard i < argv.count else { throw ChauffeurError.usage("\(token) needs a value\n\(usage)") }
             guard options[token] == nil else { throw ChauffeurError.usage("\(token) is given twice\n\(usage)") }
             options[token] = argv[i]
@@ -55,8 +74,9 @@ public struct Args {
     public func number(_ name: String, in range: ClosedRange<Double>) throws -> Double? {
         guard let raw = options[name] else { return nil }
         guard let value = Double(raw), value.isFinite, range.contains(value) else {
-            throw ChauffeurError.usage("\(name) expects a number from \(Geometry.fmt(range.lowerBound)) to "
-                                       + "\(Geometry.fmt(range.upperBound)), got \(Perception.quote(raw))\n\(usage)")
+            throw ChauffeurError.usage(
+                "\(name) expects a number from \(Geometry.fmt(range.lowerBound)) to "
+                    + "\(Geometry.fmt(range.upperBound)), got \(Perception.quote(raw))\n\(usage)")
         }
         return value
     }
@@ -65,8 +85,9 @@ public struct Args {
     public func integer(_ name: String, in range: ClosedRange<Int>) throws -> Int? {
         guard let raw = options[name] else { return nil }
         guard let value = Int(raw), range.contains(value) else {
-            throw ChauffeurError.usage("\(name) expects a whole number from \(range.lowerBound) to \(range.upperBound), "
-                                       + "got \(Perception.quote(raw))\n\(usage)")
+            throw ChauffeurError.usage(
+                "\(name) expects a whole number from \(range.lowerBound) to \(range.upperBound), "
+                    + "got \(Perception.quote(raw))\n\(usage)")
         }
         return value
     }
@@ -85,7 +106,11 @@ public struct Output: Codable, Equatable, Sendable {
     /// The same result as structured data, for `--json` and MCP; nil when a command has nothing beyond its text.
     public var data: JSON?
 
-    public init(_ text: String, exit: Int32 = 0, data: JSON? = nil) { self.text = text; self.exit = exit; self.data = data }
+    public init(_ text: String, exit: Int32 = 0, data: JSON? = nil) {
+        self.text = text
+        self.exit = exit
+        self.data = data
+    }
 
     /// `--json`: `{"data":…,"exit":0,"text":"…"}` on one line.
     public func jsonLine() -> String {

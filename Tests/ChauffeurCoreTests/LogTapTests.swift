@@ -1,15 +1,20 @@
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite struct LogTapTests {
-    static let app = "/Users/u/Library/Developer/CoreSimulator/Devices/AF7C/data/Containers/Bundle/Application/B73C/Fixture.app/Fixture"
-    static let cfnetwork = "/Library/Developer/CoreSimulator/Volumes/iOS_23C/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 26.2.simruntime/Contents/Resources/RuntimeRoot/System/Library/Frameworks/CFNetwork.framework/CFNetwork"
+    static let app =
+        "/Users/u/Library/Developer/CoreSimulator/Devices/AF7C/data/Containers/Bundle/Application/B73C/Fixture.app/Fixture"
+    static let cfnetwork =
+        "/Library/Developer/CoreSimulator/Volumes/iOS_23C/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 26.2.simruntime/Contents/Resources/RuntimeRoot/System/Library/Frameworks/CFNetwork.framework/CFNetwork"
 
     /// One `log stream --style ndjson` line, trimmed to the fields chauffeur reads.
     static func record(_ type: String, _ message: String, sender: String = app, event: String = "logEvent") -> Data {
-        let o: [String: Any] = ["eventType": event, "messageType": type, "timestamp": "2026-10-06 22:24:53.430443-0700",
-                                "eventMessage": message, "processImagePath": app, "senderImagePath": sender]
+        let o: [String: Any] = [
+            "eventType": event, "messageType": type, "timestamp": "2026-10-06 22:24:53.430443-0700",
+            "eventMessage": message, "processImagePath": app, "senderImagePath": sender,
+        ]
         return try! JSONSerialization.data(withJSONObject: o) + Data("\n".utf8)
     }
 
@@ -19,7 +24,8 @@ import Testing
     }
 
     @Test func parsesAppAndFrameworkLines() {
-        #expect(parse(Self.record("Error", "AuthService: 401 Unauthorized"))
+        #expect(
+            parse(Self.record("Error", "AuthService: 401 Unauthorized"))
                 == LogLine(time: "22:24:53.430", level: "error", message: "AuthService: 401 Unauthorized"))
         #expect(parse(Self.record("Default", "Task finished", sender: Self.cfnetwork))?.sender == "CFNetwork")
         #expect(parse(Self.record("Info", "x", event: "activityCreateEvent")) == nil)
@@ -33,11 +39,12 @@ import Testing
             LogLine(time: "t", level: "error", message: "save failed"),
             LogLine(time: "t", level: "error", message: "third party", sender: "CFNetwork"),
         ]
-        #expect(LogLine.summary(lines) == [
-            #"logs: [fault] "fixture: crashing""#,
-            #"      [error] "save failed""#,
-            #"      [error] (Network) "nw_connection failed" (1 more: chauffeur logs --since-last --level error)"#,
-        ])
+        #expect(
+            LogLine.summary(lines) == [
+                #"logs: [fault] "fixture: crashing""#,
+                #"      [error] "save failed""#,
+                #"      [error] (Network) "nw_connection failed" (1 more: chauffeur logs --since-last --level error)"#,
+            ])
         #expect(LogLine.summary([LogLine(time: "t", level: "info", message: "x")]).isEmpty)
     }
 

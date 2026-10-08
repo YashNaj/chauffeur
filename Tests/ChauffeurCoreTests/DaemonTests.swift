@@ -1,13 +1,19 @@
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite struct DaemonTests {
     @Test func versionMismatchAsksTheClientToRestart() {
         var ran = false
-        let (out, exitAfter) = Daemon.respond(to: Request(version: "0.0.1-old", args: ["snapshot"])) { _ in ran = true; return Output("x") }
+        let (out, exitAfter) = Daemon.respond(to: Request(version: "0.0.1-old", args: ["snapshot"])) { _ in
+            ran = true
+            return Output("x")
+        }
         #expect(out.exit == Daemon.versionMismatchExit && exitAfter && !ran)
-        let (ok, stay) = Daemon.respond(to: Request(version: Chauffeur.buildID, args: ["snapshot"])) { Output("ran \($0[0])") }
+        let (ok, stay) = Daemon.respond(to: Request(version: Chauffeur.buildID, args: ["snapshot"])) {
+            Output("ran \($0[0])")
+        }
         #expect(ok == Output("ran snapshot") && !stay)
     }
 
@@ -24,7 +30,10 @@ import Testing
     @Test func listenConnectRoundTrip() throws {
         let path = NSTemporaryDirectory() + "cht-\(UInt32.random(in: 0...UInt32.max)).sock"
         let server = try UnixSocket.listen(path: path)
-        defer { close(server); unlink(path) }
+        defer {
+            close(server)
+            unlink(path)
+        }
         var mode = stat()
         #expect(stat(path, &mode) == 0 && mode.st_mode & 0o777 == 0o600)
         Thread {

@@ -1,6 +1,7 @@
 import ChauffeurBridge
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite(.enabled(if: Live.enabled), .serialized)
@@ -18,12 +19,14 @@ import Testing
 
         let home = try #require(waitForTree(ax) { element($0, "Show alert") != nil })
         var cursor = log.cursor
-        #expect(Gestures.tap(digitizer, at: try #require(element(home, "Show alert")).frame.center, screen: device.size))
+        #expect(
+            Gestures.tap(digitizer, at: try #require(element(home, "Show alert")).frame.center, screen: device.size))
         #expect(log.evidence(since: cursor, waitMs: 500) == .app(Live.fixture))
 
         let alert = try #require(waitForTree(ax, timeout: 3) { element($0, "Fixture alert") != nil })
         usleep(600_000)  // a just-presented alert drops touches briefly (Task 11 ruling)
-        _ = Gestures.tap(digitizer, at: try #require(alert.all.first { $0.label == "OK" }).frame.center, screen: device.size)
+        _ = Gestures.tap(
+            digitizer, at: try #require(alert.all.first { $0.label == "OK" }).frame.center, screen: device.size)
         try SimCtl.run(["terminate", udid, Live.fixture])
         _ = waitForTree(ax) { ($0.label ?? "").trimmingCharacters(in: .whitespaces).isEmpty }  // SpringBoard
         cursor = log.cursor

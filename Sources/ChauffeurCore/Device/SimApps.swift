@@ -10,8 +10,11 @@ public enum SimApps {
 
     /// `simctl appinfo` prints an OpenStep property list; nil when it is not one (app not installed).
     public static func appInfo(_ out: String) -> AppInfo? {
-        guard let d = (try? PropertyListSerialization.propertyList(from: Data(out.utf8), options: [], format: nil)) as? [String: Any],
-              let executable = d["CFBundleExecutable"] as? String else { return nil }
+        guard
+            let d = (try? PropertyListSerialization.propertyList(from: Data(out.utf8), options: [], format: nil))
+                as? [String: Any],
+            let executable = d["CFBundleExecutable"] as? String
+        else { return nil }
         let name = (d["CFBundleDisplayName"] as? String) ?? (d["CFBundleName"] as? String) ?? executable
         return AppInfo(executable: executable, displayName: name)
     }
@@ -40,8 +43,10 @@ public enum SimApps {
     /// The bundle id and version of a built `.app`, from its Info.plist (XML or binary).
     public static func bundle(at app: URL) -> AppBundle? {
         guard let data = try? Data(contentsOf: app.appendingPathComponent("Info.plist")),
-              let d = (try? PropertyListSerialization.propertyList(from: data, options: [], format: nil)) as? [String: Any],
-              let identifier = d["CFBundleIdentifier"] as? String else { return nil }
+            let d = (try? PropertyListSerialization.propertyList(from: data, options: [], format: nil))
+                as? [String: Any],
+            let identifier = d["CFBundleIdentifier"] as? String
+        else { return nil }
         let version = [d["CFBundleShortVersionString"] as? String, (d["CFBundleVersion"] as? String).map { "(\($0))" }]
             .compactMap { $0 }.joined(separator: " ")
         return AppBundle(identifier: identifier, version: version)

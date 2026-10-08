@@ -9,7 +9,9 @@ public enum AXSettings {
 
     /// The flags `defaults read com.apple.Accessibility` shows as off or missing.
     public static func off(_ defaultsRead: String) -> [String] {
-        let d = (try? PropertyListSerialization.propertyList(from: Data(defaultsRead.utf8), options: [], format: nil)) as? [String: Any]
+        let d =
+            (try? PropertyListSerialization.propertyList(from: Data(defaultsRead.utf8), options: [], format: nil))
+            as? [String: Any]
         return flags.filter { key in
             guard let value = d?[key] else { return true }
             return "\(value)" != "1"

@@ -3,7 +3,8 @@ import Foundation
 public enum CLI {
     /// Commands that run inside the daemon.
     public static let forwarded: Set<String> = [
-        "snapshot", "find", "wait", "screenshot", "tap", "type", "scroll", "swipe", "button", "install", "launch", "terminate", "logs", "open",
+        "snapshot", "find", "wait", "screenshot", "tap", "type", "scroll", "swipe", "button", "install", "launch",
+        "terminate", "logs", "open",
         "permission", "location", "push", "appearance", "do",
     ]
 
@@ -13,9 +14,14 @@ public enum CLI {
         public var devices: () throws -> [DeviceInfo]
         public var send: (String, [String]) throws -> Output
 
-        public init(env: [String: String], cwd: URL, devices: @escaping () throws -> [DeviceInfo],
-                    send: @escaping (String, [String]) throws -> Output) {
-            self.env = env; self.cwd = cwd; self.devices = devices; self.send = send
+        public init(
+            env: [String: String], cwd: URL, devices: @escaping () throws -> [DeviceInfo],
+            send: @escaping (String, [String]) throws -> Output
+        ) {
+            self.env = env
+            self.cwd = cwd
+            self.devices = devices
+            self.send = send
         }
 
         public static func live(executable: String) -> Environment {
@@ -24,7 +30,9 @@ public enum CLI {
                 env: ProcessInfo.processInfo.environment,
                 cwd: cwd,
                 devices: { try SimCtl.devices() },
-                send: { udid, args in try DaemonClient.send(udid: udid, args: args, cwd: cwd.path, executable: executable) })
+                send: { udid, args in
+                    try DaemonClient.send(udid: udid, args: args, cwd: cwd.path, executable: executable)
+                })
         }
     }
 
@@ -36,8 +44,15 @@ public enum CLI {
         var i = 0
         while i < argv.count {
             let token = argv[i]
-            if token == "--" || token == "--args" { rest += argv[i...]; break }
-            if token == "--json" { json = true; i += 1; continue }
+            if token == "--" || token == "--args" {
+                rest += argv[i...]
+                break
+            }
+            if token == "--json" {
+                json = true
+                i += 1
+                continue
+            }
             if token == "--udid" {
                 guard i + 1 < argv.count else { throw ChauffeurError.usage("--udid needs a value\n\n" + Usage.text) }
                 udid = argv[i + 1]
@@ -77,23 +92,28 @@ public enum CLI {
                 try a.done()
                 return Doctor.run(udidFlag: udidFlag, live: a.flag("--live"), env: e)
             case "mcp":
-                try Args(tail, usage: "usage: chauffeur mcp   (an MCP server on stdin/stdout; your agent starts it)").done()
+                try Args(tail, usage: "usage: chauffeur mcp   (an MCP server on stdin/stdout; your agent starts it)")
+                    .done()
                 return Output("", exit: MCPStdio.serve(env: e))
             case "skill":
-                var a = try Args(tail, options: ["--agents"], usage: "usage: chauffeur skill install [--agents claude,codex,cursor]")
+                var a = try Args(
+                    tail, options: ["--agents"], usage: "usage: chauffeur skill install [--agents claude,codex,cursor]")
                 guard a.next() == "install" else { throw ChauffeurError.usage(a.usage) }
                 try a.done()
                 let agents = (a.option("--agents") ?? Skill.agents.joined(separator: ","))
                     .split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
                 if let unknown = agents.first(where: { !Skill.agents.contains($0) }) {
-                    throw ChauffeurError.usage("unknown agent \(Perception.quote(unknown)); choose from claude, codex, cursor\n" + a.usage)
+                    throw ChauffeurError.usage(
+                        "unknown agent \(Perception.quote(unknown)); choose from claude, codex, cursor\n" + a.usage)
                 }
                 let lines = try Skill.install(agents: agents, in: e.cwd)
-                return Output((lines + ["optional MCP server: chauffeur mcp (e.g. claude mcp add chauffeur -- chauffeur mcp)"])
-                    .joined(separator: "\n"))
+                return Output(
+                    (lines + ["optional MCP server: chauffeur mcp (e.g. claude mcp add chauffeur -- chauffeur mcp)"])
+                        .joined(separator: "\n"))
             case _ where forwarded.contains(command):
-                let udid = try Target.resolve(flag: udidFlag, env: e.env["CHAUFFEUR_UDID"],
-                                              configUDID: Target.readConfig(from: e.cwd), devices: e.devices())
+                let udid = try Target.resolve(
+                    flag: udidFlag, env: e.env["CHAUFFEUR_UDID"],
+                    configUDID: Target.readConfig(from: e.cwd), devices: e.devices())
                 return try e.send(udid, [command] + tail)
             default:
                 return Output("unknown command \"\(command)\"\n\n" + Usage.text, exit: 64)

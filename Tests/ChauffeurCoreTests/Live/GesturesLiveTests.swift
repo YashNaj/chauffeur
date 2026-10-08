@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import ChauffeurCore
 
 @Suite(.enabled(if: Live.enabled), .serialized)
@@ -28,7 +29,9 @@ import Testing
         #expect(s.last?.kind == .springboard)
         let volume = s.run(["button", "volume-up"])
         // The volume HUD may not be in the accessibility tree: changed or UNVERIFIED, never a silent "ok".
-        #expect(volume.exit == 0 || volume.text.contains("→ UNVERIFIED: no visible change (a button press leaves no touch evidence)"),
-                "\(volume.text)")
+        #expect(
+            volume.exit == 0
+                || volume.text.contains("→ UNVERIFIED: no visible change (a button press leaves no touch evidence)"),
+            "\(volume.text)")
     }
 }

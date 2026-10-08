@@ -10,7 +10,10 @@ public struct Request: Codable, Sendable {
     public var cwd: String?
 
     public init(version: String, args: [String], udid: String? = nil, cwd: String? = nil) {
-        self.version = version; self.args = args; self.udid = udid; self.cwd = cwd
+        self.version = version
+        self.args = args
+        self.udid = udid
+        self.cwd = cwd
     }
 }
 
@@ -22,7 +25,10 @@ final class DaemonLock: @unchecked Sendable {
     static func acquire(_ url: URL) -> DaemonLock? {
         let fd = open(url.path, O_RDWR | O_CREAT, 0o600)
         guard fd >= 0 else { return nil }
-        guard flock(fd, LOCK_EX | LOCK_NB) == 0 else { close(fd); return nil }
+        guard flock(fd, LOCK_EX | LOCK_NB) == 0 else {
+            close(fd)
+            return nil
+        }
         return DaemonLock(fd: fd)
     }
 
@@ -45,15 +51,23 @@ public enum Daemon {
     @MainActor static var boundInode: UInt64?
 
     /// What to answer, and whether to exit afterwards (spec §6.9 version handshake).
-    public static func respond(to request: Request, current: String = Chauffeur.buildID, serving: String? = nil,
-                               run: ([String]) -> Output) -> (Output, exitAfter: Bool) {
+    public static func respond(
+        to request: Request, current: String = Chauffeur.buildID, serving: String? = nil,
+        run: ([String]) -> Output
+    ) -> (Output, exitAfter: Bool) {
         if let wanted = request.udid, let serving, wanted.caseInsensitiveCompare(serving) != .orderedSame {
-            return (Output("this daemon serves \(serving), not \(wanted): both simulators share the socket "
-                           + "\(StatePaths.socket(serving).lastPathComponent). Shut one of them down", exit: 1), false)
+            return (
+                Output(
+                    "this daemon serves \(serving), not \(wanted): both simulators share the socket "
+                        + "\(StatePaths.socket(serving).lastPathComponent). Shut one of them down", exit: 1), false
+            )
         }
         guard request.version == current else {
-            return (Output("daemon is \(current), client is \(request.version); restarting the daemon",
-                           exit: versionMismatchExit), true)
+            return (
+                Output(
+                    "daemon is \(current), client is \(request.version); restarting the daemon",
+                    exit: versionMismatchExit), true
+            )
         }
         return (run(request.args), false)
     }
@@ -72,9 +86,13 @@ public enum Daemon {
         while lock == nil {
             lock = DaemonLock.acquire(StatePaths.lock(udid))
             if lock != nil { break }
-            if let fd = try? UnixSocket.connect(path: socketPath, timeout: 1) { close(fd); exit(0) }
+            if let fd = try? UnixSocket.connect(path: socketPath, timeout: 1) {
+                close(fd)
+                exit(0)
+            }
             guard Date() < deadline else {
-                FileHandle.standardError.write(Data("chauffeur daemon: another daemon holds \(StatePaths.lock(udid).path)\n".utf8))
+                FileHandle.standardError.write(
+                    Data("chauffeur daemon: another daemon holds \(StatePaths.lock(udid).path)\n".utf8))
                 exit(1)
             }
             usleep(100_000)
@@ -130,7 +148,8 @@ public enum Daemon {
     /// Runs on the accept thread; commands execute on the main thread (HID mouse needs it).
     nonisolated static func handle(_ client: Int32) {
         guard let line = UnixSocket.readLine(client),
-              let request = try? JSONDecoder().decode(Request.self, from: line) else { return }
+            let request = try? JSONDecoder().decode(Request.self, from: line)
+        else { return }
         let (output, exitAfter) = DispatchQueue.main.sync {
             MainActor.assumeIsolated { () -> (Output, Bool) in
                 lastActivity = Date()
@@ -180,8 +199,9 @@ public enum DaemonClient {
                 try start(udid: udid, executable: executable)
             } catch {
                 guard attempt == 0, shouldStart(after: error) else {
-                    throw ChauffeurError.daemon("no answer from the daemon (it may still be busy; retry shortly); "
-                                                + "see \(StatePaths.log(udid).path)")
+                    throw ChauffeurError.daemon(
+                        "no answer from the daemon (it may still be busy; retry shortly); "
+                            + "see \(StatePaths.log(udid).path)")
                 }
                 try start(udid: udid, executable: executable)
             }
@@ -215,8 +235,9 @@ public enum DaemonClient {
         posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
         posix_spawn_file_actions_addopen(&actions, 1, logPath, O_WRONLY | O_CREAT | O_APPEND, 0o600)
         posix_spawn_file_actions_adddup2(&actions, 1, 2)
-        let argv: [UnsafeMutablePointer<CChar>?] = ([executable, "daemon", "--udid", udid] as [String]).map { strdup($0) } + [nil]
-        defer { argv.forEach { free($0) } }
+        let argv: [UnsafeMutablePointer<CChar>?] =
+            ([executable, "daemon", "--udid", udid] as [String]).map { strdup($0) } + [nil]
+        defer { for p in argv { free(p) } }
         var pid: pid_t = 0
         guard posix_spawn(&pid, executable, &actions, &attr, argv, environ) == 0 else {
             throw ChauffeurError.daemon("cannot start \(executable) daemon")
@@ -224,11 +245,17 @@ public enum DaemonClient {
         let deadline = Date().addingTimeInterval(30)  // a predecessor may take up to ~15 s to shut down
         var exited = false
         while Date() < deadline {
-            if let fd = try? UnixSocket.connect(path: StatePaths.socket(udid).path, timeout: 1) { close(fd); return }
+            if let fd = try? UnixSocket.connect(path: StatePaths.socket(udid).path, timeout: 1) {
+                close(fd)
+                return
+            }
             if exited { break }
             // waitpid, not kill(pid, 0): an exited child stays a zombie until reaped, and kill() succeeds on zombies.
             // Try one more connect after it exits: it leaves early when another daemon already serves this simulator.
-            if waitpid(pid, nil, WNOHANG) == pid { exited = true; continue }
+            if waitpid(pid, nil, WNOHANG) == pid {
+                exited = true
+                continue
+            }
             usleep(50_000)
         }
         throw ChauffeurError.daemon("daemon did not start; see \(logPath)")

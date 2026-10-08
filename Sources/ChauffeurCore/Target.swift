@@ -4,7 +4,8 @@ import Foundation
 public enum Target {
     public static let configName = ".chauffeur.json"
 
-    public static func resolve(flag: String?, env: String?, configUDID: String?, devices: [DeviceInfo]) throws -> String {
+    public static func resolve(flag: String?, env: String?, configUDID: String?, devices: [DeviceInfo]) throws -> String
+    {
         if let pinned = flag ?? env ?? configUDID { return try match(pinned, in: devices).udid }
         let booted = devices.filter(\.booted)
         switch booted.count {
@@ -30,8 +31,9 @@ public enum Target {
         while true {
             let file = current.appendingPathComponent(configName)
             if let data = try? Data(contentsOf: file),
-               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let udid = object["udid"] as? String {
+                let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                let udid = object["udid"] as? String
+            {
                 return udid
             }
             // Directory URLs walk "/" → "/.." → "/../..", so stop at the root explicitly.

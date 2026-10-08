@@ -50,14 +50,18 @@ public enum ScrollPlan {
 
     /// A frame clipped to the visible screen (a partly off-screen container must not drag from an edge).
     public static func region(_ frame: Rect, screen: Size) -> Rect {
-        let x0 = max(frame.x, 0), y0 = max(frame.y, 0)
+        let x0 = max(frame.x, 0)
+        let y0 = max(frame.y, 0)
         return Rect(x: x0, y: y0, w: max(0, min(frame.maxX, screen.w) - x0), h: max(0, min(frame.maxY, screen.h) - y0))
     }
 
     public static func drag(_ direction: String, in r: Rect) -> (from: Point, to: Point)? {
-        let cx = r.center.x, cy = r.center.y
-        let high = r.y + r.h * 0.25, low = r.y + r.h * 0.75
-        let left = r.x + r.w * 0.25, right = r.x + r.w * 0.75
+        let cx = r.center.x
+        let cy = r.center.y
+        let high = r.y + r.h * 0.25
+        let low = r.y + r.h * 0.75
+        let left = r.x + r.w * 0.25
+        let right = r.x + r.w * 0.75
         switch direction {
         case "down": return (Point(x: cx, y: low), Point(x: cx, y: high))
         case "up": return (Point(x: cx, y: high), Point(x: cx, y: low))

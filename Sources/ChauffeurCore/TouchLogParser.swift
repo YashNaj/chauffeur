@@ -3,7 +3,10 @@ import Foundation
 public struct TouchRecord: Equatable, Sendable {
     public var context: String
     public var point: Point
-    public init(context: String, point: Point) { self.context = context; self.point = point }
+    public init(context: String, point: Point) {
+        self.context = context
+        self.point = point
+    }
 }
 
 public enum ContextOwner: Equatable, Sendable {
@@ -24,8 +27,11 @@ public struct TouchLogParser: Sendable {
         for m in message.matches(of: /\(touchStream[^)]*\); contextID: 0x([0-9A-Fa-f]+)/) {
             owners[String(m.1).uppercased()] = .touchStream
         }
-        guard let m = message.firstMatch(of: /Digitizer token: 0x([0-9A-Fa-f]+);.*?subevents: \[path: \d+; \{([\d.]+), ([\d.]+)\}/),
-              let x = Double(m.2), let y = Double(m.3) else { return nil }
+        guard
+            let m = message.firstMatch(
+                of: /Digitizer token: 0x([0-9A-Fa-f]+);.*?subevents: \[path: \d+; \{([\d.]+), ([\d.]+)\}/),
+            let x = Double(m.2), let y = Double(m.3)
+        else { return nil }
         return TouchRecord(context: String(m.1).uppercased(), point: Point(x: x, y: y))
     }
 
