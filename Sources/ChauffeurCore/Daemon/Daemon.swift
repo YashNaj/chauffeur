@@ -215,7 +215,7 @@ public enum DaemonClient {
         posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
         posix_spawn_file_actions_addopen(&actions, 1, logPath, O_WRONLY | O_CREAT | O_APPEND, 0o600)
         posix_spawn_file_actions_adddup2(&actions, 1, 2)
-        let argv: [UnsafeMutablePointer<CChar>?] = [executable, "daemon", "--udid", udid].map { strdup($0) } + [nil]
+        let argv: [UnsafeMutablePointer<CChar>?] = ([executable, "daemon", "--udid", udid] as [String]).map { strdup($0) } + [nil]
         defer { argv.forEach { free($0) } }
         var pid: pid_t = 0
         guard posix_spawn(&pid, executable, &actions, &attr, argv, environ) == 0 else {
