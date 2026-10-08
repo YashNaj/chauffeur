@@ -11,82 +11,116 @@ dead button, so the agent retries or gives up when it should wait. We answered p
 `PENDING` result and watch the app's network activity.
 
 The principle behind it is wider than requests: **a tap is judged on all the evidence the app produces, not only the
-screen.** M4b applies it to network requests first, then to the clipboard, and finishes the two other roadmap items
+screen.** M4b applies it to network activity first, then to the clipboard, and finishes the two other roadmap items
 that follow from it (a crash reported on the first line; recovering an app opened from its icon).
 
 ## Goals
 
-1. A tap that starts a request and changes nothing on screen is reported `PENDING` while the request runs, never
-   `NO EFFECT`.
-2. A tap that truly does nothing is still `NO EFFECT`, with no added delay.
+1. A tap that starts network activity and changes nothing on screen is reported `PENDING` while the app waits for a
+   reply, never `NO EFFECT`, whatever networking stack the app uses.
+2. A tap that truly does nothing is still `NO EFFECT`, with no added delay beyond what checking costs (measured in
+   step 0).
 3. A request that fails explains a `NO EFFECT`: the failure leads the result (`POST /login → 500`).
-4. Telemetry requests (analytics, crash reporting, attribution) never turn a dead button into `PENDING`.
+4. Telemetry (analytics, crash reporting, attribution) never turns a dead button into `PENDING`.
 5. `wait` finishes a `PENDING` tap and tells a slow backend from a screen that will never change.
 6. A double submit, a copy to the clipboard and a crash are each reported where an agent looks first.
-7. The agent sees method, host, path shape, status and timing; never bodies, headers, cookies, query strings, values
-   an app marked private, or clipboard contents.
+7. The agent sees host, method, path shape, status, timing and byte counts; never bodies, headers, cookies, query
+   strings, values an app marked private, or clipboard contents.
 
-## Non-goals
+## Non-goals for M4b (staged, not ruled out)
 
-- Request and response bodies, headers, a `network` command that lists all traffic, and loading a library into the
-  app. They belong to a later "network visibility" milestone with its own security review.
-- A proxy or a trusted certificate in the simulator.
-- Haptics, sounds, and file or settings writes as evidence.
-- An agent-supplied "I expect a request" hint. Easy to add on top of `PENDING` later.
-- Network access by chauffeur itself. It still reads only local logs; nothing leaves the machine.
+M4b is the first stage of seeing what an app does on the network. What it doesn't cover is scheduled, not excluded
+(see "Staging" at the end): request and response bodies, a `network` command listing all traffic, and method, path
+and status for apps that don't use Apple's networking stack. Also out of M4b: a proxy or trusted certificate in the
+simulator; haptics, sounds, and file or settings writes as evidence; an agent-supplied "I expect a request" hint.
+chauffeur itself still makes no network connections: everything here is read on the Mac.
 
-## 1. Step 0: what the logs show
+## 1. Step 0: what the Mac and the logs show
 
 Before any feature code, a throwaway app on iOS 26 and iOS 27 simulators answers:
 
-1. Which lines in the app's log stream (it already follows `process == "<app>"` at info level) mark a URLSession
-   request starting and ending, and do they carry a status code and an error kind?
-2. Does `log config --subsystem com.apple.CFNetwork --mode "private_data:on"` (run with `simctl spawn`) unhide the
-   host and path? If not, does adding Apple's lower-level networking subsystem do it? Only the global switch?
-3. How late do the lines arrive after the touch? This sets the request window (§3, default 2 s).
-4. How long does `simctl pbpaste` take?
-5. Do background-session and `WKWebView` requests appear?
+**Activity layer (the most important question):**
+1. Can chauffeur read per-process connection data for a simulator app process (remote address and port, bytes sent
+   and received, start time, state), through the NetworkStatistics framework, `nettop`, or `proc_pidinfo`? For TCP,
+   UDP and QUIC? How fresh is it (polling cost and delay)?
+2. Does it see traffic from URLSession, `Network.framework`, a raw BSD socket (standing in for Flutter and other
+   non-Apple stacks), a WebSocket, and a `WKWebView` (whose traffic runs in a WebKit networking process: can that
+   process be tied to the app)?
+3. Can the remote host name be recovered (the connection's host name, or DNS seen for that process), or only the IP?
 
-The answers are written into a "Findings" section at the end of this spec before the plan is written. Outcomes:
+**Detail layer:**
+4. Which lines in the app's log stream mark a URLSession request starting and ending, at which log level, and do
+   they carry a status code and an error kind? If the start lines are `debug`, what does following only
+   `com.apple.CFNetwork` at debug level cost in CPU?
+5. Does `log config --subsystem com.apple.CFNetwork --mode "private_data:on"` (run with `simctl spawn`) unhide host and
+   path? Does Apple's lower-level networking subsystem need it too? Only the global switch? Can chauffeur read the
+   current setting back (`log config --status`)?
+6. How late do the lines arrive after the event? Does a marker line chauffeur writes into the simulator's log
+   (`simctl spawn <udid> log …` or equivalent) arrive in order, so it can tell when the stream has caught up?
 
-- Per-subsystem unhiding works → §5 as written.
-- Only the global switch works → §5's opt-in path.
-- No start/end lines exist → stop; the design moves to an in-app library and comes back for review.
-- Background or web-view requests are missing → a documented limit (§9), not a fix.
+**Clipboard:**
+7. How long does `simctl pbpaste` take, and does reading it show a paste banner or fire the app's
+   `UIPasteboard` change handling?
 
-## 2. Request events
+The answers go into "Findings" at the end before the plan is written. Outcomes:
 
-A new `Network` folder in `ChauffeurCore` holds:
+- Activity layer works → §2 as written.
+- Activity layer doesn't work → the in-app library (Staging, stage 2) moves into M4b, and the design comes back for
+  review.
+- Per-subsystem unhiding works → §5 as written; only the global switch → §5's opt-in path.
+- No usable log lines → the detail layer comes from the in-app library instead, and the design comes back for review.
 
-- **`RequestLog`**: parses the app's log lines into events: `started(id, method, host, path, time)` and
-  `ended(id, status | error, time)`. Lines come from the existing `LogTap`; parsing is pure and unit-tested on
-  recorded lines from step 0.
-- **`Telemetry`**: decides whether a request is telemetry (§4).
-- **`PathShape`**: drops the query string and collapses identifiers in the path (§6).
+## 2. Two layers of evidence
 
-When the app's log stream isn't attached (the app wasn't launched by chauffeur and §8's recovery didn't apply), no
-requests are seen. The tap behaves as today and its result says `network not watched`.
+A new `Network` folder in `ChauffeurCore` (private API calls, if needed, go in `ChauffeurBridge`):
 
-**Which requests belong to the tap:** those that started after the touch reached the app (the touch log time) and
-before the observation ended. Requests already running before the tap do not count; if one of them changes the screen,
-the existing `the screen was already changing` (`UNVERIFIED`) rule applies.
+- **Activity (`ConnectionWatch`), universal.** Per-process connection data for the app and, for web views, its WebKit
+  networking process. Each connection: remote endpoint, host if known, bytes sent and received over time, opened and
+  closed times. From these it derives, after a given moment: *did the app send anything*, and *is it waiting for a
+  reply* (bytes went out and the reply has not finished arriving). It sees every stack because it doesn't depend on
+  how the app makes requests. It doesn't lag behind the way logs can.
+- **Detail (`RequestLog`), where available.** Apple's networking log lines from the existing `LogTap`, parsed into
+  `started(id, method, host, path, time)` and `ended(id, status | error, time)`. Matched to activity by host and time,
+  it adds method, path, status and error kind. Parsing is pure and unit-tested on recorded lines from step 0.
+- **`Telemetry`** (§4) and **`PathShape`** (§6).
+
+**What belongs to the tap:** activity and requests that started after the touch reached the app (touch log time).
+Connections already open before the tap count only for bytes sent after the touch (an HTTP/2 connection is reused
+for new requests). Activity that was already flowing before the touch and continues (a feed loading, polling) is
+excluded by comparing the rate before and after; if it changes the screen, the existing `the screen was already
+changing` (`UNVERIFIED`) rule applies.
+
+**Before judging no change**, chauffeur makes sure the evidence is current: it reads activity fresh, and, when the
+detail layer is in use, waits until its marker line has come through the log stream (§1 question 6). Step 0's
+measurement of this is the true minimum cost of goal 2.
+
+**Delayed requests.** A request sent after a short delay (search-as-you-type usually waits about 300 ms) starts after
+the screen has settled. When the tapped or typed-into element is a text or search field, chauffeur watches for
+activity for a short extra window (default 500 ms, set from step 0) before judging. Other taps are not delayed.
+
+**When the app isn't watched** (no process to attach to), the result says `network not watched` and the tap behaves as
+today. The detail layer additionally needs the app's log stream, which §8's recovery makes available for apps opened
+from their icon.
 
 ## 3. Result rules
 
 After the screen settles or reaches its time limit, with telemetry excluded:
 
-| Screen | The tap's requests | Result |
+| Screen | The tap's network activity | Result |
 |---|---|---|
-| changed | any | `changed`; one `request:` evidence line per request |
+| changed | any | `changed`; one `request:` evidence line per request or connection |
 | no change | none | `NO EFFECT`, as today |
-| no change | one still running | wait up to the request window (default 2 s) for it to end, then judge again; still running → `PENDING` |
-| no change | all ended, one failed | `NO EFFECT`; the failure leads the headline |
-| no change | all ended, all succeeded | `NO EFFECT · POST /x → 200 in 340 ms but nothing changed on screen` |
+| no change | waiting for a reply | wait up to the request window (default 2 s) for the reply, then judge again; still waiting → `PENDING` |
+| no change | reply arrived, a request failed | `NO EFFECT`; the failure leads the headline |
+| no change | reply arrived, all succeeded | `NO EFFECT · POST /x → 200 in 340 ms but nothing changed on screen` |
+| no change | a connection keeps streaming (WebSocket after its `101`, a server stream) | `NO EFFECT` with `request: … connected, data flowing`, not `PENDING` |
 | no change | clipboard changed | `changed · copied to clipboard (N characters)` (§7) |
 
-The request window only runs when a non-telemetry request is in flight, so a true no-op is never delayed.
+The request window only runs while the app is waiting for a non-telemetry reply, so a true no-op is never delayed by
+it. A chain (the reply to one request triggers another) is still the tap's: every request started after the touch
+counts.
 
-Output:
+Output, with the detail layer:
 
 ```
 tap Login → PENDING · POST api.example.com/login still running after 2.2 s
@@ -101,11 +135,19 @@ request: POST api.example.com/orders → 201 in 310 ms
 request: POST api.example.com/orders sent twice
 ```
 
-- **Duplicates:** the same method and path shape twice from one tap adds `request: … sent twice`.
-- **Telemetry:** listed on one line, `telemetry: 2 requests (app-measurement.com, sentry.io)`, never in the headline.
+With activity only (another stack, or no detail):
+
+```
+tap Login → PENDING · api.example.com:443 · 1.2 KB sent, awaiting reply after 2.1 s
+```
+
+- **Duplicates:** the same method and path shape twice from one tap adds `request: … sent twice` (detail layer).
+- **Telemetry:** one line, `telemetry: 2 requests (app-measurement.com, sentry.io)`, never in the headline.
 - **Exit codes:** `PENDING` is a new code, `6` ("effect still in flight"); the rest are unchanged.
-- **JSON and MCP:** outcome `pending`; a `requests` array of `{method, host, path, status, error, ms, telemetry,
-  duplicate}`.
+- **Batches:** a step that comes back `PENDING` does what a bare `chauffeur wait` does (§9), up to the wait limit, and
+  the batch judges the final result. A batch never stops on `PENDING` itself, so "tap Login, then tap Profile" works.
+- **JSON and MCP:** outcome `pending`; a `requests` array of `{method, host, port, path, status, error, ms, sent,
+  received, telemetry, duplicate, streaming}`, with fields absent when the layer that provides them isn't available.
 - The skill, the MCP instructions and the `act` tool description each gain one line on `PENDING`, exit 6 and
   `chauffeur wait`.
 
@@ -118,30 +160,33 @@ request: POST api.example.com/orders sent twice
   "example.com/metrics"]`. An entry is a domain suffix with an optional path prefix, matched against the path shape.
 - `chauffeur use` merges into `.chauffeur.json` instead of rewriting it, so it keeps `telemetryHosts` (today it
   overwrites the file).
-- When hosts are unavailable (§5), telemetry can't be told apart: every request counts, and the evidence line says
-  `telemetry filter unavailable (hosts hidden)`.
+- Matching needs a host. When only an IP is known (§1 question 3) and no log line names the host, the connection
+  counts, and the evidence line says `telemetry filter unavailable for <ip>`.
 
-## 5. Seeing hosts: private log data
+## 5. Seeing hosts and paths in logs: private log data
 
 URLs in the logs read `<private>` by default.
 
-- **Per-subsystem (the default if step 0 confirms it):** the first time chauffeur launches an app on a simulator, it
-  runs `simctl spawn <udid> log config --subsystem com.apple.CFNetwork --mode "private_data:on"` (plus the
-  networking subsystem if step 0 needs it), records that in its per-simulator state, and prints once:
-  `note: unhid network log data in this simulator so requests show their host; chauffeur doctor --undo-logging
-  turns it off`. The app's own log lines stay redacted.
+- **Per-subsystem (the default if step 0 confirms it):** when chauffeur launches an app, it reads the simulator's
+  current log setting; if Apple's networking subsystem is still redacted, it runs `simctl spawn <udid> log config
+  --subsystem com.apple.CFNetwork --mode "private_data:on"` (plus the networking subsystem if step 0 needs it) and
+  prints once: `note: unhid network log data in this simulator so requests show their host; chauffeur doctor
+  --undo-logging turns it off`. It checks the real setting every time rather than remembering it, so an erased or
+  reset simulator is handled. The app's own log lines stay redacted.
 - **Global only:** never automatic. `chauffeur doctor --fix network` turns it on after a warning that every private
   value in the simulator's logs, including the app's own, becomes visible to `chauffeur logs` and so to the agent.
-  Without it M4b still works, minus the telemetry filter (§4).
+  Without it, the activity layer still gives `PENDING` and hosts where §1 question 3 allows.
 - `chauffeur doctor` reports the setting's state; `--undo-logging` restores it.
 
 ## 6. What the agent may see
 
-- Method, host, path shape, status or error kind, and timing.
+- Host, port, method, path shape, status or error kind, timing, and byte counts.
 - **Path shape:** the query string and fragment are dropped. Path segments that are numbers, UUIDs, hex or base64
   runs of 16 or more characters, or contain `@`, become `{id}`, `{token}` or `{email}`:
-  `/reset/sam@example.com/7f3a…` → `/reset/{email}/{token}`.
-- Paths and hosts are quoted and escaped like screen text: they can come from server responses (redirects, links), so
+  `/reset/sam@example.com/7f3a…` → `/reset/{email}/{token}`. A segment that is a person's name (`/users/john-smith`)
+  is not caught by these rules; stage 2 adds a check against identifiers seen elsewhere (screen text, the app's
+  data) to close that.
+- Hosts and paths are quoted and escaped like screen text: they can come from server responses (redirects, links), so
   they are untrusted data.
 - Never: bodies, headers, cookies, query strings, the app's private log values, clipboard contents.
 
@@ -149,62 +194,93 @@ URLs in the logs read `<private>` by default.
 
 chauffeur hashes `simctl pbpaste` output before and after a tap, inside the daemon. A change is a verified effect:
 `changed · copied to clipboard (24 characters)`. Only the length leaves the daemon. If step 0 shows `pbpaste` over
-30 ms, the clipboard is read only after a no-change result, the one case where it can change the verdict.
+30 ms, the clipboard is read only after a no-change result, the one case where it can change the verdict. If step 0
+shows that reading it is visible to the app (a paste banner, a change notification), the clipboard check is dropped
+from M4b and redesigned rather than shipped with a side effect.
 
 ## 8. Crash first, and recovering an app opened from its icon
 
 - **Crash first:** a tap that kills the app leads with `tap Pay → APP CRASHED · Fixture died 120 ms after the touch
   (SIGABRT)`; the screen diff and the crash block follow. Exit 5 is unchanged.
 - **Icon-opened app:** when the frontmost app has no accessibility tree because it was opened from its icon,
-  chauffeur relaunches it through its own launch path (which also attaches the log stream, so §2 works), retries the
-  command once, and says so: `note: relaunched com.example.app — it was opened from its icon without accessibility;
-  its in-app state was reset`. Only the frontmost app, once per app per session, and never inside a batch, where it
-  stops with today's message because a state reset would corrupt the flow.
+  chauffeur relaunches it through its own launch path (which also attaches the log stream, so the detail layer works),
+  retries the command once, and says so: `note: relaunched com.example.app — it was opened from its icon without
+  accessibility; its in-app state was reset`. Only the frontmost app, once per app per session, and never inside a
+  batch, where it stops with today's message because a state reset would corrupt the flow.
 
 ## 9. `wait`
 
-- **`chauffeur wait`** (no query) finishes the last `PENDING` tap: it waits for that tap's requests to end and the
+- **`chauffeur wait`** (no query) finishes the last `PENDING` tap: it waits for that tap's replies to arrive and the
   screen to settle, then judges the tap again with §3's rules and output. No pending tap → a message and exit 1.
-- **`wait "<query>"`** that times out names what is still running: `wait "Welcome" → timed out after 10 s · still
-  running: GET api.example.com/feed (9.8 s)`.
+- **`wait "<query>"`** that times out names what is still waiting: `wait "Welcome" → timed out after 10 s · still
+  waiting: GET api.example.com/feed (9.8 s)`.
 - Both keep the 300 s limit.
 
-Known limits, stated in the skill and `docs/design.md`: requests the app's process doesn't log (if step 0 finds
-background sessions or web views missing) aren't seen; a first-party request that is really telemetry counts until
-the project lists it.
+## 10. Release
+
+New output and a new exit code change what agents see, so M4b ships as **0.2.0**. The README's benchmark figures were
+measured before M4b: the release either re-runs the benchmark tasks that touch the network, or states that the figures
+come from 0.1.x. The MCP bundle and registry entry move to 0.2.0 with it.
 
 ## Testing
 
 **Unit (no simulator):**
-- `RequestLog` on recorded lines from step 0, including failures and timeouts.
-- Every row of §3's table, through the existing fake clock and touch transport; a true no-op is not delayed.
-- `Telemetry`: built-in suffixes, project entries, path prefixes, hosts unavailable.
+- `RequestLog` on recorded lines from step 0, including failures, timeouts and `101` upgrades.
+- `ConnectionWatch` derivations on recorded connection samples: sent-after-touch, waiting for a reply, streaming,
+  traffic already flowing before the touch.
+- Every row of §3's table, through the existing fake clock and touch transport; a true no-op is not delayed; batches
+  wait through `PENDING`.
+- `Telemetry`: built-in suffixes, project entries, path prefixes, IP-only.
 - `PathShape`: `{id}`, `{token}`, `{email}`, query and fragment stripping, escaping.
-- Duplicates; exit code 6; the JSON `requests` array; `chauffeur use` keeps `telemetryHosts`.
-- Clipboard hash compare; the crash headline order; relaunch-once and never-in-a-batch.
+- Duplicates; exit code 6; the JSON `requests` array with absent fields; `chauffeur use` keeps `telemetryHosts`.
+- The marker-line catch-up; the text-field extra window.
+- Clipboard hash compare; the crash headline order; relaunch-once and never-in-a-batch; the private-data setting read
+  back rather than remembered.
 
-**Live (fixture app, Xcode 27 locally):** a "Network" screen talks to a small HTTP server the tests start on
-127.0.0.1, so no internet is needed:
+**Live (fixture app, Xcode 27 locally):** a "Network" screen talks to a small HTTP and WebSocket server the tests start
+on 127.0.0.1, so no internet is needed:
 
-| Button | Expected |
+| Button or field | Expected |
 |---|---|
 | slow API (2.5 s) | `PENDING`, then `chauffeur wait` → `changed` with the request line |
 | fast API (100 ms) | `changed` with a request line |
 | failing API (500) | `NO EFFECT · … → 500` |
 | analytics only | `NO EFFECT` with a telemetry line |
 | double submit | a `sent twice` line |
-| dead | plain `NO EFFECT`, no slower than today |
+| slow raw-socket request (a non-Apple stack) | `PENDING` from the activity layer |
+| open WebSocket | `NO EFFECT` with `connected, data flowing` |
+| web view link to a slow page | `PENDING` |
+| search field (300 ms debounce) | typing → `PENDING` or `changed`, never a false `NO EFFECT` |
+| dead | plain `NO EFFECT`, no slower than step 0's measured minimum |
 | Copy | `changed · copied to clipboard` |
 
-Plus an icon-launch test for §8's recovery.
+Plus a batch through the slow API, and an icon-launch test for §8's recovery.
 
 ## Done when
 
 - Step 0's findings are in this spec, and the design matches them.
 - Unit tests pass in CI on Xcode 26; the live tests pass locally on Xcode 27.
 - The skill, MCP instructions and tool descriptions explain `PENDING`, exit 6 and `chauffeur wait`.
-- `docs/design.md` replaces the "network inspection" non-goal with this scope and its limits.
-- `docs/roadmap.md` marks M4b in progress and records the network visibility milestone as later work.
+- `docs/design.md` replaces the "network inspection" non-goal with this scope and the staging below.
+- `docs/roadmap.md` marks M4b in progress and lists stage 2.
+- 0.2.0 is released per §10.
+
+## Staging
+
+| Today's gap | Closed by | Stage |
+|---|---|---|
+| a slow request reported `NO EFFECT` | activity + detail layers, `PENDING` | M4b |
+| Flutter, raw sockets, gRPC, other stacks | activity layer | M4b |
+| WebSockets and server streams | activity layer (`data flowing`) | M4b |
+| web views | activity layer via the WebKit networking process | M4b |
+| log delay | activity layer; marker-line catch-up | M4b |
+| delayed (debounced) requests | text-field extra window | M4b |
+| method, path and status on non-Apple stacks | in-app library loaded at launch | stage 2 (network visibility) |
+| bodies, headers (opt-in), a `network` command | in-app library | stage 2 |
+| names in paths | identifier check against screen and app data | stage 2 |
+
+Stage 2 gets its own spec and security review: it runs code inside the app, and bodies can carry secrets and untrusted
+text.
 
 ## Findings
 
