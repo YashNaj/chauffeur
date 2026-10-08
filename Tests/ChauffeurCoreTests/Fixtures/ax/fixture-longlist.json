@@ -1,0 +1,283 @@
+{
+  "children" : [
+    {
+      "children" : [
+
+      ],
+      "enabled" : true,
+      "frame" : [
+        16,
+        62,
+        44,
+        44
+      ],
+      "hidden" : false,
+      "identifier" : "BackButton",
+      "label" : "Fixture",
+      "role" : "AXButton"
+    },
+    {
+      "children" : [
+
+      ],
+      "enabled" : true,
+      "frame" : [
+        16,
+        119.66666666666667,
+        133.66666666666666,
+        40.66666666666667
+      ],
+      "hidden" : false,
+      "label" : "Long list",
+      "role" : "AXHeading"
+    },
+    {
+      "children" : [
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            168,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Row 1",
+          "role" : "AXStaticText"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            220,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Row 2",
+          "role" : "AXStaticText"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            272,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Row 3",
+          "role" : "AXStaticText"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            324,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Row 4",
+          "role" : "AXStaticText"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            376,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Row 5",
+          "role" : "AXStaticText"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            428,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Row 6",
+          "role" : "AXStaticText"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            480,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Row 7",
+          "role" : "AXStaticText"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            532,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Row 8",
+          "role" : "AXStaticText"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            584,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Row 9",
+          "role" : "AXStaticText"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            636,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Row 10",
+          "role" : "AXStaticText"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            688,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Row 11",
+          "role" : "AXStaticText"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            740,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Row 12",
+          "role" : "AXStaticText"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            792,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Row 13",
+          "role" : "AXStaticText"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            844,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Row 14",
+          "role" : "AXStaticText"
+        }
+      ],
+      "enabled" : true,
+      "frame" : [
+        0,
+        0,
+        402,
+        874
+      ],
+      "hidden" : false,
+      "role" : "AXGroup"
+    },
+    {
+      "children" : [
+
+      ],
+      "enabled" : true,
+      "frame" : [
+        0,
+        791,
+        402,
+        83
+      ],
+      "hidden" : false,
+      "label" : "Tab Bar",
+      "role" : "AXGroup"
+    }
+  ],
+  "enabled" : true,
+  "frame" : [
+    0,
+    0,
+    402,
+    874
+  ],
+  "hidden" : false,
+  "label" : "Fixture",
+  "role" : "AXApplication"
+}

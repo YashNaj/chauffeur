@@ -1,0 +1,178 @@
+{
+  "children" : [
+    {
+      "children" : [
+
+      ],
+      "enabled" : true,
+      "frame" : [
+        0,
+        62,
+        402,
+        106
+      ],
+      "hidden" : false,
+      "identifier" : "Fixture",
+      "role" : "AXGroup"
+    },
+    {
+      "children" : [
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            168,
+            370,
+            40.33333333333334
+          ],
+          "hidden" : false,
+          "label" : "Status",
+          "role" : "AXHeading"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            208.33333333333334,
+            370,
+            52.00000000000003
+          ],
+          "hidden" : false,
+          "identifier" : "lastAction",
+          "label" : "Last action: none",
+          "role" : "AXStaticText"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            278,
+            370,
+            40.333333333333314
+          ],
+          "hidden" : false,
+          "label" : "Actions",
+          "role" : "AXHeading"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            318.33333333333337,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Show alert",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            370.33333333333337,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Request location",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            422.33333333333337,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Request notifications",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            474.3333333333333,
+            370,
+            51.99999999999994
+          ],
+          "hidden" : false,
+          "label" : "Long list",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            526.3333333333333,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Crash",
+          "role" : "AXButton"
+        }
+      ],
+      "enabled" : true,
+      "frame" : [
+        0,
+        0,
+        402,
+        874
+      ],
+      "hidden" : false,
+      "role" : "AXGroup"
+    },
+    {
+      "children" : [
+
+      ],
+      "enabled" : true,
+      "frame" : [
+        0,
+        791,
+        402,
+        83
+      ],
+      "hidden" : false,
+      "label" : "Tab Bar",
+      "role" : "AXGroup"
+    }
+  ],
+  "enabled" : true,
+  "frame" : [
+    0,
+    0,
+    402,
+    874
+  ],
+  "hidden" : false,
+  "label" : "Fixture",
+  "role" : "AXApplication"
+}

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key><string>dev.chauffeur.fixture</string>
+    <key>CFBundleExecutable</key><string>Fixture</string>
+    <key>CFBundleName</key><string>Fixture</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleShortVersionString</key><string>0.1</string>
+    <key>CFBundleVersion</key><string>1</string>
+    <key>CFBundleSupportedPlatforms</key><array><string>iPhoneSimulator</string></array>
+    <key>MinimumOSVersion</key><string>17.0</string>
+    <key>UIDeviceFamily</key><array><integer>1</integer></array>
+    <key>UILaunchScreen</key><dict/>
+    <key>CFBundleURLTypes</key><array><dict>
+        <key>CFBundleURLName</key><string>dev.chauffeur.fixture</string>
+        <key>CFBundleURLSchemes</key><array><string>chauffeur-fixture</string></array>
+    </dict></array>
+    <key>NSLocationWhenInUseUsageDescription</key><string>Fixture asks so chauffeur can test permission prompts.</string>
+</dict>
+</plist>

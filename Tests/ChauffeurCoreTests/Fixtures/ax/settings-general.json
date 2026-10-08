@@ -1,0 +1,201 @@
+{
+  "children" : [
+    {
+      "children" : [
+
+      ],
+      "enabled" : true,
+      "frame" : [
+        16,
+        62,
+        44,
+        44
+      ],
+      "hidden" : false,
+      "identifier" : "BackButton",
+      "label" : "Settings",
+      "role" : "AXButton"
+    },
+    {
+      "children" : [
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            36,
+            224.16666857401532,
+            80,
+            26.333333333333314
+          ],
+          "hidden" : false,
+          "label" : "General",
+          "role" : "AXHeading"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            36,
+            254.50000190734863,
+            330,
+            86.33333333333331
+          ],
+          "hidden" : false,
+          "label" : "Manage your overall setup and preferences for iPhone, such as software updates, device language, CarPlay, AirDrop, and more.",
+          "role" : "AXHeading"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            20,
+            391.3333377838135,
+            362,
+            53
+          ],
+          "hidden" : false,
+          "identifier" : "About",
+          "label" : "About",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            20,
+            444.3333377838135,
+            362,
+            53
+          ],
+          "hidden" : false,
+          "identifier" : "SCREEN_CAPTURE",
+          "label" : "Screen Capture",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            20,
+            532.3333377838135,
+            362,
+            53
+          ],
+          "hidden" : false,
+          "identifier" : "AUTOFILL",
+          "label" : "AutoFill & Passwords",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            20,
+            585.3333377838135,
+            362,
+            53
+          ],
+          "hidden" : false,
+          "identifier" : "DICTIONARY",
+          "label" : "Dictionary",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            20,
+            638.3333377838135,
+            362,
+            53
+          ],
+          "hidden" : false,
+          "identifier" : "FONT_SETTING",
+          "label" : "Fonts",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            20,
+            691.3333377838135,
+            362,
+            53
+          ],
+          "hidden" : false,
+          "identifier" : "Keyboard",
+          "label" : "Keyboard",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            20,
+            744.3333377838135,
+            362,
+            53
+          ],
+          "hidden" : false,
+          "identifier" : "INTERNATIONAL",
+          "label" : "Language & Region",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            20,
+            797.3333377838135,
+            362,
+            53
+          ],
+          "hidden" : false,
+          "identifier" : "POINTERS",
+          "label" : "Trackpad & Mouse",
+          "role" : "AXButton"
+        }
+      ],
+      "enabled" : true,
+      "frame" : [
+        0,
+        0,
+        402,
+        874
+      ],
+      "hidden" : false,
+      "role" : "AXGroup"
+    }
+  ],
+  "enabled" : true,
+  "frame" : [
+    0,
+    0,
+    402,
+    874
+  ],
+  "hidden" : false,
+  "label" : "Settings",
+  "role" : "AXApplication"
+}

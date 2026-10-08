@@ -1,0 +1,9 @@
+.DS_Store
+.context-mem/
+.superpowers/
+spikes/build/
+spikes/fixture-app/build/
+spikes/hid-tap/hid-tap
+.build/
+__pycache__/
+*.pyc

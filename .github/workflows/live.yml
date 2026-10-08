@@ -1,0 +1,28 @@
+name: live
+on:
+  workflow_dispatch:
+  schedule: [{cron: "0 6 * * 1"}]
+jobs:
+  live:
+    runs-on: macos-26
+    timeout-minutes: 60
+    continue-on-error: true  # advisory until green 3 times in a row
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select the newest Xcode
+        run: |
+          X=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$X/Contents/Developer"; xcodebuild -version
+      - name: Boot the newest iPhone simulator
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys
+          d=json.load(sys.stdin)["devices"]
+          print(next(x["udid"] for r,l in sorted(d.items(), reverse=True) if "iOS" in r for x in l if x["name"].startswith("iPhone")))')
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID"; xcrun simctl bootstatus "$UDID" -b; sleep 60
+      - name: Build
+        run: swift build -c release
+      - name: Doctor
+        run: .build/release/chauffeur --udid "$UDID" doctor --live
+      - name: Live suites
+        run: CHAUFFEUR_LIVE_UDID="$UDID" swift test --no-parallel --filter "AppsLiveTests|TapLiveTests"

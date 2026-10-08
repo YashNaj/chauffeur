@@ -1,0 +1,85 @@
+{"app_name":"Fixture","timestamp":"2026-10-06 11:34:43.00 -0700","app_version":"0.1","bundleID":"dev.chauffeur.fixture","bug_type":"309","name":"Fixture","incident_id":"09554FB1-80E6-41DF-8BA1-BF49BADB5756"}
+{
+  "procName": "Fixture",
+  "pid": 39261,
+  "procPath": "/Users/USER/Library/Developer/CoreSimulator/Devices/AF7CFC76-936D-4E67-98F7-102C682E7ECD/data/Containers/Bundle/Application/B73C14B2-4CE1-4B8B-BDF8-717825224DDB/Fixture.app/Fixture",
+  "bundleInfo": {
+    "CFBundleShortVersionString": "0.1",
+    "CFBundleVersion": "1",
+    "CFBundleIdentifier": "dev.chauffeur.fixture"
+  },
+  "captureTime": "2026-10-06 11:33:37.8708 -0700",
+  "exception": {
+    "codes": "0x0000000000000001, 0x000000019772c2ec",
+    "rawCodes": [
+      1,
+      6835847916
+    ],
+    "type": "EXC_BREAKPOINT",
+    "signal": "SIGTRAP"
+  },
+  "termination": {
+    "flags": 0,
+    "code": 5,
+    "namespace": "SIGNAL",
+    "indicator": "Trace/BPT trap: 5",
+    "byProc": "exc handler",
+    "byPid": 39261
+  },
+  "faultingThread": 0,
+  "threads": [
+    {
+      "triggered": true,
+      "id": 345528,
+      "frames": [
+        {
+          "imageIndex": 0,
+          "imageOffset": 1065708,
+          "symbol": "_assertionFailure(_:_:file:line:flags:)",
+          "symbolLocation": 156
+        },
+        {
+          "imageIndex": 1,
+          "imageOffset": 10872,
+          "symbol": "closure #5 in closure #2 in closure #1 in HomeView.body.getter",
+          "symbolLocation": 268
+        },
+        {
+          "imageIndex": 2,
+          "imageOffset": 7321888,
+          "symbol": "<deduplicated_symbol>",
+          "symbolLocation": 24
+        },
+        {
+          "imageIndex": 2,
+          "imageOffset": 14667184,
+          "symbol": "specialized static MainActor.assumeIsolated<A>(_:file:line:)",
+          "symbolLocation": 132
+        },
+        {
+          "imageIndex": 2,
+          "imageOffset": 14448556,
+          "symbol": "ButtonAction.callAsFunction()",
+          "symbolLocation": 388
+        }
+      ]
+    }
+  ],
+  "usedImages": [
+    {
+      "name": "libswiftCore.dylib",
+      "path": "/Volumes/VOLUME/*/libswiftCore.dylib",
+      "uuid": "c62f8d53-88b1-335b-991e-5bc56d71d347"
+    },
+    {
+      "name": "Fixture",
+      "path": "/Users/USER/Library/Developer/CoreSimulator/Devices/AF7CFC76-936D-4E67-98F7-102C682E7ECD/data/Containers/Bundle/Application/B73C14B2-4CE1-4B8B-BDF8-717825224DDB/Fixture.app/Fixture",
+      "uuid": "0b534e2c-81a0-32d2-9fa4-5966897c8e82"
+    },
+    {
+      "name": "SwiftUI",
+      "path": "/Volumes/VOLUME/*/SwiftUI.framework/SwiftUI",
+      "uuid": "719cf349-8c4a-3054-9536-23eb53648ee0"
+    }
+  ]
+}

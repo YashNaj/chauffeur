@@ -1,0 +1,888 @@
+{
+  "children": [
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        0,
+        62,
+        402,
+        54
+      ],
+      "hidden": false,
+      "identifier": "Identifier 2",
+      "role": "AXGroup"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        92.83333587646484,
+        198.3333282470703,
+        216.33331298828125,
+        89.66667175292969
+      ],
+      "hidden": false,
+      "label": "Label 3",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        67.66666666666669,
+        291,
+        266.66666666666663,
+        18
+      ],
+      "hidden": false,
+      "label": "Label 4",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        31.33333396911621,
+        471.0673828125,
+        54.666664123535156,
+        15.666656494140625
+      ],
+      "hidden": false,
+      "label": "Label 5",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        104,
+        471.7003580729167,
+        67,
+        14.333333333333314
+      ],
+      "hidden": false,
+      "label": "Label 6",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        20,
+        497.7340494791667,
+        325.66666666666663,
+        34.00000000000006
+      ],
+      "hidden": false,
+      "label": "Label 7",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        20,
+        555.6666666666666,
+        114,
+        44
+      ],
+      "hidden": false,
+      "label": "Label 8",
+      "role": "AXButton"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        144,
+        555.6666666666666,
+        114,
+        44
+      ],
+      "hidden": false,
+      "label": "Label 9",
+      "role": "AXButton"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        268,
+        555.6666666666666,
+        114,
+        44
+      ],
+      "hidden": false,
+      "label": "Label 10",
+      "role": "AXButton"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        32,
+        623.7340494791666,
+        52.33333333333333,
+        14.333333333333371
+      ],
+      "hidden": false,
+      "label": "Label 11",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        36,
+        658.0673828125,
+        40.66666666666666,
+        19.66666666666663
+      ],
+      "hidden": false,
+      "label": "Label 12",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        328,
+        658.0673828125,
+        38,
+        19.66666666666663
+      ],
+      "hidden": false,
+      "label": "Label 13",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        36,
+        698.0673828125,
+        44.66666666666666,
+        19.66666666666663
+      ],
+      "hidden": false,
+      "label": "Label 14",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        250.33333333333331,
+        698.0673828125,
+        115.66666666666669,
+        19.66666666666663
+      ],
+      "hidden": false,
+      "label": "Label 15",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        36.00000000000003,
+        738.0673828125,
+        67.66666666666666,
+        19.66666666666663
+      ],
+      "hidden": false,
+      "label": "Label 16",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        294.6666666666667,
+        738.0673828125,
+        71.33333333333331,
+        19.66666666666663
+      ],
+      "hidden": false,
+      "label": "Label 17",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        36,
+        778.0673828125,
+        100,
+        19.66666666666663
+      ],
+      "hidden": false,
+      "label": "Label 18",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        294.6666666666667,
+        778.0673828125,
+        71.33333333333331,
+        19.66666666666663
+      ],
+      "hidden": false,
+      "label": "Label 19",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        36,
+        818.0673828125,
+        97,
+        19.66666666666663
+      ],
+      "hidden": false,
+      "label": "Label 20",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        335.3333333333333,
+        818.0673828125,
+        30.666666666666686,
+        19.66666666666663
+      ],
+      "hidden": false,
+      "label": "Label 21",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        36,
+        858.0673828125,
+        29,
+        19.66666666666663
+      ],
+      "hidden": false,
+      "label": "Label 22",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        319,
+        858.0673828125,
+        47,
+        19.66666666666663
+      ],
+      "hidden": false,
+      "label": "Label 23",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        36,
+        898.0673828125,
+        138.33333333333331,
+        19.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 24",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        328.6666666666667,
+        898.0673828125,
+        37.333333333333314,
+        19.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 25",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        36,
+        938.0673828125,
+        27.666666666666664,
+        19.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 26",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        329.3333333333333,
+        938.0673828125,
+        36.666666666666686,
+        19.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 27",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        32,
+        993.0673828125,
+        88.33333333333333,
+        14.333333333333371
+      ],
+      "hidden": false,
+      "label": "Label 28",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        334.66666666666663,
+        991.6666666666666,
+        47.333333333333314,
+        17
+      ],
+      "hidden": false,
+      "label": "Label 29",
+      "role": "AXButton"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        36,
+        1030.7340494791665,
+        306.66666666666663,
+        36.666666666666515
+      ],
+      "hidden": false,
+      "label": "Label 30",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        32,
+        1104.7340494791665,
+        44.66666666666666,
+        14.333333333333485
+      ],
+      "hidden": false,
+      "label": "Label 31",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        304.66666666666663,
+        1103.3333333333333,
+        77.33333333333331,
+        17
+      ],
+      "hidden": false,
+      "label": "Label 32",
+      "role": "AXButton"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        36,
+        1142.4007161458333,
+        330,
+        36.66666666666674
+      ],
+      "hidden": false,
+      "label": "Label 33",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        32,
+        1215.0673828125,
+        83.33333333333333,
+        14.333333333333485
+      ],
+      "hidden": false,
+      "label": "Label 34",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        36,
+        1249.4007161458333,
+        136.66666666666666,
+        19.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 35",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        281,
+        1249.4007161458333,
+        85,
+        19.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 36",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        32,
+        1303.0673828125,
+        73.33333333333333,
+        14.333333333333485
+      ],
+      "hidden": false,
+      "label": "Label 37",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        36,
+        1337.4007161458333,
+        98.66666666666666,
+        19.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 38",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        306.6666666666667,
+        1337.4007161458333,
+        59.333333333333314,
+        19.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 39",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        36,
+        1377.4007161458333,
+        98,
+        19.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 40",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        270.33333333333337,
+        1377.4007161458333,
+        95.66666666666663,
+        19.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 41",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        36,
+        1417.4007161458333,
+        108.66666666666666,
+        19.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 42",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        202.33333333333334,
+        1417.4007161458333,
+        163.66666666666666,
+        19.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 43",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        20,
+        1476.7340494791667,
+        85,
+        14.333333333333258
+      ],
+      "hidden": false,
+      "label": "Label 44",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        260,
+        1471,
+        122,
+        25.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 45",
+      "role": "AXButton"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        66,
+        1516.7340494791667,
+        72.66666666666666,
+        19.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 46",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        38,
+        1534.3333333333333,
+        14,
+        18
+      ],
+      "hidden": false,
+      "identifier": "Identifier 48",
+      "label": "Label 47",
+      "role": "AXImage"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        66,
+        1538.4007161458335,
+        165.33333333333331,
+        31.333333333333258
+      ],
+      "hidden": false,
+      "label": "Label 49",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        342.66666666666663,
+        1532,
+        23.333333333333314,
+        22.666666666666742
+      ],
+      "hidden": false,
+      "identifier": "Identifier 51",
+      "label": "Label 50",
+      "role": "AXButton"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        20,
+        1603.7340494791667,
+        141.66666666666666,
+        14.333333333333258
+      ],
+      "hidden": false,
+      "label": "Label 52",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        45.5,
+        1653.2340494791667,
+        15,
+        15.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 53",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        82,
+        1644.0673828125,
+        50,
+        19.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 54",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        147,
+        1646.7340494791667,
+        43.66666666666666,
+        14.333333333333258
+      ],
+      "hidden": false,
+      "label": "Label 55",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        83.33333587646484,
+        1666.7340087890625,
+        74.66666412353516,
+        15.6666259765625
+      ],
+      "hidden": false,
+      "label": "Label 56",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        83,
+        1685.4007568359375,
+        58,
+        15.6666259765625
+      ],
+      "hidden": false,
+      "label": "Label 57",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        82,
+        1704.0673828125002,
+        83.33333333333331,
+        15.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 58",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        83.16666666666667,
+        1744.0673828125,
+        10.333333333333329,
+        19.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 59",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        195.83333333333334,
+        1744.0673828125,
+        10.333333333333343,
+        19.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 60",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        291.6666666666667,
+        1744.0673828125,
+        44,
+        19.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 61",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        68.33333333333334,
+        1765.7340494791667,
+        40,
+        13.333333333333258
+      ],
+      "hidden": false,
+      "label": "Label 62",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        164,
+        1765.7340494791667,
+        74,
+        13.333333333333258
+      ],
+      "hidden": false,
+      "label": "Label 63",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        279.1666666666667,
+        1765.7340494791667,
+        69,
+        13.333333333333258
+      ],
+      "hidden": false,
+      "label": "Label 64",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        20,
+        1824.7340494791667,
+        53.33333333333333,
+        14.333333333333258
+      ],
+      "hidden": false,
+      "label": "Label 65",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        305.66666666666663,
+        1819,
+        76.33333333333331,
+        25.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 66",
+      "role": "AXPopUpButton"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        187.66666666666666,
+        1880.3333333333333,
+        26.666667938232422,
+        26.33333396911621
+      ],
+      "hidden": false,
+      "identifier": "Identifier 68",
+      "label": "Label 67",
+      "role": "AXImage"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        139,
+        1914.4007161458335,
+        124,
+        19.666666666666742
+      ],
+      "hidden": false,
+      "label": "Label 69",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        36,
+        1940.0673828125002,
+        330,
+        31.333333333333258
+      ],
+      "hidden": false,
+      "label": "Label 70",
+      "role": "AXStaticText"
+    },
+    {
+      "children": [],
+      "enabled": true,
+      "frame": [
+        0,
+        791,
+        402,
+        83
+      ],
+      "hidden": false,
+      "label": "Label 71",
+      "role": "AXGroup"
+    }
+  ],
+  "enabled": true,
+  "frame": [
+    0,
+    0,
+    402,
+    874
+  ],
+  "hidden": false,
+  "label": "App",
+  "role": "AXApplication"
+}

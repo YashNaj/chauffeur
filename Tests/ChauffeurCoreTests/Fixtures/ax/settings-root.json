@@ -1,0 +1,250 @@
+{
+  "children" : [
+    {
+      "children" : [
+
+      ],
+      "enabled" : true,
+      "frame" : [
+        16,
+        119.66666666666667,
+        133,
+        40.66666666666667
+      ],
+      "hidden" : false,
+      "label" : "Settings",
+      "role" : "AXHeading"
+    },
+    {
+      "children" : [
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            168,
+            370,
+            90.33333333333331
+          ],
+          "hidden" : false,
+          "identifier" : "com.apple.settings.primaryAppleAccount",
+          "label" : "Apple Account, Sign in to access your iCloud data, the App Store, Apple services, and more.",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            293.3333333333333,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "identifier" : "com.apple.settings.general",
+          "label" : "General",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            345.33333333333337,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "identifier" : "com.apple.settings.accessibility",
+          "label" : "Accessibility",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            397.33333333333337,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "identifier" : "com.apple.settings.actionButton",
+          "label" : "Action Button",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            449.3333333333333,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "identifier" : "com.apple.settings.siri",
+          "label" : "Apple Intelligence & Siri",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            501.3333333333333,
+            370,
+            51.99999999999994
+          ],
+          "hidden" : false,
+          "identifier" : "com.apple.settings.camera",
+          "label" : "Camera",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            553.3333333333333,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "identifier" : "com.apple.settings.homeScreen",
+          "label" : "Home Screen & App Library",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            605.3333333333333,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "identifier" : "com.apple.settings.search",
+          "label" : "Search",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            657.3333333333333,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "identifier" : "com.apple.settings.standBy",
+          "label" : "StandBy",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            744.3333333333334,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "identifier" : "com.apple.settings.screenTime",
+          "label" : "Screen Time",
+          "role" : "AXButton"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            831.3333333333334,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "identifier" : "com.apple.settings.passcodeAndBiometrics",
+          "label" : "Passcode",
+          "role" : "AXButton"
+        }
+      ],
+      "enabled" : true,
+      "frame" : [
+        0,
+        0,
+        402,
+        874
+      ],
+      "hidden" : false,
+      "role" : "AXGroup"
+    },
+    {
+      "children" : [
+
+      ],
+      "enabled" : true,
+      "frame" : [
+        32.99999999999994,
+        803,
+        336,
+        38
+      ],
+      "hidden" : false,
+      "role" : "AXTextField",
+      "subrole" : "AXSearchField",
+      "value" : "Search"
+    },
+    {
+      "children" : [
+
+      ],
+      "enabled" : true,
+      "frame" : [
+        335.6666666666667,
+        811,
+        17.333333333333314,
+        22
+      ],
+      "hidden" : false,
+      "identifier" : "Dictate",
+      "label" : "Dictate",
+      "role" : "AXButton"
+    }
+  ],
+  "enabled" : true,
+  "frame" : [
+    0,
+    0,
+    402,
+    874
+  ],
+  "hidden" : false,
+  "label" : "Settings",
+  "role" : "AXApplication"
+}

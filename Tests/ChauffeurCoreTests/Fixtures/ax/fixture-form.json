@@ -1,0 +1,122 @@
+{
+  "children" : [
+    {
+      "children" : [
+
+      ],
+      "enabled" : true,
+      "frame" : [
+        15.999999999999993,
+        119.66666666666667,
+        81,
+        40.66666666666667
+      ],
+      "hidden" : false,
+      "label" : "Form",
+      "role" : "AXHeading"
+    },
+    {
+      "children" : [
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            32,
+            183,
+            338,
+            22
+          ],
+          "hidden" : false,
+          "identifier" : "email",
+          "role" : "AXTextField",
+          "value" : "Email"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            32,
+            235.66666666666666,
+            338,
+            21.00000000000003
+          ],
+          "hidden" : false,
+          "identifier" : "password",
+          "role" : "AXTextField",
+          "subrole" : "AXSecureTextField",
+          "value" : "Password"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : true,
+          "frame" : [
+            16,
+            272,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Agree to terms",
+          "role" : "AXCheckBox",
+          "subrole" : "AXSwitch",
+          "value" : "0"
+        },
+        {
+          "children" : [
+
+          ],
+          "enabled" : false,
+          "frame" : [
+            16,
+            324,
+            370,
+            52
+          ],
+          "hidden" : false,
+          "label" : "Submit",
+          "role" : "AXButton"
+        }
+      ],
+      "enabled" : true,
+      "frame" : [
+        0,
+        0,
+        402,
+        874
+      ],
+      "hidden" : false,
+      "role" : "AXGroup"
+    },
+    {
+      "children" : [
+
+      ],
+      "enabled" : true,
+      "frame" : [
+        0,
+        791,
+        402,
+        83
+      ],
+      "hidden" : false,
+      "label" : "Tab Bar",
+      "role" : "AXGroup"
+    }
+  ],
+  "enabled" : true,
+  "frame" : [
+    0,
+    0,
+    402,
+    874
+  ],
+  "hidden" : false,
+  "label" : "Fixture",
+  "role" : "AXApplication"
+}

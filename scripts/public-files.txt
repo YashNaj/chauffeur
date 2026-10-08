@@ -1,0 +1,32 @@
+# The public tree (M3b spec §2.1). A file stays private until it is listed here.
+Package.swift
+Package.resolved
+README.md
+LICENSE
+NOTICE
+CONTRIBUTING.md
+SECURITY.md
+CHANGELOG.md
+.gitignore
+.github/workflows/ci.yml
+.github/workflows/live.yml
+Sources/**
+Tests/**
+scripts/**
+dogfood/**
+demos/**
+docs/design.md
+docs/benchmark.md
+docs/a11y-audit.md
+docs/media/**
+# never public, even if a glob above matches
+!Tests/acceptance-m2.sh
+!dogfood/results/**
+!dogfood/results-m2/**
+!dogfood/results-launch/*.jsonl
+!dogfood/results-launch/*.err
+!dogfood/results-launch/*.png
+!dogfood/results-launch/*.reset
+!dogfood/results-launch/*.appearance
+!docs/release-v0.1.0.md
+!docs/launch-post.md

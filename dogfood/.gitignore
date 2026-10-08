@@ -1,0 +1,6 @@
+results/*
+!results/summary.csv
+!results/verdicts.tsv
+results-launch/*
+!results-launch/summary.csv
+!results-launch/verdicts.tsv

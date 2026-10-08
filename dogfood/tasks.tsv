@@ -1,0 +1,16 @@
+F0	none	Take a snapshot of the simulator screen and tell me which app is in front.	hand
+F1	fixture	In the Fixture app, fill the form with email dogfood@example.com, agree to the terms and submit it.	claim:password
+F2	fixture	In the Fixture app's form, enter the password s3cret-dogfood and the email a@b.co, then submit.	claim:terms
+F3	fixture	Open the long list in the Fixture app and tell me which row comes right after Row 47.	claim:row 48
+F4	fixture	In the Fixture app, show the alert, dismiss it with Cancel, and tell me what the app says the last action was.	claim:alert cancel
+F5	fixture	Go to the Form tab, then back to Home, then tap Show alert and press OK.	claim:alert ok
+F6	perm	Make the Fixture app request location access, allow it while using the app, and confirm it worked.	hand
+F7	fixture	Tap the Crash button in the Fixture app and tell me exactly what happened and why.	claim:fatal error|FixtureApp\.swift:57
+F8	fixture	Tap Log errors in the Fixture app and summarise any errors the app logged.	claim:error 1.*error 4
+F9	fixture-nolaunch	Open the Fixture app and switch the segmented control on its home screen to Mine.	hand
+S1	settings	Using the Settings app, find out which iOS version this simulator runs.	claim:27\.0
+S2	settings	Turn on Dark Mode using the Settings app (not a shortcut).	appearance:dark
+S3	settings	In Settings, find the Accessibility setting that makes text bigger and tell me its current value. Don't change it.	claim:larger text.*\boff\b|\boff\b.*larger text
+C1	calendar	In the Calendar app, find which calendars are listed and tell me their names. Don't create or change anything.	claim:us holidays.*birthdays|birthdays.*us holidays
+K1	contacts	In Contacts, open Kate Bell and tell me which company she works for. Don't change anything.	claim:creative consulting
+R1	reminders	Open the Reminders app and tell me which lists are under My Lists and how many reminders each one has. Don't create or change anything.	claim:\breminders\b.*\b(0|no|zero|none|empty)\b
