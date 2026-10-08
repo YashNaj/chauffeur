@@ -61,6 +61,11 @@ d=$(tree leak); printf 'see /Users/%s/x\n' "Ya""sh" > "$d/Sources/ChauffeurCore/
 expect_fail "private material fails" leak "$d"
 d=$(tree leak-bin); printf 'x\0\377\376 /Users/%s/x\0' "Ya""sh" > "$d/Sources/ChauffeurCore/cache.pyc"
 expect_fail "private material in a binary file fails" leak "$d"
+d=$(tree leak-ignored); (cd "$d" && git init -q && echo 'cache/' > .gitignore)
+mkdir -p "$d/cache"; printf 'see /Users/%s/x\n' "Ya""sh" > "$d/cache/run.log"
+expect_pass "private material in a gitignored file passes" "$d"
+printf 'see /Users/%s/x\n' "Ya""sh" > "$d/notes.md"
+expect_fail "private material in an untracked file fails" leak "$d"
 
 d=$(tree "with space"); echo 'let x = try! f()' > "$d/Sources/ChauffeurCore/B.swift"
 expect_fail "path with a space" try-bang "$d"

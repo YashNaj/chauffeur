@@ -12,6 +12,7 @@ step() {
 step format xcrun swift-format lint --strict -r Sources Tests
 step code scripts/check-code.sh
 step build swift build -Xswiftc -warnings-as-errors
+step release swift build -c release -Xswiftc -warnings-as-errors
 step test swift test -Xswiftc -warnings-as-errors
 step verifier python3 -I -B dogfood/test_verify.py
 step readme python3 -I -B scripts/check-readme-numbers.py README.md docs/benchmark.md

@@ -49,8 +49,21 @@ length_limit() {
 length_limit Sources 400
 length_limit Tests 600
 
-if ! leaks=$("$SCRIPTS/check-public.sh" "$ROOT"); then
-  LC_ALL=C sed -E "s|^$ROOT/||; s|^([^:]+:[0-9]+):.*|\1: leak: private material|" <<<"$leaks"
+# In a git checkout, scan only what git could ship (tracked and untracked-but-not-ignored files): ignored caches and
+# logs on the owner's machine can't reach the public repo.
+SCAN=$ROOT
+if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  SCAN=$(mktemp -d); trap 'rm -rf "$SCAN"' EXIT
+  while IFS= read -r -d '' f; do
+    [ -f "$ROOT/$f" ] || continue
+    mkdir -p "$SCAN/$(dirname "$f")"; cp "$ROOT/$f" "$SCAN/$f"
+  done < <(git -C "$ROOT" ls-files -z --cached --others --exclude-standard)
+fi
+if ! leaks=$("$SCRIPTS/check-public.sh" "$SCAN"); then
+  while IFS= read -r line; do
+    line=${line#"$SCAN"/}
+    echo "${line%%:*}:$(LC_ALL=C cut -d: -f2 <<<"$line"): leak: private material"
+  done <<<"$leaks"
   found=1
 fi
 
