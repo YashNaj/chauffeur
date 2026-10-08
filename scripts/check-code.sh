@@ -50,7 +50,7 @@ length_limit Sources 400
 length_limit Tests 600
 
 if ! leaks=$("$SCRIPTS/check-public.sh" "$ROOT"); then
-  sed -E "s|^$ROOT/||; s|^([^:]+:[0-9]+):.*|\1: leak: private material|" <<<"$leaks"
+  LC_ALL=C sed -E "s|^$ROOT/||; s|^([^:]+:[0-9]+):.*|\1: leak: private material|" <<<"$leaks"
   found=1
 fi
 

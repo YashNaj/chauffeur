@@ -29,7 +29,8 @@ import Testing
         }
         UnixSocket.unlink(path, ifInode: oldInode)
         #expect(FileManager.default.fileExists(atPath: path))
-        UnixSocket.unlink(path, ifInode: try #require(UnixSocket.inode(path)))
+        let newInode = try #require(UnixSocket.inode(path))
+        UnixSocket.unlink(path, ifInode: newInode)
         #expect(!FileManager.default.fileExists(atPath: path))
     }
 

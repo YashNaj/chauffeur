@@ -59,6 +59,8 @@ expect_fail "allow for another rule fails" try-bang "$d"
 
 d=$(tree leak); printf 'see /Users/%s/x\n' "Ya""sh" > "$d/Sources/ChauffeurCore/notes.md"
 expect_fail "private material fails" leak "$d"
+d=$(tree leak-bin); printf 'x\0\377\376 /Users/%s/x\0' "Ya""sh" > "$d/Sources/ChauffeurCore/cache.pyc"
+expect_fail "private material in a binary file fails" leak "$d"
 
 d=$(tree "with space"); echo 'let x = try! f()' > "$d/Sources/ChauffeurCore/B.swift"
 expect_fail "path with a space" try-bang "$d"
