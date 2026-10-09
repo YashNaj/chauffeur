@@ -46,10 +46,19 @@ extension Session {
         var data: [String: JSON] = [:]
         let crashed = noticed ?? detectCrash()
         if let crashed {
-            // An action's diff after a crash would only show the home screen; a crash noticed before the command ran
-            // leaves the command's own result (launch, terminate…) intact.
-            if logs && noticed == nil { out.text = String(out.text.prefix { $0 != "\n" }) }
-            extra += crashed.render()
+            var block = crashed.render()
+            // An action's diff after a crash would only show the home screen, and its verdict is moot: the crash leads
+            // the first line, where agents look (M4b spec §8). A crash noticed before the command ran leaves the
+            // command's own result (launch, terminate…) intact.
+            if logs && noticed == nil {
+                let first = out.text.prefix { $0 != "\n" }
+                if let arrow = first.range(of: " → ") {
+                    out.text = String(first[..<arrow.lowerBound]) + " → " + block.removeFirst()
+                } else {
+                    out.text = String(first)
+                }
+            }
+            extra += block
             data["crash"] = crashed.json
         }
         if logs || crashed != nil {
