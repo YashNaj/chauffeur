@@ -16,6 +16,19 @@ enum Fixtures {
             Bundle.module.url(forResource: name, withExtension: "ips", subdirectory: "Fixtures/crash"))
         return try Data(contentsOf: url)
     }
+
+    /// Apple networking log lines recorded in M4b step 0 (`Fixtures/network`), as `LogTap` stores them.
+    static func network(_ name: String) throws -> [LogLine] {
+        let url = try #require(
+            Bundle.module.url(forResource: name, withExtension: "jsonl", subdirectory: "Fixtures/network"))
+        return try String(contentsOf: url, encoding: .utf8).split(separator: "\n").map { row in
+            let o = try #require(try JSONSerialization.jsonObject(with: Data(row.utf8)) as? [String: String])
+            return LogRedact.line(
+                LogLine(
+                    time: "00:00:00.000", level: o["level"] ?? "default", message: o["message"] ?? "",
+                    sender: o["sender"]))
+        }
+    }
 }
 
 /// Finds the first element whose label, identifier or value contains `text`.
