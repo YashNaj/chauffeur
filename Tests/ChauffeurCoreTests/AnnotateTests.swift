@@ -46,8 +46,7 @@ import Testing
         #expect(out.exit == 5)
         #expect(
             out.text == """
-                tap e5 "Crash" → changed · settled 610ms · rev 3→4
-                APP CRASHED: dev.chauffeur.fixture (pid 4321) · crash report not written yet (macOS can take a minute)
+                tap e5 "Crash" → APP CRASHED: dev.chauffeur.fixture (pid 4321) · crash report not written yet (macOS can take a minute)
                 reason: "fixture: crashing"
                 logs: [fault] "fixture: crashing"
                 hint: after fixing it, rebuild, chauffeur install <path.app>, then chauffeur launch dev.chauffeur.fixture
@@ -78,9 +77,14 @@ import Testing
         let report = try #require(CrashReport.parse(try Fixtures.crash("Fixture-sample"), path: "/r/Fixture.ips"))
         let out = session(alive: false, report: report).annotate(tapped, since: 0, logs: true)
         #expect(
-            out.text.contains(
-                "APP CRASHED: dev.chauffeur.fixture (pid 4321) · EXC_BREAKPOINT (SIGTRAP)\nreport: /r/Fixture.ips\n  libswiftCore.dylib"
+            out.text.hasPrefix(
+                "tap e5 \"Crash\" → APP CRASHED: dev.chauffeur.fixture (pid 4321) · EXC_BREAKPOINT (SIGTRAP)\nreport: /r/Fixture.ips\n  libswiftCore.dylib"
             ))
+    }
+
+    @Test func aResultWithoutAnArrowKeepsItsFirstLine() {
+        let out = session(alive: false).annotate(Output("done\nmore"), since: 0, logs: true)
+        #expect(out.text.hasPrefix("done\nAPP EXITED: dev.chauffeur.fixture (pid 4321)"))
     }
 
     @Test func endingTheAppOnPurposeIsNotACrash() {

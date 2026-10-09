@@ -11,11 +11,21 @@ public enum ChauffeurError: Error, Equatable, CustomStringConvertible {
     case bridge(String)
     case noTree
     case blind(String)
+    /// The app in front has no tree and chauffeur knows which app it is: `withRelaunch` can recover (M4b spec §8).
+    case needsRelaunch(bundle: String, why: String)
     case landscape
     case usage(String)
     case daemon(String)
     /// A step that failed with its own explanation (simctl or image errors).
     case failed(String)
+
+    /// The front app's first tree isn't up: `launch` and `wait` keep polling instead of failing or recovering.
+    public var appNotUpYet: Bool {
+        switch self {
+        case .noTree, .blind, .needsRelaunch: return true
+        default: return false
+        }
+    }
 
     public var description: String {
         switch self {
@@ -40,6 +50,8 @@ public enum ChauffeurError: Error, Equatable, CustomStringConvertible {
             return "no accessibility tree yet (app still launching, or nothing in the foreground). "
                 + "Retry, or run: chauffeur doctor"
         case .blind(let why):
+            return why
+        case .needsRelaunch(_, let why):
             return why
         case .landscape:
             return "the screen is in landscape; M1 supports portrait only. Rotate back (Device ▸ Rotate in Simulator)"

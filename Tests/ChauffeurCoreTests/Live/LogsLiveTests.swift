@@ -30,7 +30,7 @@ import Testing
         defer { s.shutdown() }
         let out = s.run(["tap", try ref(s, "button:Crash")])
         #expect(out.exit == 5, "\(out.text)")
-        #expect(out.text.contains("\nAPP CRASHED: dev.chauffeur.fixture (pid "), "\(out.text)")
+        #expect(out.text.contains("→ APP CRASHED: dev.chauffeur.fixture (pid "), "\(out.text)")
         #expect(out.text.contains("[fault] \"fixture: crashing\""), "\(out.text)")
         #expect(s.run(["snapshot"]).exit == 0, "a crash is reported once")
         // macOS wrote reports 17–70 s after a crash on the 8 GB Mac: poll `logs` for up to 3 minutes.

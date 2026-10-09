@@ -34,6 +34,20 @@ public enum SimApps {
         return nil
     }
 
+    /// Running apps (a pid, and a `UIKitApplication:<bundle>[…]` label) in `simctl spawn <udid> launchctl list`.
+    public static func runningApps(_ launchctlList: String) -> [(pid: Int32, bundle: String)] {
+        launchctlList.split(separator: "\n").compactMap { line in
+            let cols = line.split(separator: "\t")
+            guard cols.count == 3, let pid = Int32(cols[0]), cols[2].hasPrefix("UIKitApplication:") else { return nil }
+            return (pid, String(cols[2].dropFirst("UIKitApplication:".count).prefix { $0 != "[" }))
+        }
+    }
+
+    /// The bundle id of the running app with this pid; nil when no app has it.
+    public static func runningApp(pid: Int32, in launchctlList: String) -> String? {
+        runningApps(launchctlList).first { $0.pid == pid }?.bundle
+    }
+
     public struct AppBundle: Equatable, Sendable {
         public var identifier: String
         /// `0.1 (1)`

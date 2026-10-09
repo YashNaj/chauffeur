@@ -176,7 +176,7 @@ extension Session {
                     let settled = try observe(minMs: 150, capMs: 1500).snapshot
                     return (settled, clock.nowMs() - start)
                 }
-            } catch ChauffeurError.noTree, ChauffeurError.blind {
+            } catch let error as ChauffeurError where error.appNotUpYet {
                 // the app's first tree is not up yet (healing judges a launch slower than its patience as blind)
             }
             clock.sleep(ms: 150)
