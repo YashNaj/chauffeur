@@ -25,25 +25,36 @@ public enum Target {
         throw ChauffeurError.ambiguousTarget(nameOrUDID, matches: named.map(\.summary))
     }
 
-    /// Looks for `.chauffeur.json` in `dir` and its ancestors.
+    /// Looks for `.chauffeur.json` in `dir` and its ancestors: the nearest one that sets `udid`.
     public static func readConfig(from dir: URL) -> String? {
+        nearest(from: dir) { $0["udid"] as? String }
+    }
+
+    /// The project's own telemetry entries (M4b spec §4): the nearest `.chauffeur.json` that sets `telemetryHosts`.
+    public static func telemetryHosts(from dir: URL) -> [String] {
+        nearest(from: dir) { $0["telemetryHosts"] as? [String] } ?? []
+    }
+
+    static func nearest<T>(from dir: URL, _ pick: ([String: Any]) -> T?) -> T? {
         var current = dir.standardizedFileURL
         while true {
-            let file = current.appendingPathComponent(configName)
-            if let data = try? Data(contentsOf: file),
-                let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                let udid = object["udid"] as? String
-            {
-                return udid
-            }
+            if let object = config(in: current), let value = pick(object) { return value }
             // Directory URLs walk "/" → "/.." → "/../..", so stop at the root explicitly.
             if current.path == "/" { return nil }
             current = current.deletingLastPathComponent().standardizedFileURL
         }
     }
 
+    static func config(in dir: URL) -> [String: Any]? {
+        guard let data = try? Data(contentsOf: dir.appendingPathComponent(configName)) else { return nil }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    }
+
+    /// Sets `udid` in `dir`'s `.chauffeur.json`, keeping every other key (`chauffeur use`).
     public static func writeConfig(udid: String, in dir: URL) throws {
-        let data = try JSONSerialization.data(withJSONObject: ["udid": udid], options: [.prettyPrinted, .sortedKeys])
+        var object = config(in: dir) ?? [:]
+        object["udid"] = udid
+        let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: dir.appendingPathComponent(configName))
     }
 }

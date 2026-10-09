@@ -50,4 +50,26 @@ import Testing
         let dir = FileManager.default.temporaryDirectory  // a directory URL: walks "/" → "/.." → … without a root check
         #expect(Target.readConfig(from: dir) == nil)
     }
+
+    @Test func useKeepsOtherKeys() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cht-keep-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent(Target.configName)
+        try Data(#"{"udid":"AAAA-1","telemetryHosts":["events.example.com"]}"#.utf8).write(to: file)
+        try Target.writeConfig(udid: "BBBB-2", in: root)
+        #expect(Target.readConfig(from: root) == "BBBB-2")
+        #expect(Target.telemetryHosts(from: root) == ["events.example.com"])
+    }
+
+    @Test func telemetryHostsAreFoundFromSubdirectories() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cht-tel-\(UUID().uuidString)")
+        let sub = root.appendingPathComponent("a/b")
+        try FileManager.default.createDirectory(at: sub, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        #expect(Target.telemetryHosts(from: sub).isEmpty)
+        try Data(#"{"telemetryHosts":["x.example.com","example.com/m"]}"#.utf8)
+            .write(to: root.appendingPathComponent(Target.configName))
+        #expect(Target.telemetryHosts(from: sub) == ["x.example.com", "example.com/m"])
+    }
 }
