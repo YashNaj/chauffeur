@@ -4,18 +4,25 @@ Put your name in **Owner** (in a PR) before starting a milestone. Each one start
 
 | Milestone | Status | Owner |
 |---|---|---|
-| M4a: guardrails and the contributor workflow | in progress | YashNaj |
-| M4b: edge cases | not started | |
+| M4a: guardrails and the contributor workflow | done | YashNaj |
+| M4b: network requests and other evidence | in progress | YashNaj |
 | M4c: eval v2 | not started | |
 
-## M4b: edge cases
+## M4b: network requests and other evidence
 
-- **PENDING.** A tap that starts a network request but changes nothing on screen is reported as `NO EFFECT` today.
-  Watch the app's network activity too, and report it as in flight.
-- **An app opened from its home-screen icon has accessibility off.** chauffeur only asks for a relaunch; it should
-  recover on its own.
-- **A crashing tap reports `APP CRASHED` on the second line.** It belongs on the first, where agents look.
-- **A sweep for more:** keyboards, alerts that arrive late, animations that never settle, web views.
+Spec: `docs/specs/2026-10-08-m4b-network-and-evidence-design.md`.
+
+- [x] Step 0: what the Mac and the logs show (Findings in the spec)
+- [x] Path shapes, telemetry hosts, crash first, relaunching an app opened from its icon
+- [ ] Network activity and detail layers, `PENDING`, `wait`, batches, clipboard (Plan 2)
+- [ ] A sweep for more: keyboards, alerts that arrive late, animations that never settle.
+- [ ] 0.2.0
+
+## Network visibility (stage 2, after M4b)
+
+Every request's method (no log line carries it), the path of requests on a reused connection, path and status for
+apps that don't use Apple's networking stack, opt-in bodies, a `network` command, and names in paths, through a small
+library chauffeur loads into apps it launches. Its own spec and security review.
 
 ## M4c: eval v2
 
