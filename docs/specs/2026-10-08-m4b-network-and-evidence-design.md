@@ -23,7 +23,7 @@ that follow from it (a crash reported on the first line; recovering an app opene
 3. A request that fails explains a `NO EFFECT`: the failure leads the result (`api.example.com/login → 500`).
 4. Telemetry (analytics, crash reporting, attribution) never turns a dead button into `PENDING`.
 5. `wait` finishes a `PENDING` tap and tells a slow backend from a screen that will never change.
-6. A double submit, a copy to the clipboard and a crash are each reported where an agent looks first.
+6. A copy to the clipboard and a crash are each reported where an agent looks first (a double submit: stage 2).
 7. The agent sees host, path shape, status, timing and byte counts; never bodies, headers, cookies, query
    strings, values an app marked private, or clipboard contents.
 
@@ -129,21 +129,32 @@ tap Login → PENDING · api.example.com/login still running after 2.2 s
 hint: run `chauffeur wait` for the result
 ```
 ```
-tap Login → NO EFFECT · api.example.com/login → 500 in 180 ms
+tap Login → NO EFFECT · api.example.com/login → 500 Internal Server Error in 180 ms (server 160 ms)
+request: sent 1.2 KB (body 1.1 KB), got 94 B · h2
+hint: the server failed (500) and the app shows nothing for it; check the server or the app's error handling
+```
+```
+tap Login → NO EFFECT · localhost:8765/login failed: could not connect to the server (-1004) after 20 ms
+hint: nothing accepted the connection at localhost:8765; is the server running?
 ```
 ```
 tap Place order → changed · settled 420ms · rev 7→8
-request: api.example.com/orders → 201 in 310 ms
-request: api.example.com/orders sent twice
+request: api.example.com/orders → 201 Created in 310 ms (server 280 ms) · sent 900 B (body 812 B), got 2.1 KB · h2
 ```
 
 With activity only (another stack, or no detail):
 
 ```
-tap Login → PENDING · api.example.com:443 · 1.2 KB sent, awaiting reply after 2.1 s
+tap Login → PENDING · 93.184.215.14:443 · sent 1.2 KB, no reply after 2.1 s
 ```
 
-- **Duplicates:** the same host and path shape twice from one tap adds `request: … sent twice` (detail layer).
+- **What a request line carries** (owner decision, 2026-10-08): the status and its name, or the error code and what
+  it means; the total time and how long the server took to start answering; bytes each way and whether the request
+  carried a body (CFNetwork logs `sent request, body S 14` for a 14-byte body, `body N 0` for none); the protocol;
+  and a hint for a failure or for a success that changed nothing. The app's own error lines for the tap keep coming
+  first in `logs:`; CFNetwork's lines for a request already shown are left out of it.
+- **Duplicates ("sent twice") are stage 2** (owner decision): they need every request's path, which the logs give
+  only for a connection's first request.
 - **Telemetry:** one line, `telemetry: 2 requests (app-measurement.com, sentry.io)`, never in the headline.
 - **Exit codes:** `PENDING` is a new code, `6` ("effect still in flight"); the rest are unchanged.
 - **Batches:** a step that comes back `PENDING` does what a bare `chauffeur wait` does (§9), up to the wait limit, and
@@ -194,14 +205,19 @@ URLs in the logs read `<private>` by default.
 - Hosts and paths are quoted and escaped like screen text: they can come from server responses (redirects, links), so
   they are untrusted data.
 - Never: bodies, headers, cookies, query strings, the app's private log values, clipboard contents.
+- **Logs follow the same rule** (owner decision, 2026-10-08): every URL in Apple's networking log lines (CFNetwork
+  and Network, including the failing URL in an error line) is stored as scheme, host, port and path shape, so
+  `chauffeur logs`, action results and the log file never show a query, token or email. The app's own lines are left
+  as the developer logged them.
 
 ## 7. Clipboard
 
 chauffeur hashes `simctl pbpaste` output before and after a tap, inside the daemon. A change is a verified effect:
-`changed · copied to clipboard (24 characters)`. Only the length leaves the daemon. If step 0 shows `pbpaste` over
-30 ms, the clipboard is read only after a no-change result, the one case where it can change the verdict. If step 0
-shows that reading it is visible to the app (a paste banner, a change notification), the clipboard check is dropped
-from M4b and redesigned rather than shipped with a side effect.
+`changed · copied to clipboard (24 characters)`. Only the length leaves the daemon. If step 0 shows `pbpaste` over 30
+ms, the clipboard is read only after a no-change result, the one case where it can change the verdict; the "before"
+value is read in the background when the tap starts, and the touch waits for it only if it isn't done. If step 0 shows
+that reading it is visible to the app (a paste banner, a change notification), the clipboard check is dropped from M4b
+and redesigned rather than shipped with a side effect.
 
 ## 8. Crash first, and recovering an app opened from its icon
 
@@ -219,7 +235,7 @@ from M4b and redesigned rather than shipped with a side effect.
   screen to settle, then judges the tap again with §3's rules and output. No pending tap → a message and exit 1.
 - **`wait "<query>"`** that times out names what is still waiting: `wait "Welcome" → timed out after 10 s · still
   waiting: api.example.com/feed (9.8 s)`.
-- Both keep the 300 s limit.
+- Both keep the 300 s limit. A bare `wait` waits up to 30 s unless `--timeout` says otherwise.
 
 ## 10. Release
 
@@ -237,7 +253,7 @@ come from 0.1.x. The MCP bundle and registry entry move to 0.2.0 with it.
   wait through `PENDING`.
 - `Telemetry`: built-in suffixes, project entries, path prefixes, IP-only.
 - `PathShape`: `{id}`, `{token}`, `{email}`, query and fragment stripping, escaping.
-- Duplicates; exit code 6; the JSON `requests` array with absent fields; `chauffeur use` keeps `telemetryHosts`.
+- Exit code 6; the JSON `requests` array with absent fields; `chauffeur use` keeps `telemetryHosts`.
 - The marker-line catch-up; the text-field extra window.
 - Clipboard hash compare; the crash headline order; relaunch-once and never-in-a-batch; the private-data setting read
   back rather than remembered.
@@ -251,7 +267,6 @@ on 127.0.0.1, so no internet is needed:
 | fast API (100 ms) | `changed` with a request line |
 | failing API (500) | `NO EFFECT · … → 500` |
 | analytics only | `NO EFFECT` with a telemetry line |
-| double submit | a `sent twice` line |
 | slow raw-socket request (a non-Apple stack) | `PENDING` from the activity layer |
 | open WebSocket | `NO EFFECT` with `connected, data flowing` |
 | web view link to a slow page | `PENDING` |
@@ -283,6 +298,7 @@ Plus a batch through the slow API, and an icon-launch test for §8's recovery.
 | every request's method; paths on reused connections; path and status on non-Apple stacks | in-app library loaded at launch | stage 2 (network visibility) |
 | bodies, headers (opt-in), a `network` command | in-app library | stage 2 |
 | names in paths | identifier check against screen and app data | stage 2 |
+| a request sent twice | every request's path, from the in-app library | stage 2 |
 
 Stage 2 gets its own spec and security review: it runs code inside the app, and bodies can carry secrets and untrusted
 text.
@@ -416,9 +432,11 @@ touch reached the app 2 s after the command started.
   start, status, error and timing, and the connection's `url:` line for the host. A path is shown only when the task
   set up the connection (it logs `setting up Connection N`, and `CN`'s `url:` line comes from that request);
   otherwise the path is absent, never guessed. There is no method, so results name host and path
-  (`api.example.com/login → 500`), and duplicates ("sent twice") compare host and path shape. Telemetry entries with a
-  path prefix only match when the path is known. On kept-alive and HTTP/2 connections the path is usually unknown,
-  which weakens both; Plan 2 decides how they behave then.
+  (`api.example.com/login → 500`). Telemetry entries with a path prefix only match when the path is known; "sent
+  twice" waits for stage 2 (owner decision, 2026-10-08).
+- **Fresh simulator checked** (2026-10-08): a newly created iOS 27 simulator also starts in `PRIVATE_DATA` mode and
+  shows the same `url:` lines. CFNetwork's error lines carry the full failing URL (`NSErrorFailingURLStringKey=…`) at
+  error level, which action results show; §6's log rule shapes them.
 - **Private data: no step.** The URL is visible without changing anything, the switches can't be set in the
   simulator, and the app's own private values stay hidden. §5's `log config` steps and `doctor --undo-logging` are
   dropped; `doctor` can report the `log config --status` line.
