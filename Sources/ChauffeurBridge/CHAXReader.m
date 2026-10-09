@@ -85,6 +85,12 @@ static NSString *CHString(id element, NSString *key) {
     return root ? [self walk:root token:token depth:0] : nil;
 }
 
+- (pid_t)frontmostPid {
+    id translation = [_translator frontmostApplicationWithDisplayId:0 bridgeDelegateToken:NSUUID.UUID.UUIDString];
+    if (!translation) return 0;
+    @try { return [[translation valueForKey:@"pid"] intValue]; } @catch (NSException *e) { return 0; }
+}
+
 - (NSDictionary *)elementAtPoint:(CGPoint)point {
     NSString *token = NSUUID.UUID.UUIDString;
     id hit = [_translator objectAtPoint:point displayId:0 bridgeDelegateToken:token];

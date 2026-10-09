@@ -10,6 +10,8 @@ extension Session {
 
     /// `do 'tap e4; type e5 "hi"; wait "Done"'`: runs in order and stops at the first failure (spec §5.1).
     func batchCommand(_ argv: [String]) throws -> Output {
+        inBatch = true
+        defer { inBatch = false }
         var a = try Args(argv, usage: "usage: chauffeur do '<command>; <command>; …'   (stops at the first failure)")
         guard let script = a.text() else { throw ChauffeurError.usage(a.usage) }
         let commands = try Batch.parse(script)

@@ -31,6 +31,12 @@ public final class AXProvider {
         reader.frontmostTree().flatMap { AXElement(dictionary: $0) }
     }
 
+    /// The pid of the app in front; nil when the bridge doesn't say. Known even when that app has no tree.
+    public func frontmostPID() -> Int32? {
+        let pid = reader.frontmostPid()
+        return pid > 0 ? pid : nil
+    }
+
     /// One process's tree, whatever is in front. Used to tell a poisoned bridge from a silent simulator.
     public func read(pid: Int32) -> AXElement? {
         reader.tree(pid: pid).flatMap { AXElement(dictionary: $0) }

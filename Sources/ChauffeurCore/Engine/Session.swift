@@ -56,6 +56,12 @@ public final class Session {
     var lastNoTreeMs: Int?
     var bridgeRestartedMs: Int?
     var healNote: String?
+    /// Inside `do`: a blind app is not relaunched, because resetting its state would corrupt the flow (M4b spec §8).
+    var inBatch = false
+    /// Apps relaunched for accessibility this session: at most once each.
+    var relaunchedForAccessibility: Set<String> = []
+    /// Seam for unit tests: how an app is relaunched (default: `launchCommand`).
+    var relaunch: ((String) -> Output)?
     /// Where the launched app's log lines start in `logTap` (crash evidence is this launch's lines only).
     var appLogCursor: Int?
     let clock = SystemClock()
@@ -142,7 +148,11 @@ public final class Session {
             noTreeSinceMs = since
             lastNoTreeMs = now
             let plan = heal(noTreeForMs: now - since, ax: ax, screen: device.size)
-            if plan.relaunchApp { throw ChauffeurError.blind(AXHealth.message(plan, recovered: false)) }
+            if plan.relaunchApp {
+                let why = AXHealth.message(plan, recovered: false)
+                if let bundle = relaunchCandidate(ax) { throw ChauffeurError.needsRelaunch(bundle: bundle, why: why) }
+                throw ChauffeurError.blind(why)
+            }
             if plan.restartBridge {
                 result = poll(ax, minMs: minMs, capMs: max(capMs, 3000))
                 if result.value == nil { throw ChauffeurError.blind(AXHealth.message(plan, recovered: false)) }
@@ -229,8 +239,10 @@ public final class Session {
         // (launch, install, terminate and permission changes all do) and so hide it.
         let noticed = Self.watched.contains(command) ? detectCrash() : nil
         var output = guarded {
-            commandHook?(command)
-            return try dispatch(command, Array(argv.dropFirst()))
+            try withRelaunch {
+                commandHook?(command)
+                return try dispatch(command, Array(argv.dropFirst()))
+            }
         }
         if Self.watched.contains(command) {
             output = annotate(

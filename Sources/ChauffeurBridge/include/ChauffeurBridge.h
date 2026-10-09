@@ -30,6 +30,9 @@ FOUNDATION_EXPORT NSString *const CHBridgeErrorDomain;
 @interface CHAXReader : NSObject
 - (nullable instancetype)initWithSimulator:(CHSimulator *)simulator error:(NSError **)error;
 - (nullable NSDictionary<NSString *, id> *)frontmostTree;
+/// The pid of the app in front, as the accessibility bridge reports it; 0 when unknown. Works for an app that
+/// started without accessibility, whose tree is empty and unlabeled.
+- (pid_t)frontmostPid;
 /// The element under a point, without children.
 - (nullable NSDictionary<NSString *, id> *)elementAtPoint:(CGPoint)point NS_SWIFT_NAME(element(at:));
 /// The accessibility tree of one process, whatever is in front (AXPTranslatorRequest type 1 with a pid).
