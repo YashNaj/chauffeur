@@ -64,7 +64,11 @@ extension Session {
         if logs || crashed != nil {
             // A crash noticed by a later command still shows what the last action logged before the app died.
             let from = crashed == nil ? cursor : min(cursor, actionCursor ?? lastActionLogCursor)
-            let errors = logTap.since(from).filter(\.isError)
+            // CFNetwork's lines about a request the result already shows add nothing but noise (spec §3).
+            let shown = out.data?["requests"] != nil
+            let errors = logTap.since(from).filter {
+                $0.isError && !(shown && $0.sender == "CFNetwork" && $0.message.hasPrefix("Task <"))
+            }
             extra += LogLine.summary(errors)
             if !errors.isEmpty { data["logs"] = .array(errors.prefix(20).map(\.json)) }
         }

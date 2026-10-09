@@ -62,6 +62,13 @@ public final class Session {
     var relaunchedForAccessibility: Set<String> = []
     /// Seam for unit tests: how an app is relaunched (default: `launchCommand`).
     var relaunch: ((String) -> Output)?
+    /// The activity layer (M4b spec §2), built on the first tap; nil when NetworkStatistics is unavailable.
+    var flowSource: FlowSource?
+    var flowSourceTried = false
+    /// The last tap that came back PENDING, for a bare `wait` (M4b spec §9). Any other action forgets it.
+    var pendingTap: PendingTap?
+    /// Test seam: the project's telemetry entries (default: `.chauffeur.json` from the client's directory).
+    var telemetryOverride: [String]?
     /// Where the launched app's log lines start in `logTap` (crash evidence is this launch's lines only).
     var appLogCursor: Int?
     let clock = SystemClock()
@@ -235,6 +242,7 @@ public final class Session {
         let cursor = logTap.cursor
         let previousActionCursor = lastActionLogCursor
         if Self.logged.contains(command) { lastActionLogCursor = cursor }
+        if Self.logged.contains(command) { pendingTap = nil }
         // A crash since the previous command must be noticed before this command can stop following the app
         // (launch, install, terminate and permission changes all do) and so hide it.
         let noticed = Self.watched.contains(command) ? detectCrash() : nil
