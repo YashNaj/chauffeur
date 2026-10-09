@@ -20,20 +20,21 @@ that follow from it (a crash reported on the first line; recovering an app opene
    reply, never `NO EFFECT`, whatever networking stack the app uses.
 2. A tap that truly does nothing is still `NO EFFECT`, with no added delay beyond what checking costs (measured in
    step 0).
-3. A request that fails explains a `NO EFFECT`: the failure leads the result (`POST /login → 500`).
+3. A request that fails explains a `NO EFFECT`: the failure leads the result (`api.example.com/login → 500`).
 4. Telemetry (analytics, crash reporting, attribution) never turns a dead button into `PENDING`.
 5. `wait` finishes a `PENDING` tap and tells a slow backend from a screen that will never change.
 6. A double submit, a copy to the clipboard and a crash are each reported where an agent looks first.
-7. The agent sees host, method, path shape, status, timing and byte counts; never bodies, headers, cookies, query
+7. The agent sees host, path shape, status, timing and byte counts; never bodies, headers, cookies, query
    strings, values an app marked private, or clipboard contents.
 
 ## Non-goals for M4b (staged, not ruled out)
 
 M4b is the first stage of seeing what an app does on the network. What it doesn't cover is scheduled, not excluded
-(see "Staging" at the end): request and response bodies, a `network` command listing all traffic, and method, path
-and status for apps that don't use Apple's networking stack. Also out of M4b: a proxy or trusted certificate in the
-simulator; haptics, sounds, and file or settings writes as evidence; an agent-supplied "I expect a request" hint.
-chauffeur itself still makes no network connections: everything here is read on the Mac.
+(see "Staging" at the end): request and response bodies, a `network` command listing all traffic, every request's
+method, paths on reused connections, and path and status for apps that don't use Apple's networking stack. Also out of
+M4b: a proxy or trusted certificate in the simulator; haptics, sounds, and file or settings writes as evidence; an
+agent-supplied "I expect a request" hint. chauffeur itself still makes no network connections: everything here is
+read on the Mac.
 
 ## 1. Step 0: what the Mac and the logs show
 
@@ -80,8 +81,9 @@ A new `Network` folder in `ChauffeurCore` (private API calls, if needed, go in `
   reply* (bytes went out and the reply has not finished arriving). It sees every stack because it doesn't depend on
   how the app makes requests. It doesn't lag behind the way logs can.
 - **Detail (`RequestLog`), where available.** Apple's networking log lines from the existing `LogTap`, parsed into
-  `started(id, method, host, path, time)` and `ended(id, status | error, time)`. Matched to activity by host and time,
-  it adds method, path, status and error kind. Parsing is pure and unit-tested on recorded lines from step 0.
+  `started(id, host, path?, time)` and `ended(id, status | error, time)`. Matched to activity by host and time,
+  it adds host, path (when known), status and error kind. There is no method in the logs (Findings §4). Parsing is
+  pure and unit-tested on recorded lines from step 0.
 - **`Telemetry`** (§4) and **`PathShape`** (§6).
 
 **What belongs to the tap:** activity and requests that started after the touch reached the app (touch log time).
@@ -112,7 +114,7 @@ After the screen settles or reaches its time limit, with telemetry excluded:
 | no change | none | `NO EFFECT`, as today |
 | no change | waiting for a reply | wait up to the request window (default 2 s) for the reply, then judge again; still waiting → `PENDING` |
 | no change | reply arrived, a request failed | `NO EFFECT`; the failure leads the headline |
-| no change | reply arrived, all succeeded | `NO EFFECT · POST /x → 200 in 340 ms but nothing changed on screen` |
+| no change | reply arrived, all succeeded | `NO EFFECT · api.example.com/x → 200 in 340 ms but nothing changed on screen` |
 | no change | a connection keeps streaming (WebSocket after its `101`, a server stream) | `NO EFFECT` with `request: … connected, data flowing`, not `PENDING` |
 | no change | clipboard changed | `changed · copied to clipboard (N characters)` (§7) |
 
@@ -123,16 +125,16 @@ counts.
 Output, with the detail layer:
 
 ```
-tap Login → PENDING · POST api.example.com/login still running after 2.2 s
+tap Login → PENDING · api.example.com/login still running after 2.2 s
 hint: run `chauffeur wait` for the result
 ```
 ```
-tap Login → NO EFFECT · POST api.example.com/login → 500 in 180 ms
+tap Login → NO EFFECT · api.example.com/login → 500 in 180 ms
 ```
 ```
 tap Place order → changed · settled 420ms · rev 7→8
-request: POST api.example.com/orders → 201 in 310 ms
-request: POST api.example.com/orders sent twice
+request: api.example.com/orders → 201 in 310 ms
+request: api.example.com/orders sent twice
 ```
 
 With activity only (another stack, or no detail):
@@ -141,12 +143,12 @@ With activity only (another stack, or no detail):
 tap Login → PENDING · api.example.com:443 · 1.2 KB sent, awaiting reply after 2.1 s
 ```
 
-- **Duplicates:** the same method and path shape twice from one tap adds `request: … sent twice` (detail layer).
+- **Duplicates:** the same host and path shape twice from one tap adds `request: … sent twice` (detail layer).
 - **Telemetry:** one line, `telemetry: 2 requests (app-measurement.com, sentry.io)`, never in the headline.
 - **Exit codes:** `PENDING` is a new code, `6` ("effect still in flight"); the rest are unchanged.
 - **Batches:** a step that comes back `PENDING` does what a bare `chauffeur wait` does (§9), up to the wait limit, and
   the batch judges the final result. A batch never stops on `PENDING` itself, so "tap Login, then tap Profile" works.
-- **JSON and MCP:** outcome `pending`; a `requests` array of `{method, host, port, path, status, error, ms, sent,
+- **JSON and MCP:** outcome `pending`; a `requests` array of `{host, port, path, status, error, ms, sent,
   received, telemetry, duplicate, streaming}`, with fields absent when the layer that provides them isn't available.
 - The skill, the MCP instructions and the `act` tool description each gain one line on `PENDING`, exit 6 and
   `chauffeur wait`.
@@ -165,6 +167,9 @@ tap Login → PENDING · api.example.com:443 · 1.2 KB sent, awaiting reply afte
 
 ## 5. Seeing hosts and paths in logs: private log data
 
+**Superseded by step 0** (Findings §5 and Decision): the URL is already visible, the simulator refuses both switches,
+and chauffeur changes no log settings. The original proposal is kept below for the record.
+
 URLs in the logs read `<private>` by default.
 
 - **Per-subsystem (the default if step 0 confirms it):** when chauffeur launches an app, it reads the simulator's
@@ -180,7 +185,7 @@ URLs in the logs read `<private>` by default.
 
 ## 6. What the agent may see
 
-- Host, port, method, path shape, status or error kind, timing, and byte counts.
+- Host, port, path shape, status or error kind, timing, and byte counts.
 - **Path shape:** the query string and fragment are dropped. Path segments that are numbers, UUIDs, hex or base64
   runs of 16 or more characters, or contain `@`, become `{id}`, `{token}` or `{email}`:
   `/reset/sam@example.com/7f3a…` → `/reset/{email}/{token}`. A segment that is a person's name (`/users/john-smith`)
@@ -213,7 +218,7 @@ from M4b and redesigned rather than shipped with a side effect.
 - **`chauffeur wait`** (no query) finishes the last `PENDING` tap: it waits for that tap's replies to arrive and the
   screen to settle, then judges the tap again with §3's rules and output. No pending tap → a message and exit 1.
 - **`wait "<query>"`** that times out names what is still waiting: `wait "Welcome" → timed out after 10 s · still
-  waiting: GET api.example.com/feed (9.8 s)`.
+  waiting: api.example.com/feed (9.8 s)`.
 - Both keep the 300 s limit.
 
 ## 10. Release
@@ -273,9 +278,9 @@ Plus a batch through the slow API, and an icon-launch test for §8's recovery.
 | Flutter, raw sockets, gRPC, other stacks | activity layer | M4b |
 | WebSockets and server streams | activity layer (`data flowing`) | M4b |
 | web views | activity layer via the WebKit networking process | M4b |
-| log delay | activity layer; marker-line catch-up | M4b |
+| log delay | activity layer; a short fixed grace (Findings §6) | M4b |
 | delayed (debounced) requests | text-field extra window | M4b |
-| method, path and status on non-Apple stacks | in-app library loaded at launch | stage 2 (network visibility) |
+| every request's method; paths on reused connections; path and status on non-Apple stacks | in-app library loaded at launch | stage 2 (network visibility) |
 | bodies, headers (opt-in), a `network` command | in-app library | stage 2 |
 | names in paths | identifier check against screen and app data | stage 2 |
 
@@ -366,8 +371,8 @@ already gone (`https://example.com/a/123?q=secret` logged as `…/a/123`). Two l
 
 - **No method**, at any level, in any line (checked at debug level too).
 - **The path is only known for a connection's first request.** With keep-alive, a later task logs only
-  `Task <…>.<7> now using Connection 7`, and Connection 7's `url:` line still names the first request's path. The host is
-  right for every task on the connection; the path is not.
+  `Task <…>.<7> now using Connection 7`, and Connection 7's `url:` line still names the first request's path. The host
+  is right for every task on the connection; the path is not.
 
 Cost of following more than today's stream, over eight taps: info level 0.29 s of CPU, debug level limited to
 `com.apple.CFNetwork` 0.22 s, debug level for the whole app 0.42 s. Debug level isn't needed.
@@ -410,15 +415,17 @@ touch reached the app 2 s after the command started.
 - **Detail layer works, narrower than §2 assumed.** Info level and today's predicate. Parse the `Task <…>` lines for
   start, status, error and timing, and the connection's `url:` line for the host. A path is shown only when the task
   set up the connection (it logs `setting up Connection N`, and `CN`'s `url:` line comes from that request);
-  otherwise the path is absent, never guessed. There is no method: §3's examples lose the method (`api.example.com/login → 500`), and duplicates
-  ("sent twice") compare host and path shape. Telemetry entries with a path prefix only match when the path is known.
+  otherwise the path is absent, never guessed. There is no method, so results name host and path
+  (`api.example.com/login → 500`), and duplicates ("sent twice") compare host and path shape. Telemetry entries with a
+  path prefix only match when the path is known. On kept-alive and HTTP/2 connections the path is usually unknown,
+  which weakens both; Plan 2 decides how they behave then.
 - **Private data: no step.** The URL is visible without changing anything, the switches can't be set in the
   simulator, and the app's own private values stay hidden. §5's `log config` steps and `doctor --undo-logging` are
   dropped; `doctor` can report the `log config --status` line.
 - **Catching up: a fixed 20 ms grace, no marker.** Lines lag at most 10 ms; a marker costs 350 ms and doesn't exist on
   iOS 26.
-- **Request window 2 s and text-field window 500 ms**, as proposed: a task's connection appeared 11–240 ms after the task
-  started (loopback and a real host), well inside both.
+- **Request window 2 s and text-field window 500 ms**, as proposed: a task's connection appeared 11–240 ms after the
+  task started (loopback and a real host), well inside both.
 - **Clipboard stays, read only after a no-change result** (§7's rule for a read over 30 ms): reading is invisible to
   the app.
 - **Goal 2's minimum cost:** one fresh poll (under 10 ms) plus the 20 ms grace on a dead tap, against today's ~1.0 s.
