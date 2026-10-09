@@ -72,4 +72,16 @@ import Testing
             .write(to: root.appendingPathComponent(Target.configName))
         #expect(Target.telemetryHosts(from: sub) == ["x.example.com", "example.com/m"])
     }
+
+    /// `use` never overwrites a config it can't read: the user's other keys would be lost (final review, item 4).
+    @Test func useRefusesToOverwriteAnUnreadableConfig() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cht-bad-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent(Target.configName)
+        let broken = #"{"udid":"AAAA-1","telemetryHosts":["a.com"]"#  // no closing brace
+        try Data(broken.utf8).write(to: file)
+        #expect(throws: ChauffeurError.self) { try Target.writeConfig(udid: "BBBB-2", in: root) }
+        #expect(try String(contentsOf: file, encoding: .utf8) == broken)
+    }
 }

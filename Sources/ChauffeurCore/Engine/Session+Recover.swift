@@ -12,7 +12,8 @@ extension Session {
             relaunchedForAccessibility.insert(bundle)
             let launched = relaunch?(bundle) ?? guarded { try launchCommand([bundle]) }
             guard launched.exit == 0 else { throw ChauffeurError.blind(why) }
-            var out = try body()
+            // A retry that fails still says the app was reset: the agent's next steps depend on it.
+            var out = guarded(body)
             out.text +=
                 "\nnote: relaunched \(bundle) — it was opened from its icon without accessibility; its in-app state "
                 + "was reset"
@@ -25,6 +26,13 @@ extension Session {
         guard let pid = ax.frontmostPID(), let list = try? SimCtl.run(["spawn", udid, "launchctl", "list"]).out else {
             return nil
         }
-        return SimApps.runningApp(pid: pid, in: list)
+        return Self.relaunchBundle(frontPID: pid, launchctlList: list, launchedPID: app?.pid)
+    }
+
+    /// The app to relaunch: the running app with the front pid, unless chauffeur launched that very process itself,
+    /// with accessibility on (its empty tree is then the app's own, and resetting it would be a guess).
+    nonisolated static func relaunchBundle(frontPID: Int32?, launchctlList: String, launchedPID: Int32?) -> String? {
+        guard let frontPID, frontPID != launchedPID else { return nil }
+        return SimApps.runningApp(pid: frontPID, in: launchctlList)
     }
 }

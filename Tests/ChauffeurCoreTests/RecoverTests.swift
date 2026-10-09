@@ -82,4 +82,36 @@ import Testing
     @Test func needsRelaunchReadsAsItsReason() {
         #expect(ChauffeurError.needsRelaunch(bundle: "x.y", why: "relaunch it").description == "relaunch it")
     }
+
+    /// `launch` and `wait` poll through a slow first tree; recovery must not cut them short (final review, item 1).
+    @Test func aBlindAppStillLaunchingIsWaitedFor() {
+        #expect(ChauffeurError.noTree.appNotUpYet)
+        #expect(ChauffeurError.blind("b").appNotUpYet)
+        #expect(ChauffeurError.needsRelaunch(bundle: "x.y", why: "b").appNotUpYet)
+        #expect(!ChauffeurError.landscape.appNotUpYet)
+    }
+
+    /// An app chauffeur launched itself started with accessibility on: an empty tree there is the app's own (a game,
+    /// a custom-drawn screen), so it is not reset on a guess (final review, item 2).
+    @Test func anAppChauffeurLaunchedIsNotRelaunched() {
+        #expect(Session.relaunchBundle(frontPID: 9031, launchctlList: list, launchedPID: 9031) == nil)
+        #expect(Session.relaunchBundle(frontPID: 9031, launchctlList: list, launchedPID: 5) == "dev.chauffeur.fixture")
+        #expect(
+            Session.relaunchBundle(frontPID: 9031, launchctlList: list, launchedPID: nil) == "dev.chauffeur.fixture")
+        #expect(Session.relaunchBundle(frontPID: nil, launchctlList: list, launchedPID: nil) == nil)
+    }
+
+    /// The agent learns its app was reset even when the retried command then fails (final review, item 3).
+    @Test func aFailedRetryStillReportsTheRelaunch() throws {
+        let s = session()
+        s.relaunch = { _ in Output("ok") }
+        var calls = 0
+        let out = try s.withRelaunch {
+            calls += 1
+            if calls == 1 { throw ChauffeurError.needsRelaunch(bundle: "x.y", why: "blind") }
+            throw ChauffeurError.failed("no element e9")
+        }
+        #expect(out.exit == 1)
+        #expect(out.text.hasPrefix("no element e9\nnote: relaunched x.y"))
+    }
 }

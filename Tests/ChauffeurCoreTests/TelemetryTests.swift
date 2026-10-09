@@ -42,4 +42,10 @@ import Testing
         #expect(Set(Telemetry.builtIn).count == Telemetry.builtIn.count)
         #expect(Telemetry.builtIn.allSatisfy { $0 == $0.lowercased() && !$0.contains("/") })
     }
+
+    /// Paths are case-sensitive; only the domain is case-folded (final review, item 5).
+    @Test func pathEntriesKeepTheirCase() {
+        #expect(Telemetry.isTelemetry(host: "Example.com", path: "/Metrics/x", extra: ["EXAMPLE.com/Metrics"]))
+        #expect(!Telemetry.isTelemetry(host: "example.com", path: "/metrics/x", extra: ["example.com/Metrics"]))
+    }
 }

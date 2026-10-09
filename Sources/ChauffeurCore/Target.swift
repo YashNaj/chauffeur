@@ -52,7 +52,12 @@ public enum Target {
 
     /// Sets `udid` in `dir`'s `.chauffeur.json`, keeping every other key (`chauffeur use`).
     public static func writeConfig(udid: String, in dir: URL) throws {
-        var object = config(in: dir) ?? [:]
+        let file = dir.appendingPathComponent(configName)
+        let exists = FileManager.default.fileExists(atPath: file.path)
+        guard var object = config(in: dir) ?? (exists ? nil : [:]) else {
+            throw ChauffeurError.failed(
+                "\(file.path) is not a JSON object; fix or remove it, then run chauffeur use again")
+        }
         object["udid"] = udid
         let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: dir.appendingPathComponent(configName))

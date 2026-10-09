@@ -44,8 +44,9 @@ public enum Telemetry {
         let host = host.lowercased()
         let shaped = path.map(PathShape.shape)
         return (builtIn + extra).contains { entry in
-            let parts = entry.lowercased().split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
-            let domain = String(parts[0])
+            // Domains are case-insensitive; paths are not.
+            let parts = entry.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
+            let domain = parts[0].lowercased()
             guard host == domain || host.hasSuffix("." + domain) else { return false }
             guard parts.count == 2 else { return true }
             guard let shaped else { return false }

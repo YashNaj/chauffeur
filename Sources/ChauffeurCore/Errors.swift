@@ -19,6 +19,14 @@ public enum ChauffeurError: Error, Equatable, CustomStringConvertible {
     /// A step that failed with its own explanation (simctl or image errors).
     case failed(String)
 
+    /// The front app's first tree isn't up: `launch` and `wait` keep polling instead of failing or recovering.
+    public var appNotUpYet: Bool {
+        switch self {
+        case .noTree, .blind, .needsRelaunch: return true
+        default: return false
+        }
+    }
+
     public var description: String {
         switch self {
         case .simulatorServiceUnresponsive(let command):

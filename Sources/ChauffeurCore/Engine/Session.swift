@@ -374,7 +374,7 @@ public final class Session {
                             "matches": .array(hits.map { $0.json(all: false) }),
                         ])
                 }
-            } catch ChauffeurError.noTree, ChauffeurError.blind {
+            } catch let error as ChauffeurError where error.appNotUpYet {
                 // app still launching; keep waiting
             }
             if Double(clock.nowMs() - start) >= timeout * 1000 {

@@ -34,4 +34,24 @@ import Testing
         #expect(PathShape.shape("?q=1") == "/")
         #expect(PathShape.shape("/") == "/")
     }
+
+    /// Hyphenated slugs with a number are words, not tokens (final review, item 6).
+    @Test func slugsWithNumbersStay() {
+        #expect(PathShape.shape("/products/iphone-15-pro-max") == "/products/iphone-15-pro-max")
+        #expect(PathShape.shape("/order-history-v2") == "/order-history-v2")
+        #expect(PathShape.shape("/blog/2024-annual-report") == "/blog/2024-annual-report")
+    }
+
+    @Test func phoneNumbersAreIds() {
+        #expect(PathShape.shape("/call/+15551234567") == "/call/{id}")
+        #expect(PathShape.shape("/call/%2B15551234567") == "/call/{id}")
+    }
+
+    @Test func matrixParametersAreDropped() {
+        #expect(PathShape.shape("/cart;jsessionid=1A2B3C4D5E6F7A8B9C0D/items") == "/cart/items")
+    }
+
+    @Test func doubleEncodedEmailIsCollapsed() {
+        #expect(PathShape.shape("/reset/sam%2540example.com") == "/reset/{email}")
+    }
 }
