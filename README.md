@@ -166,3 +166,5 @@ design is in [docs/design.md](docs/design.md).
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE), and [NOTICE](NOTICE) for credits.
+
+Built by [Yashal Najeeb](https://yashnaj.dev).
