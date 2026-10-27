@@ -61,3 +61,67 @@ extension Fixtures {
         return ConnectResponse(status: recorded.status, headers: recorded.headers ?? [:], body: body)
     }
 }
+
+/// Keys in a dictionary. Counts data reads so tests can prove `list` and a denied ask read nothing.
+final class MemoryKeyStore: KeyStore, @unchecked Sendable {
+    private let lock = NSLock()
+    private var keys: [String: (stored: StoredKey, pem: String)] = [:]
+    private var reads = 0
+
+    var dataReads: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return reads
+    }
+
+    func add(_ key: StoredKey, pem: String) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        guard keys[key.keyID] == nil else { throw ConnectError.duplicateKey(key.keyID) }
+        keys[key.keyID] = (key, pem)
+    }
+
+    func list() throws -> [StoredKey] {
+        lock.lock()
+        defer { lock.unlock() }
+        return keys.values.map(\.stored).sorted { $0.keyID < $1.keyID }
+    }
+
+    func pem(for keyID: String) throws -> String {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let entry = keys[keyID] else { throw ConnectError.unknownKey(keyID, known: keys.keys.sorted()) }
+        reads += 1
+        return entry.pem
+    }
+
+    func remove(_ keyID: String) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        guard keys.removeValue(forKey: keyID) != nil else {
+            throw ConnectError.unknownKey(keyID, known: keys.keys.sorted())
+        }
+    }
+}
+
+/// Answers every ask the same way and records the reasons it was given.
+final class ScriptedPresence: Presence, @unchecked Sendable {
+    private let allow: Bool
+    private let lock = NSLock()
+    private var reasons: [String] = []
+
+    init(allow: Bool) { self.allow = allow }
+
+    var asked: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return reasons
+    }
+
+    func confirm(reason: String) throws {
+        lock.lock()
+        reasons.append(reason)
+        lock.unlock()
+        guard allow else { throw ConnectError.presenceDenied("cancelled") }
+    }
+}
