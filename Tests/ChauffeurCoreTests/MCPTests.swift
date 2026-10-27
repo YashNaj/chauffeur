@@ -114,6 +114,14 @@ import Testing
             r?["result"]?["content"] == [["type": "text", "text": "type e2 \"--submit\" → TEXT MISMATCH via keys"]])
     }
 
+    @Test func actWaitFinishesAPendingTap() throws {
+        #expect(
+            try MCPTools.argv(tool: "act", arguments: ["action": "wait"], payloadFile: { _ in "" }) == ["wait"])
+        #expect(
+            try MCPTools.argv(tool: "act", arguments: ["action": "wait", "timeout": 45], payloadFile: { _ in "" })
+                == ["wait", "--timeout", "45"])
+    }
+
     @Test func everyToolMapsToTheCLI() throws {
         func argv(_ tool: String, _ arguments: JSON) throws -> [String] {
             try MCPTools.argv(tool: tool, arguments: arguments) { _ in "/tmp/p.json" }

@@ -71,11 +71,13 @@ public enum MCPTools {
                 + "by ';', stopping at the first failure.",
             properties: [
                 "action": prop(
-                    "string", "what to do", ["enum": ["tap", "type", "scroll", "swipe", "button", "batch"]]),
+                    "string", "what to do", ["enum": ["tap", "type", "scroll", "swipe", "button", "wait", "batch"]]),
                 "target": prop("string", "tap: a ref (e4) or a point (201,344); type: a text field ref"),
                 "text": prop("string", "type: the text to enter"),
                 "submit": prop("boolean", "type: press Return afterwards"),
                 "long": prop("number", "tap: hold for this many seconds", ["minimum": 0.05, "maximum": 30]),
+                "timeout": prop(
+                    "number", "wait: seconds to wait for a PENDING tap (default 30)", ["minimum": 0, "maximum": 300]),
                 "edge": prop("boolean", "tap or swipe within 6 pt of a screen edge (triggers system gestures)"),
                 "direction": prop(
                     "string", "scroll: which way the content moves into view",
@@ -255,10 +257,12 @@ public enum MCPTools {
                     + ["--", try a.required("from", for: "act swipe"), try a.required("to", for: "act swipe")]
             case "button":
                 argv = ["button", "--", try a.required("button", for: "act button")]
+            case "wait":
+                argv = ["wait"] + (try a.number("timeout").map { ["--timeout", $0] } ?? [])
             case "batch":
                 argv = ["do", "--", try a.required("commands", for: "act batch")]
             default:
-                throw MCPToolError.invalid("act action must be tap, type, scroll, swipe, button or batch")
+                throw MCPToolError.invalid("act action must be tap, type, scroll, swipe, button, wait or batch")
             }
         case "screenshot":
             argv = ["screenshot"] + (try a.string("zoom").map { ["--zoom", $0] } ?? [])
