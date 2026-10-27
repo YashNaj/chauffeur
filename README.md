@@ -123,8 +123,8 @@ chauffeur keys use <key-id>
 ```
 
 `keys add` probes the key first and refuses one that can reach users or certificates. The key lives in the login
-keychain and is read only after Touch ID. Keys are for humans: an agent never adds or removes one. Details:
-[the M5a spec](docs/specs/2026-10-26-m5a-connect-key-design.md).
+keychain and is read only after Touch ID or your login password. Keys are for humans: an agent never adds or removes
+one. Details: [the M5a spec](docs/specs/2026-10-26-m5a-connect-key-design.md).
 
 ## How it works
 
