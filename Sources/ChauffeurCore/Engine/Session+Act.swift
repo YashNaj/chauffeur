@@ -126,11 +126,14 @@ extension Session {
         try a.done()
         let (device, _) = try connect()
         let network = netStart()
+        let udid = self.udid
+        let clipboard = Background { Session.readClipboard(udid: udid) }
         let (before, settled) = try baseline()
         let aimed = try aim(target, in: before)
         if let refusal = Geometry.refusal(for: aimed.point, screen: device.size, allowEdge: allowEdge) {
             return Output("tap \(aimed.label) refused: \(refusal)", exit: 1)
         }
+        let clipboardBefore = clipboard.result(waitingAtMost: 2000) ?? nil
         var report = try act(
             "tap \(aimed.label)", target: aimed.node, before: before, baselineSettled: settled, network: network
         ) {
@@ -160,6 +163,15 @@ extension Session {
                     "the first touch reached the app but the switch ignored it; chauffeur tapped once more")
             }
             report = second
+        }
+        // A copy changes nothing on screen; read the pasteboard again only then (spec §7: a read costs ~100 ms).
+        if report.outcome == .noEffect,
+            let copied = ClipboardMark.copied(before: clipboardBefore, after: Session.readClipboard(udid: udid))
+        {
+            report.outcome = .changed
+            report.copiedCharacters = copied
+            report.hints = []
+            report.evidenceShot = nil
         }
         return Output(report.render(), exit: report.exitCode, data: report.json)
     }
