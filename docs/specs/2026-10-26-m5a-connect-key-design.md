@@ -266,8 +266,12 @@ programs are not in the repo; the plan's live tests repeat the checks that matte
    says to run `keys add` at the Mac or pass `--no-presence`. SwiftPM's ad-hoc identifier differs between debug
    (`chauffeur-<hash>`) and release (`chauffeur`) builds, so a rebuilt debug chauffeur is "another binary" to the
    keychain and gets the dialog once per build; a release build keeps its identifier.
-2. **The probes.** Not yet run: they need keys of each role and the issuer id (the owner's to-do). The plan records
-   the responses as fixtures under `Tests/ChauffeurCoreTests/Fixtures/connect/` when they are run; until then the
+2. **The probes.** Partly run, 2026-10-27, with the owner's existing keys. An Admin key: `GET /v1/users?limit=1`
+   answered 200, `keys add` refused it after that one request and stored nothing (the refusal text in §3, verbatim).
+   A second key on the machine answered 401 on the first probe (revoked, or minted under another issuer): refused
+   with the §3 401 text, nothing stored. Still to run: an App Manager key with and without the Certificates,
+   Identifiers & Profiles toggle, and a Developer key, to settle whether App Manager also gets 200 on `/v1/users`.
+   The responses become fixtures under `Tests/ChauffeurCoreTests/Fixtures/connect/` when recorded; until then the
    decision table is tested on Apple's documented error shape.
 3. **Reading the role back.** No endpoint returns a team key's own role (Apple's API reference lists none; the key
    list endpoints are for individual keys only). The declared role stands, checked at first write (M5b).
