@@ -269,14 +269,23 @@ programs are not in the repo; the plan's live tests repeat the checks that matte
 2. **The probes.** Partly run, 2026-10-27, with the owner's existing keys. An Admin key: `GET /v1/users?limit=1`
    answered 200, `keys add` refused it after that one request and stored nothing (the refusal text in §3, verbatim).
    A second key on the machine answered 401 on the first probe (revoked, or minted under another issuer): refused
-   with the §3 401 text, nothing stored. Still to run: an App Manager key with and without the Certificates,
-   Identifiers & Profiles toggle, and a Developer key, to settle whether App Manager also gets 200 on `/v1/users`.
+   with the §3 401 text, nothing stored. A third key, minted 2026-10-27 for chauffeur, answered 200 on all of
+   `/v1/users`, `/v1/certificates`, `/v1/bundleIds` and `/v1/userInvitations`: it was either Admin or App Manager
+   with the Certificates, Identifiers & Profiles box checked, and `keys add` refused it after the first request.
+   Observed shapes: a 200 on `/v1/users` carries `data[].attributes.roles` (e.g. `["ADMIN",
+   "CLOUD_MANAGED_DEVELOPER_ID"]`); `X-Rate-Limit` is `user-hour-lim:3600;user-hour-rem:N` and counts down by one
+   per request. Still to run: an App Manager key without the toggle, and a Developer key, to settle whether App
+   Manager also gets 200 on `/v1/users`.
    The responses become fixtures under `Tests/ChauffeurCoreTests/Fixtures/connect/` when recorded; until then the
    decision table is tested on Apple's documented error shape.
 3. **Reading the role back.** No endpoint returns a team key's own role (Apple's API reference lists none; the key
    list endpoints are for individual keys only). The declared role stands, checked at first write (M5b).
-4. **Scoped tokens.** Not yet run (needs a key). Documented behaviour, to confirm: a scoped token on a path outside
-   its scope gets `405`.
+4. **Scoped tokens.** Run 2026-10-27. A token with `scope: ["GET /v1/apps?limit=200"]` gets 200 on that path, and
+   **403** (not 405) on `GET /v1/users?limit=1`, with `code: FORBIDDEN.REQUEST_DOES_NOT_MATCH_SCOPE` and a `detail`
+   that names the request and the authorised scopes. Apple normalises the query when matching: a scope written with
+   literal brackets (`filter[bundleId]=…`) and one written encoded (`filter%5BbundleId%5D=…`) both match a request
+   sent as `%5B`/`%5D` (200 each). So the client's literal-bracket scope string is fine, and §4's "a scoped token
+   sent with a POST gets 405" stays to be confirmed when M5b adds a write.
 5. **A key file's permissions.** No `.p8` in `~/Downloads` to observe; Safari's downloads here are `0644`
    (`-rw-r--r--`), so a key it downloaded is readable by every process as this user until deleted. Keys that
    `altool` stored under `~/.appstoreconnect/private_keys` are `0600`. The hint in §2 stands.
