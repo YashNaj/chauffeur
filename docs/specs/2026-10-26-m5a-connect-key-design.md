@@ -283,11 +283,11 @@ ID prompt is observed by hand once per macOS version and noted in Findings.
 7. **Live run of the revised design, 2026-10-27**, signed release build (`scripts/sign.sh`, flags `adhoc,runtime`):
    `keys add` with the App Manager key printed the six-line sheet (`role check: not an Admin or Finance key`), stored
    it, `keys list` and `doctor` showed it with no dialog, `keys use` pinned it, `keys check` re-probed and answered
-   `ok (2 apps)` after the presence step. The Admin key was refused with the finance-alarm text after two requests
+   `ok (2 apps)` after the presence step, which showed the Touch ID sheet on macOS 27.0.1 and the owner answered it
+   (observed 2026-10-27). The Admin key was refused with the finance-alarm text after two requests
    (apps 200, finance 400); the revoked key was rejected with the 401 text after one. The debug build refused
    `keys check` with the unhardened-build text before any prompt. A `DYLD_INSERT_LIBRARIES` library ran inside the
-   unsigned release binary and not inside the signed one. Whether the presence step showed the Touch ID sheet or the
-   password sheet on this Mac is recorded by the owner's observation (pending at the time of writing).
+   unsigned release binary and not inside the signed one.
 
 ## Decision (2026-10-27)
 
