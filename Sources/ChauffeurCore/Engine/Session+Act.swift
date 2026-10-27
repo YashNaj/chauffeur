@@ -85,6 +85,7 @@ extension Session {
                 if report.outcome == .pending {
                     pendingTap = PendingTap(report: report, before: before, net: net, target: target)
                 }
+                try judgeScreenAgain(&report, before: before, net: net, capMs: capMs)
             }
             if report.outcome == .noEffect, let frame = target?.frame,
                 let shot = try? capture(

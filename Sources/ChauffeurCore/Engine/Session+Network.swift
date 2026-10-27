@@ -79,7 +79,9 @@ extension Session {
             verdict = RequestEvidence.verdict(netItems(net, previous: &previous))
         } else {
             let textField = target.map { Perception.textEntry.contains($0.role) } ?? false
-            verdict = NetJudge.judge(clock: clock, extraWindowMs: textField ? NetJudge.textFieldWindowMs : 0) {
+            verdict = NetJudge.judge(
+                clock: clock, touchMs: net.touchMs, extraWindowMs: textField ? NetJudge.textFieldWindowMs : 0
+            ) {
                 netItems(net, previous: &previous)
             }
         }
@@ -95,5 +97,19 @@ extension Session {
         case .settled(let items):
             if let hint = ActionReport.lead(items, pending: false).flatMap(RequestText.hint) { report.hints = [hint] }
         }
+    }
+
+    /// Spec §3: a reply arrived inside the request window, so the screen is judged again as it is now. Without this,
+    /// a response the app draws after its reply would be a false NO EFFECT.
+    func judgeScreenAgain(_ report: inout ActionReport, before: Snapshot, net: TapNet, capMs: Int) throws {
+        guard report.outcome == .noEffect, report.requests.contains(where: { !$0.telemetry }) else { return }
+        let (again, settle) = try observe(minMs: 150, capMs: capMs)
+        guard again.hash != before.hash else { return }
+        report.outcome = .changed
+        report.revAfter = again.rev
+        report.diff = Diff.lines(from: before, to: again)
+        report.settledMs = clock.nowMs() - net.touchMs
+        report.settled = settle.settled
+        report.hints = []
     }
 }

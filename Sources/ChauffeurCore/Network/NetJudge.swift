@@ -14,9 +14,10 @@ public enum NetJudge {
     static let pollMs = 100
 
     /// `sample` reads both layers afresh and merges them. Nothing the tap caused → `.none` after the grace, with no
-    /// window and no second look.
+    /// window and no second look. The window counts from `touchMs`, the touch (spec §3: "still running after
+    /// 2.2 s"), so a screen that is slow to settle doesn't push a slow reply inside it.
     public static func judge(
-        clock: some SettleClock, extraWindowMs: Int = 0, sample: () -> [RequestItem]
+        clock: some SettleClock, touchMs: Int, extraWindowMs: Int = 0, sample: () -> [RequestItem]
     ) -> NetVerdict {
         clock.sleep(ms: graceMs)
         var verdict = RequestEvidence.verdict(sample())
@@ -25,7 +26,7 @@ public enum NetJudge {
             clock.sleep(ms: pollMs)
             verdict = RequestEvidence.verdict(sample())
         }
-        var deadline = clock.nowMs() + requestWindowMs
+        var deadline = touchMs + requestWindowMs
         var confirmed = false
         while true {
             switch verdict {

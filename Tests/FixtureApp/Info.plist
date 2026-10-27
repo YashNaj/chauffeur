@@ -17,5 +17,6 @@
         <key>CFBundleURLSchemes</key><array><string>chauffeur-fixture</string></array>
     </dict></array>
     <key>NSLocationWhenInUseUsageDescription</key><string>Fixture asks so chauffeur can test permission prompts.</string>
+    <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
 </dict>
 </plist>

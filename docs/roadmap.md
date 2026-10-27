@@ -18,6 +18,12 @@ Spec: `docs/specs/2026-10-08-m4b-network-and-evidence-design.md`.
 - [ ] A sweep for more: keyboards, alerts that arrive late, animations that never settle.
 - [ ] 0.2.0
 
+## Web views in the tree (after M4b)
+
+A `WKWebView` contributes nothing to the app's accessibility tree: its content is the WebContent process's own tree,
+placed at the web view's frame (found in M4b Plan 2, Task 12). Reading that tree and merging it into the snapshot
+so links and fields in web content get refs. Its own spec.
+
 ## Network visibility (stage 2, after M4b)
 
 Every request's method (no log line carries it), the path of requests on a reused connection, path and status for

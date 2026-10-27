@@ -2720,6 +2720,30 @@ Spec "Testing → Live".
 - Consumes: everything above; `Live`, `ref(_:_:)`, `Session.telemetryOverride`.
 - Produces: live evidence for every row of the spec's live table except "double submit" (stage 2).
 
+**Rulings recorded in the plan (live run, 2026-10-27, iPhone 17, iOS 27.0, Xcode 27.1):**
+
+1. The request window counts from the touch, not from the settle. The first run judged the 2.5 s API `NO EFFECT`:
+   the tab had just opened, the web view kept the tree changing for the whole 1.5 s cap, and the 2 s window only
+   started after that. Spec §3's headline ("still running after 2.2 s") counts from the touch, so `NetJudge.judge`
+   takes `touchMs`. Unit test: `aSlowSettleDoesNotExtendTheWindow`.
+2. A reply that arrives inside the window is judged again on the screen (§3: "then judge again"). Without it, the
+   same tap said "but nothing changed on screen" while the Result row already read `slow 200`: a false `NO EFFECT`.
+   `Session.judgeScreenAgain` runs after `applyNetwork`. The fixture gains "Medium API" (1.2 s) and the live test
+   `aReplyInsideTheWindowThatChangesTheScreenIsAChange`.
+3. Web content is not in the tree. The `WKWebView` contributes no element to the app's tree (16 elements, depth 3,
+   nothing at its frame); its content is the WebContent process's own tree (an `AXApplication` whose group sits at
+   the web view's frame, 32,703,338,120). Reading and merging that tree is a Perception change outside M4b and gets
+   its own spec (roadmap: "Web views in the tree"). The live row is evidenced by tapping the link at a point under
+   the search field. The page must declare `width=device-width`: on a desktop-width page the touch did not navigate.
+4. The activity layer asks again for a connection's remote address. NetworkStatistics reports a socket as soon as it
+   exists, before `connect`; the bridge queried its description once, so a WebSocket and the web view's request
+   showed as "a request", and the WebSocket, unmatched to its log record, came back `PENDING` instead of
+   "connected, data flowing". This is also the likely cause of one run printing the slow request's connection twice.
+   `CHNetStats` re-queries every open flow without a remote on each sample. Live test:
+   `aSocketSeenBeforeItConnectedGetsItsRemoteLater`.
+5. `aCopyIsAChange` resets the pasteboard first: copying the code already on the pasteboard is no change (§7
+   compares content).
+
 - [ ] **Step 1: The local server**
 
 `Tests/FixtureApp/netserver.py`:

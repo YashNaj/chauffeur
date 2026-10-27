@@ -34,6 +34,7 @@ static NSString *CHEndpoint(id value) {
     dispatch_queue_t _queue;
     CHNStatManager _manager;
     CHQueryAllFn _queryAll;
+    CHSourceFn _queryDescription;
     CHManagerFn _destroy;
     NSMutableDictionary<NSNumber *, NSMutableDictionary *> *_flows;  // only touched on _queue
     uint64_t _nextId;
@@ -62,12 +63,16 @@ static NSString *CHEndpoint(id value) {
     }
     _queue = dispatch_queue_create("chauffeur.netstats", DISPATCH_QUEUE_SERIAL);
     _flows = [NSMutableDictionary dictionary];
+    _queryDescription = queryDescription;
     __weak CHNetStats *weakSelf = self;
     _manager = create(kCFAllocatorDefault, _queue, ^(CHNStatSource source, void *unused) {
         CHNetStats *strongSelf = weakSelf;
         if (!strongSelf) return;
         NSNumber *key = @(++strongSelf->_nextId);
         NSMutableDictionary *flow = [@{@"id": key, @"openedMs": @(CHNowMs()), @"tx": @0, @"rx": @0} mutableCopy];
+        // The kernel reports a socket as soon as it exists; a socket that connects later gets its description asked
+        // for again on the next sample (`flowsForPids:`), until it has a remote address. Valid while open.
+        flow[@"source"] = [NSValue valueWithPointer:source];
         strongSelf->_flows[key] = flow;
         setDescription(source, ^(CFDictionaryRef d) { [CHNetStats update:flow from:(__bridge NSDictionary *)d]; });
         setCounts(source, ^(CFDictionaryRef c) { [CHNetStats update:flow from:(__bridge NSDictionary *)c]; });
@@ -98,6 +103,13 @@ static NSString *CHEndpoint(id value) {
 
 - (NSArray<NSDictionary<NSString *, id> *> *)flowsForPids:(NSArray<NSNumber *> *)pids {
     dispatch_semaphore_t done = dispatch_semaphore_create(0);
+    dispatch_sync(_queue, ^{
+        for (NSMutableDictionary *flow in self->_flows.allValues) {
+            if (!flow[@"remote"] && !flow[@"closedMs"] && flow[@"source"]) {
+                self->_queryDescription([flow[@"source"] pointerValue]);
+            }
+        }
+    });
     _queryAll(_manager, ^{ dispatch_semaphore_signal(done); });
     dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, 250 * NSEC_PER_MSEC));
     NSSet<NSNumber *> *wanted = [NSSet setWithArray:pids];

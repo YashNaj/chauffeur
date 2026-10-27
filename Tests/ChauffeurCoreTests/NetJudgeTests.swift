@@ -9,45 +9,54 @@ import Testing
 
     @Test func aTrueNoOpIsNotDelayed() {
         let clock = FakeClock()
-        #expect(NetJudge.judge(clock: clock) { [] } == .none([]))
+        #expect(NetJudge.judge(clock: clock, touchMs: 0) { [] } == .none([]))
         #expect(clock.now == NetJudge.graceMs)
     }
 
     @Test func telemetryOnlyIsNoEffect() {
         let clock = FakeClock()
         let ping = RequestItem(host: "app-measurement.com", waiting: true, telemetry: true)
-        #expect(NetJudge.judge(clock: clock) { [ping] } == .none([ping]))
+        #expect(NetJudge.judge(clock: clock, touchMs: 0) { [ping] } == .none([ping]))
         #expect(clock.now == NetJudge.graceMs)
     }
 
     @Test func aReplyWithinTheWindowSettles() {
         let clock = FakeClock()
-        let verdict = NetJudge.judge(clock: clock) { clock.now < 300 ? [open] : [done] }
+        let verdict = NetJudge.judge(clock: clock, touchMs: 0) { clock.now < 300 ? [open] : [done] }
         #expect(verdict == .settled([done]))
         #expect(clock.now < 300 + NetJudge.confirmMs + 200)
     }
 
     @Test func noReplyWithinTheWindowIsPending() {
         let clock = FakeClock()
-        #expect(NetJudge.judge(clock: clock) { [open] } == .pending([open]))
+        #expect(NetJudge.judge(clock: clock, touchMs: 0) { [open] } == .pending([open]))
         #expect(clock.now == NetJudge.graceMs + NetJudge.requestWindowMs)
+    }
+
+    /// The window counts from the touch (spec §3: "still running after 2.2 s"), so a screen that is slow to settle
+    /// doesn't push a 2.5 s reply inside it. Here the settle took 1.5 s.
+    @Test func aSlowSettleDoesNotExtendTheWindow() {
+        let clock = FakeClock()
+        clock.now = 1500
+        #expect(NetJudge.judge(clock: clock, touchMs: 0) { [open] } == .pending([open]))
+        #expect(clock.now == 1500 + NetJudge.graceMs + 500)
     }
 
     @Test func aRequestChainedOnTheReplyIsWaitedFor() {
         let clock = FakeClock()
         let next = RequestItem(host: "api.example.com", port: 443, path: "/profile", waiting: true)
         // /login answers at once; its reply starts /profile, which never answers.
-        let verdict = NetJudge.judge(clock: clock) { clock.now < 100 ? [done] : [done, next] }
+        let verdict = NetJudge.judge(clock: clock, touchMs: 0) { clock.now < 100 ? [done] : [done, next] }
         #expect(verdict == .pending([done, next]))
     }
 
     @Test func aDebouncedRequestIsCaughtOnlyWithTheTextFieldWindow() {
         let late = FakeClock()
         #expect(
-            NetJudge.judge(clock: late, extraWindowMs: NetJudge.textFieldWindowMs) {
+            NetJudge.judge(clock: late, touchMs: 0, extraWindowMs: NetJudge.textFieldWindowMs) {
                 late.now < 320 ? [] : [open]
             } == .pending([open]))
         let plain = FakeClock()
-        #expect(NetJudge.judge(clock: plain) { plain.now < 320 ? [] : [open] } == .none([]))
+        #expect(NetJudge.judge(clock: plain, touchMs: 0) { plain.now < 320 ? [] : [open] } == .none([]))
     }
 }
