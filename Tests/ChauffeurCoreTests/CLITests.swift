@@ -10,12 +10,17 @@ import Testing
         booted: [DeviceInfo], cwd: URL = FileManager.default.temporaryDirectory, recorder: Recorder = Recorder(),
         vars: [String: String] = [:]
     ) -> CLI.Environment {
-        CLI.Environment(
+        var e = CLI.Environment(
             env: vars, cwd: cwd, devices: { booted },
             send: { udid, args in
                 recorder.calls.append((udid, args))
                 return Output("from daemon")
             })
+        // A fake key store by default, so no unit test reads the login keychain.
+        e.connect = ConnectKeys.Environment(
+            store: MemoryKeyStore(), presence: ScriptedPresence(allow: true), transport: ScriptedTransport([:]),
+            readFile: { _ in "" }, now: Date.init)
+        return e
     }
 
     let a = DeviceInfo(udid: "AAAA-1", name: "iPhone 17 Pro", runtime: "iOS 26.2", state: "Booted")
@@ -98,12 +103,7 @@ import Testing
 
     @Test func keysCommandsNeverReachTheDaemon() throws {
         let rec = Recorder()
-        let store = MemoryKeyStore()
-        let connect = ConnectKeys.Environment(
-            store: store, presence: ScriptedPresence(allow: true), transport: ScriptedTransport([:]),
-            readFile: { _ in "" }, now: Date.init)
-        var e = env(booted: [a], recorder: rec)
-        e.connect = connect
+        let e = env(booted: [a], recorder: rec)
         #expect(CLI.handle(["keys", "list"], e).text.hasPrefix("no keys stored"))
         let bad = CLI.handle(
             ["keys", "add", "k.p8", "--issuer", TestKeys.issuer, "--key-id", "7X2K9ABC1D", "--role", "admin"], e)
