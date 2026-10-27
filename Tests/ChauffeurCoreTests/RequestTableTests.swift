@@ -29,9 +29,29 @@ import Testing
             RequestTable.never() == [
                 "expire a build", "cancel a submission", "remove a tester", "delete a webhook", "change pricing",
             ])
-        let expiring = RequestRow(
-            method: .patch, path: "/v1/builds/{id}", resource: "builds", role: .appManager, fields: ["expired"])
-        #expect(RequestTable.denied[0].violates(expiring))
+        #expect(RequestTable.never(in: RequestTable.rows) == RequestTable.denied.map(\.text))
+    }
+    @Test func everyDenyEntryCatchesItsViolation() {
+        func row(_ method: Method, _ resource: String, _ fields: [String] = []) -> RequestRow {
+            RequestRow(
+                method: method, path: "/v1/\(resource)/{id}", resource: resource, role: .appManager, fields: fields)
+        }
+        let cases: [(violating: RequestRow, benign: RequestRow)] = [
+            (row(.patch, "builds", ["expired"]), row(.get, "builds")),
+            (row(.patch, "reviewSubmissions", ["canceled"]), row(.get, "reviewSubmissions")),
+            (row(.post, "betaTesters"), row(.get, "betaTesters")),
+            (row(.patch, "webhooks"), row(.get, "webhooks")),
+            (row(.patch, "appPrices"), row(.get, "appPrices")),
+        ]
+        #expect(cases.count == RequestTable.denied.count)
+        let all = RequestTable.denied.map(\.text)
+        for (entry, pair) in zip(RequestTable.denied, cases) {
+            #expect(entry.violates(pair.violating), "\(entry.text)")
+            #expect(!entry.violates(pair.benign), "\(entry.text)")
+            var rows = RequestTable.rows
+            rows[.build] = pair.violating
+            #expect(RequestTable.never(in: rows) == all.filter { $0 != entry.text }, "\(entry.text)")
+        }
     }
     @Test func pathsAndQueries() {
         #expect(RequestTable.pathAndQuery(for: .probeUsers) == "/v1/users?limit=1")
@@ -44,5 +64,8 @@ import Testing
                 == "/v1/builds?filter[app]=a1&filter[preReleaseVersion.version]=1.3.0&limit=200&sort=-uploadedDate")
         #expect(
             RequestTable.path(for: .buildUploadFiles(uploadID: "u/1")) == "/v1/buildUploads/u%2F1/buildUploadFiles")
+        #expect(
+            RequestTable.path(for: .appStoreVersions(appID: "..")) == "/v1/apps/%2E%2E/appStoreVersions")
+        #expect(RequestTable.path(for: .build(id: "a.b")) == "/v1/builds/a%2Eb")
     }
 }

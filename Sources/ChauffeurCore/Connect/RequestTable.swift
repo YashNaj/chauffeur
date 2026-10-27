@@ -75,7 +75,9 @@ public enum RequestTable {
     ]
 
     /// The texts of every deny entry that no row violates.
-    public static func never() -> [String] {
+    public static func never() -> [String] { never(in: rows) }
+
+    static func never(in rows: [Operation.Kind: RequestRow]) -> [String] {
         denied.filter { entry in !rows.values.contains(where: entry.violates) }.map(\.text)
     }
 
@@ -96,7 +98,7 @@ public enum RequestTable {
 
     private static let pathAllowed: CharacterSet = {
         var set = CharacterSet.urlPathAllowed
-        set.remove(charactersIn: "/")
+        set.remove(charactersIn: "/.")
         return set
     }()
 
