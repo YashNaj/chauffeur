@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (0.2.0)
+## 0.2.0
 
 - A crash now leads the action's result: `tap Pay → APP CRASHED: …` on the first line.
 - An app opened from its home-screen icon without accessibility is relaunched once, with a note; never inside `do`.
