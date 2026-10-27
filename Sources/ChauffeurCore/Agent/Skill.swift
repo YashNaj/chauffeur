@@ -78,6 +78,7 @@ public enum Skill {
         - Exit codes: 0 ok · 1 error · 3 no verified effect · 4 not found · 5 app crashed · 64 usage.
         - Take a screenshot to check how something looks (layout, colour, checkmarks): the tree has no pixels. Otherwise prefer the tree; an image costs far more tokens.
         - Text typed into secure fields is never printed or traced.
+        - App Store Connect keys belong to the human: never run `chauffeur keys add`, `remove` or `use`. If a command reports no key, say so and stop.
         """
 
     /// The section added to the project's AGENTS.md, which Codex and Cursor read.

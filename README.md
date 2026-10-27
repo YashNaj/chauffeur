@@ -112,6 +112,20 @@ Every action reports what it actually did, on its first line:
 | `APP CRASHED` | The app died. The reason and its last log lines follow. | Run `chauffeur logs` for the crash report, fix the code, then rebuild and relaunch. |
 | `APP EXITED` | The app is gone, with no crash report or fatal log line. | Relaunch it. |
 
+### App Store Connect key
+
+```
+chauffeur keys add <AuthKey.p8> --issuer <uuid> --key-id <id> --role developer|app-manager
+chauffeur keys list
+chauffeur keys check [<key-id>]
+chauffeur keys remove <key-id>
+chauffeur keys use <key-id>
+```
+
+`keys add` probes the key first and refuses one that can reach users or certificates. The key lives in the login
+keychain and is read only after Touch ID. Keys are for humans: an agent never adds or removes one. Details:
+[the M5a spec](docs/specs/2026-10-26-m5a-connect-key-design.md).
+
 ## How it works
 
 - **A daemon for each simulator** keeps the connection open, so a command doesn't pay a startup cost each time.

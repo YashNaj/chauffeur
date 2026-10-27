@@ -24,6 +24,7 @@ chauffeur lets a coding agent drive the iOS Simulator and tells it the truth abo
 | `Sources/ChauffeurCore/Logs` | App log following and crash reports. |
 | `Sources/ChauffeurCore/Daemon` | The per-simulator daemon and its socket. |
 | `Sources/ChauffeurCore/Agent` | MCP server, tool definitions, the agent skill. |
+| `Sources/ChauffeurCore/Connect` | App Store Connect: the key, tokens, the request table and the probes. Reads only until M5b. |
 | `Sources/ChauffeurCore/Verifier.swift` | Turning evidence into an outcome. |
 | `Sources/chauffeur` | The CLI entry point. The only target that prints. |
 
