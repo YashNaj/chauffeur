@@ -1,6 +1,6 @@
 # M5a: the App Store Connect key, and what it can never do
 
-**Status:** draft for review · **Date:** 2026-10-26
+**Status:** revised 2026-10-27 after Step 0 (see Decision) · **Date:** 2026-10-26
 
 ## Why
 
@@ -12,11 +12,18 @@ that can be undone by API. An agent holding such a key, one bad tool call or one
 it, is a lockout waiting to happen.
 
 Apple gives a tool almost nothing to narrow a key after the fact. A team key has one role, fixed at creation. It
-reaches every app on the team. The JWT `scope` claim limits GET requests only; a scoped token sent with a POST gets
-`405`. So a confirmation prompt is theatre: the only guards that hold are the key's role and the client's own code.
+reaches every app on the team. The JWT `scope` claim is documented for GET requests only. And (Findings 2) Apple
+exposes no read that tells an Admin key from an App Manager key, except one finance-report quirk that works as a
+one-way alarm. So the guards that hold are: the client's own code, which has no request that could lock anyone out;
+the binary, which must be the only process that can read the key; and the human, who sees every write named in a
+Touch ID sheet before it is sent. (The first draft called a confirmation prompt theatre. That was wrong here: when
+an agent runs chauffeur, chauffeur's output goes to the agent, so the Touch ID sheet is the human's only trusted
+channel, and a prompt rendered from the exact request is load-bearing. M5b designs it.)
 
-M5a is those two guards. **chauffeur never holds a key that could lock the team out, and its client has no code path
-that could try.** The worst an agent can do with chauffeur's key is upload a build nobody wanted, which is recoverable.
+M5a is the first two guards and the setup that explains them. **chauffeur's client has no code path that could lock
+the team out, whatever key it holds; setup refuses the one dangerous role it can detect (Admin, through the finance
+alarm) and tells the human which role to mint.** The worst an agent can do with chauffeur's key is upload a build
+nobody wanted, which is recoverable.
 
 This also changes a line in `docs/design.md`. "No telemetry, no network access" becomes: **no telemetry; the only
 network connections are to App Store Connect, only during release commands, and to the project's own metadata URLs in
@@ -24,8 +31,10 @@ the review check (M5c).** The promise that mattered was never "no network"; it w
 
 ## Goals
 
-1. A key chauffeur stores can't revoke a certificate, delete an identifier or profile, remove or change a user, or
-   delete a webhook. Setup refuses a key that can (§3), and the client can't send those requests (§4).
+1. chauffeur can't revoke a certificate, delete an identifier or profile, remove or change a user, invite a user,
+   delete a webhook, change pricing or availability, or touch in-app purchases, whatever key it holds: the client
+   can't send those requests (§4). Setup refuses the one dangerous role it can detect, Admin or Finance, through the
+   finance alarm (§3), and says plainly that it can't verify the rest of the declared role.
 2. The `.p8` lives in the login keychain, readable only with the user present (Touch ID or password), never in a
    file chauffeur wrote, an environment variable, a log, the trace, or an MCP response.
 3. The agent sees named operations only. There is no "send this request" command, in the CLI or over MCP.
@@ -103,39 +112,54 @@ so a key whose role was changed by revoking and re-creating it under the same id
 id>"`. `chauffeur use` keeps both (it merges, since M4b). Resolution: `--key <id>` › `.chauffeur.json` › the only
 key in the keychain › an error listing the keys.
 
-## 3. The probes: what a key may be
+## 3. The probes: what a key may be (revised 2026-10-27)
 
-Before storing, and at the start of every release command:
+Step 0 (Findings 2) showed that an Admin key and an App Manager key answer identically on every ordinary read,
+including `/v1/users` and `/v1/certificates`, and that every App Manager team key reads Certificates, Identifiers &
+Profiles (the key dialog has no toggle any more). The first draft's probes would have refused every key that can
+ship. What survives is one asymmetry: only Account Holder, Admin and Finance may "view payments and financial
+reports", and `GET /v1/financeReports` checks the role before it checks its parameters. With an impossible vendor
+number the request can never return data, so it is a safe **finance alarm**.
+
+Before storing, and at the start of every release command, in this order:
 
 | Probe | Response | Verdict |
 |---|---|---|
-| `GET /v1/users?limit=1` | 200 | **refused: Admin key.** "This key can remove every other Admin and change roles. chauffeur never holds one. In App Store Connect, create a key with the App Manager role and no access to Certificates, Identifiers & Profiles." |
-| `GET /v1/certificates?limit=1` | 200 | **refused: reaches Certificates, Identifiers & Profiles.** "This key can revoke the team's distribution certificate, which breaks every profile and unsubmitted build. Create one without that access." |
-| `GET /v1/apps?limit=200` | 200 | ok: the sheet lists the apps |
-| any | 401 | "App Store Connect rejected the key: check `--issuer` and `--key-id`, and that the key is not revoked" |
-| any | 403 on both of the first two | the key is at most App Manager without the toggle: accepted |
-| any | 429 | "rate limited by App Store Connect: N requests left this hour; try again later" (`X-Rate-Limit` gives the budget, not a reset time) |
+| `GET /v1/apps?limit=200` | 401 | **rejected.** "App Store Connect rejected the key: check `--issuer` and `--key-id`, and that the key is not revoked" |
+| `GET /v1/apps?limit=200` | 429 | "rate limited by App Store Connect: N requests left this hour; try again later" |
+| `GET /v1/apps?limit=200` | 200 | the sheet lists the apps |
+| `GET /v1/financeReports?filter[regionCode]=US&filter[reportDate]=<last month, yyyy-MM>&filter[reportType]=FINANCIAL&filter[vendorNumber]=0` with `Accept: application/a-gzip` | 400 `PARAMETER_ERROR.INVALID` | **refused: finance-capable key.** "This key can read the team's finance reports, which only Admin, Account Holder and Finance keys can. An Admin key can remove every other Admin, revoke certificates and delete identifiers; chauffeur never holds one. In App Store Connect, generate a key with the App Manager role." |
+| same | 403 `FORBIDDEN_ERROR` | **not finance-capable:** accepted with the declared role |
+| same | anything else (another 403 code such as `FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED`, 5xx, a transport error) | **unknown:** accepted with the declared role; the sheet says `role check: unavailable (<status> <code>)` |
 
-**No Admin-only read** (step 0, question 2, the branch where App Manager also lists users): the Admin probe is
-replaced by the declared role, and the harm the sheet names for "people" narrows to what an App Manager can do
-("add or remove people below Admin"), which can't strip the team's Admins. The certificates probe is unchanged and
-is the one that matters for the lockout. Author's call, 2026-10-26: a key is still accepted in that branch, because
-refusing App Manager would refuse the only role that can submit.
+The alarm is one-way and best-effort: a 400 is proof of finance access; a `FORBIDDEN_ERROR` is Apple's answer today
+and could change if Apple reorders its checks; anything else proves nothing. The verdict is never "proven App
+Manager". Refusing finance-capable keys costs no capability: App Manager is the least role that can submit and
+release, and Admin adds nothing to the release path (Findings 2, research 2026-10-27).
 
 The role the human declared (`--role`) can't be read back (step 0, question 3). It is stored on the item and checked
-at first write: a Developer key that gets 403 on a write the sheet promised is reported as `key 7X2K… is Developer,
-not App Manager: it can upload and read, but not submit, edit metadata or manage testers` and the sheet is corrected.
+at first write (M5b): a Developer key that gets `403 FORBIDDEN_ERROR` on a write the sheet promised is reported as
+`key 7X2K… is Developer, not App Manager: it can upload and read, but not submit, edit metadata or manage testers`
+and the sheet is corrected. A 403 whose code starts with `FORBIDDEN.REQUIRED_AGREEMENTS` is an agreement problem,
+not a role problem, and is reported as such.
 
-**The capability sheet**, printed by `add` and `check`, in words, from the probes and the declared role:
+**The capability sheet**, printed by `add` and `check`, in words, from the declared role, the alarm and the table:
 
 ```
-key 7X2K9ABC1D · App Manager · issuer 69a6de70… · apps: Fixture (com.example.fixture), Notes (com.example.notes)
+key 7X2K9ABC1D · App Manager (declared) · issuer 69a6de70… · apps: chauffeur-fixture (dev.chauffeur.fixture), Notes (dev.x.notes)
+role check: not an Admin or Finance key (finance alarm) · App Store Connect offers no other read-back
 can:    upload builds · manage TestFlight groups and testers · edit version metadata · submit for review · release
-cannot: touch certificates, identifiers or profiles · add or remove people · change roles · delete apps · create keys
-chauffeur will never: expire a build · cancel a submission · remove a tester · delete a webhook · change pricing
+cannot (Apple's role chart): add or remove Admins · generate keys · remove or transfer apps · sign agreements
+unverified for this role: revoking certificates, deleting profiles and identifiers · chauffeur has no such request
+chauffeur will never: expire a build · cancel a submission · remove a tester · delete or revoke a certificate, identifier or profile · invite or remove a user · change pricing or availability · touch in-app purchases · manage webhooks
 ```
 
-The last line is §4's deny list, so the human reads what the code refuses, not only what Apple's role allows.
+With the unknown verdict the second line reads
+`role check: unavailable (403 FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED) · taking App Manager as declared`.
+The Developer sheet keeps its `can:` line (`upload builds · read builds, TestFlight and version state`) and its
+`cannot:` line (`submit for review · edit version metadata · manage testers` plus the chart items). The last line
+is §4's deny list, generated from the table, so the human reads what the code refuses, not only what Apple's role
+allows.
 
 ## 4. The client: named operations, and nothing else
 
@@ -147,8 +171,10 @@ gains a row for `Connect` (App Store Connect: the key, tokens, the request table
   method, path template, the role it needs, and whether it writes. A request not in the table can't be built: the
   only way to make one is through an `Operation` value, and every `Operation` case maps to one table row. There is no
   "raw request" initialiser, public or internal.
-- **The table has no DELETE at all**, and no PATCH on `users`, `certificates`, `bundleIds`, `profiles`, `webhooks`,
-  `betaTesters` or `betaGroups` membership removal. `PATCH /v1/builds/{id}` exists for `usesNonExemptEncryption`
+- **The table has no DELETE at all**, no PATCH on `users`, `certificates`, `bundleIds`, `profiles`, `webhooks`,
+  `betaTesters` or `betaGroups` membership removal, and (revised 2026-10-27) no POST on `certificates`,
+  `bundleIds`, `profiles`, `userInvitations`, `webhooks`, `inAppPurchases`, `subscriptions`, `appPriceSchedules`
+  or `appAvailabilities`. `PATCH /v1/builds/{id}` exists for `usesNonExemptEncryption`
   only; the body encoder for it has no `expired` field. `PATCH /v1/reviewSubmissions/{id}` exists for `submitted`
   only; its encoder has no `canceled` field. A unit test walks the table and asserts each of these, so a later PR
   can't add one without changing the test, and the sheet's "chauffeur will never" line is generated from the same
@@ -188,14 +214,27 @@ gains a row for `Connect` (App Store Connect: the key, tokens, the request table
   message says so.
 - A `KeyStore` protocol fronts the keychain and a `Presence` protocol fronts LocalAuthentication, so unit tests use
   an in-memory store and a scripted presence; one live test writes and deletes a real item under a test account.
+- **The binary that reads the key is hardened (added 2026-10-27).** Step 0's follow-up showed the release
+  `chauffeur` is linker-signed ad hoc without the hardened runtime, so a library injected with
+  `DYLD_INSERT_LIBRARIES` runs inside it under its keychain identity and skips the presence check; the debug build
+  carries `get-task-allow`, so a debugger can attach. Release artifacts are therefore signed with
+  `codesign -o runtime` (ad hoc is enough: `scripts/sign.sh`, run by `build-mcpb.sh`, CI's release job and the
+  Homebrew formula), and every command that reads or writes a key first checks its own code signature: hardened
+  runtime present and no `get-task-allow`. A build that fails the check refuses with
+  `this build can't hold an App Store Connect key: it isn't hardened. Build and sign a release: swift build -c
+  release && scripts/sign.sh`. Developers run key commands from the signed release build; the live keychain test
+  calls `KeychainStore` directly and is unaffected.
 
 ## 6. Tokens
 
 - ES256 with CryptoKit (`P256.Signing.PrivateKey(pemRepresentation:)`); header `kid`, `typ: JWT`; claims `iss`,
   `iat`, `exp`, `aud: appstoreconnect-v1`, and `scope` for GET-only tokens.
-- **Lifetimes.** A one-off call: two minutes. A session (the upload in M5b, or a wait that polls): twenty minutes,
-  re-minted when it expires, never longer. Polling tokens carry a `scope` of the GET paths they poll and nothing
-  else, so a token that leaks into a log can read one build's state and do nothing else.
+- **Lifetimes.** A one-off call: two minutes. Polling tokens carry a `scope` of the GET paths they poll and nothing
+  else, so a token that leaks into a log can read one build's state and do nothing else. **Writes (M5b) get their
+  own two-minute token each, minted in the process that sends them:** `scope` is documented for GET only
+  (Findings 4), so a write token is a bearer credential for every write the role allows, and must not outlive the
+  request. The twenty-minute `TokenSession` stays in the code for the one case that may need it, the upload's chunk
+  PUTs, and M5b verifies first whether those pre-signed URLs need a JWT at all.
 - Tokens are minted per command in the CLI process. The daemon never sees a token, a key, or the keychain.
 
 ## 7. What the agent and the logs see
@@ -230,17 +269,40 @@ once per macOS version and noted in Findings.
 
 ## Done when
 
-- Step 0's findings are in this spec and the design matches them.
+- Step 0's findings are in this spec and the design matches them (Decision, 2026-10-27).
+- The finance alarm refuses the owner's Admin key and accepts the App Manager key, live, with recorded fixtures.
+- The release binary is signed with the hardened runtime and a debug build refuses to hold a key.
 - Unit tests pass in CI; the live tests pass locally.
 - `docs/design.md` carries the new network line and a note on where keys live.
 - `chauffeur doctor` reports the key; the skill gains one sentence: an agent never adds or removes keys.
 - No release command exists yet (M5b), so the table has reads only, and the "never" test already guards it.
 
+## Decision (2026-10-27)
+
+After Step 0 and a research pass (notes and report under `.superpowers/research/`, summarised in Findings 2 and 4):
+
+1. The `/v1/users` and `/v1/certificates` probes and the "refuse a key that reaches Certificates, Identifiers &
+   Profiles" rule are dropped: they cannot distinguish roles, and every key that can ship reads CIP.
+2. The finance alarm (§3) replaces them as the only detection, one-way and best-effort; the declared role and the
+   first-write check stay.
+3. The request table remains the structural guard and its deny list grows to the writes an App Manager key could
+   make that a release tool never needs (§4).
+4. The release binary is hardened and key commands refuse to run from a build that isn't (§5).
+5. The "confirmation prompt is theatre" line is reversed. M5b's spec gains plan/apply with one Touch ID approval
+   per plan whose reason text is rendered from the exact requests, a separate approval for release and
+   phased-release completion that `--no-presence` cannot bypass, and per-write two-minute tokens.
+6. An opt-in later tier, an individual key for an App Manager user limited to chosen apps (Apple blocks individual
+   keys from the certificate and profile endpoints), waits on one test: that such a user can still upload a build.
+
+What stays unverifiable, and the sheet says so: the key's role beyond "finance-capable or not"; whether an App
+Manager key can revoke a certificate (a throwaway development certificate test could answer it, with the owner's
+approval); whether anyone else uses the key; whether the human read the prompt.
+
 ## Staging
 
 | Gap | Closed by | Stage |
 |---|---|---|
-| a key that could lock the team out | probes, refusal, the request table | M5a |
+| a key that could lock the team out | the request table; the finance alarm for Admin keys; the hardened binary | M5a |
 | the `.p8` on disk or in the environment | keychain with user presence | M5a |
 | a tool that can expire, cancel or delete | no such operation exists | M5a |
 | individual keys | `sub: "user"` tokens, same probes | stage 2 |

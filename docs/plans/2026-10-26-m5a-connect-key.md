@@ -1295,3 +1295,112 @@ git commit -m "Connect: recorded probe fixtures and the scoped-token check; find
   first), titled "M5a: the App Store Connect key, and what it can never do", body: the spec link, the Findings
   summary, the live run's transcript with ids, and the note that no release command exists yet so the table is
   reads only.
+
+---
+
+## Addendum (2026-10-27): the spec's Decision
+
+Step 0 and the research pass (spec Findings 2 and 4, Decision) changed §3 and added a binary-hardening requirement.
+Tasks 1–12 are complete on the branch; these two tasks bring the code to the revised spec. Task 13's live run then
+uses the owner's App Manager key.
+
+### Task 15: The finance alarm replaces the users and certificates probes
+
+Spec §3 (revised), §4 deny list (revised).
+
+**Files:**
+- Modify: `Sources/ChauffeurCore/Connect/Operation.swift`, `RequestTable.swift`, `ConnectTransport.swift`,
+  `Probe.swift`, `CapabilitySheet.swift`, `ConnectKeys.swift`
+- Modify: `Tests/ChauffeurCoreTests/RequestTableTests.swift`, `ConnectClientTests.swift`, `ProbeTests.swift`,
+  `ConnectKeysTests.swift`, `CLITests.swift` (if it names the removed kinds), `ConnectSupport.swift`,
+  `Live/ConnectLiveTests.swift`
+- Fixtures: delete `users-200.json`, `users-403.json`, `certificates-200.json`, `certificates-403.json`; add
+  `finance-400.json` (Admin key), `finance-403.json` (App Manager key), `finance-403-agreements.json` (hand-written,
+  `code: FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED`, `source: documented`); re-record `apps-200.json` and
+  `unauthorized-401.json` from the real keys. Recorded files carry `"source": "recorded 2026-10-27"`.
+
+**Interfaces:**
+- `Operation`: remove `probeUsers` and `probeCertificates` (and their `Kind`s, rows, and every test that names them);
+  add `probeFinance(month: String)` → row `GET /v1/financeReports`, resource `financeReports`, query
+  `filter[regionCode]=US`, `filter[reportDate]=<month>`, `filter[reportType]=FINANCIAL`, `filter[vendorNumber]=0`
+  (sorted by name as the others), `accept: "application/a-gzip"`.
+- `RequestRow` gains `public let accept: String` (default `"application/json"` in the memberwise init);
+  `ConnectRequest` gains `accept` and `headers["Accept"]` uses it; `ConnectClient.request(for:)` passes the row's.
+- `RequestTable.forbiddenPost: Set<String> = ["certificates", "bundleIds", "profiles", "userInvitations", "webhooks", "inAppPurchases", "subscriptions", "appPriceSchedules", "appAvailabilities"]`
+  and a test `noPostOnTheForbiddenResources` like the PATCH one.
+- `RequestTable.denied`, in this order, texts exact: `"expire a build"`, `"cancel a submission"`,
+  `"remove a tester"`, `"delete or revoke a certificate, identifier or profile"` (any non-GET on `certificates`,
+  `bundleIds` or `profiles`), `"invite or remove a user"` (any non-GET on `users` or `userInvitations`),
+  `"change pricing or availability"` (non-GET on a resource starting with `appPrice` or `appAvailabilit`),
+  `"touch in-app purchases"` (non-GET on `inAppPurchases`, `subscriptions` or a resource starting with
+  `subscription`/`inAppPurchase`), `"manage webhooks"` (non-GET on `webhooks`). `theNeverLineIsTheWholeDenyList`
+  and `everyDenyEntryCatchesItsViolation` cover all eight.
+- `public enum RoleCheck: Equatable, Sendable { case notFinanceCapable; case unavailable(status: Int, code: String?) }`
+  (in `Probe.swift`).
+- `ProbeVerdict`: `unauthorized`, `rateLimited(remaining: Int)`, `refusedFinance`, `accepted(apps: [String], roleCheck: RoleCheck)`.
+  `refusedAdmin` and `refusedCertificates` are removed.
+- `Probe.decide(apps: Int, finance: (status: Int, code: String?)?) -> ProbeVerdict?`: `apps` 401 → `unauthorized`;
+  429 → `rateLimited(remaining: 0)`; 200 with `finance == nil` → nil (caller must probe finance); 200 and finance
+  `(400, "PARAMETER_ERROR.INVALID")` → `refusedFinance`; `(403, "FORBIDDEN_ERROR")` → `accepted(apps: [],
+  roleCheck: .notFinanceCapable)` (the caller fills `apps`); any other finance pair → `accepted(apps: [],
+  roleCheck: .unavailable(status:, code:))`; any other `apps` status → nil (caller throws `client.error(for:op:)`).
+- `Probe.run(_ client:, now: Date)`: `perform(.probeApps)`; map 401/429 as before; on 200 parse apps, then
+  `ensure(requests: 1)`, `perform(.probeFinance(month: Probe.lastMonth(now)))` (never `send`: every status is a
+  verdict here; a transport error becomes `.unavailable(status: 0, code: "transport")`), then `decide`.
+  `Probe.lastMonth(_ now: Date) -> String` is `yyyy-MM` of the previous month in UTC.
+- `Probe.message(.refusedFinance)` is the spec's text verbatim: `refused: finance-capable key. This key can read the
+  team's finance reports, which only Admin, Account Holder and Finance keys can. An Admin key can remove every other
+  Admin, revoke certificates and delete identifiers; chauffeur never holds one. In App Store Connect, generate a key
+  with the App Manager role.`
+- `CapabilitySheet.render(keyID:role:issuer:apps:roleCheck:)` produces the six lines of spec §3 (role line reads
+  `App Manager (declared)`; the `role check:` line has the two forms; the `cannot (Apple's role chart):` line; the
+  `unverified for this role:` line; the `chauffeur will never:` line from `RequestTable.never()`). Developer keeps
+  its own `can:`/`cannot` lines as the spec says.
+- `ConnectKeys.add`/`check`: verdict handling follows the new enum; the `stored key …` line is unchanged; `data`
+  gains `"roleCheck": "not-finance-capable" | "unavailable"`.
+- Fixture recording: a test-only `RecordingTransport` in `ConnectSupport.swift` wrapping `URLSessionTransport`, used
+  by `ConnectLiveTests.recordProbes`, enabled by `CHAUFFEUR_RECORD_PROBES=<label>` with `CHAUFFEUR_LIVE_P8`,
+  `CHAUFFEUR_LIVE_ISSUER`, `CHAUFFEUR_LIVE_KEY_ID`; it runs `Probe.run` and writes each response as
+  `Fixtures/connect/<label>-<resource>-<status>.json` (headers trimmed to `X-Rate-Limit` and `Content-Type`; a
+  gzip body is stored as an empty object). The implementer runs it for the Admin key, the App Manager key and the
+  revoked key (Findings 2 names them; the owner authorised their use for testing on 2026-10-27), then renames the
+  files to the names the unit tests use.
+
+Steps: failing tests first (`RequestTableTests`, `ProbeTests`, `ConnectKeysTests`), implement, record fixtures,
+`scripts/check.sh`, commit `Connect: the finance alarm replaces the role probes; the deny list grows`.
+
+### Task 16: Only a hardened build may hold a key
+
+Spec §5 (hardened binary).
+
+**Files:**
+- Create: `scripts/sign.sh`, `Sources/ChauffeurCore/Connect/BuildIdentity.swift`, `Tests/ChauffeurCoreTests/BuildIdentityTests.swift`
+- Modify: `Sources/ChauffeurCore/Connect/ConnectKeys.swift`, `Sources/ChauffeurCore/Connect/ConnectError.swift`,
+  `scripts/check.sh`, `scripts/build-mcpb.sh`, `CONTRIBUTING.md`, `README.md`, `Tests/ChauffeurCoreTests/ConnectSupport.swift`,
+  `ConnectKeysTests.swift`, `CLITests.swift`
+
+**Interfaces:**
+- `public protocol BuildIdentity: Sendable { var hardenedRuntime: Bool { get }; var debuggable: Bool { get } }`.
+- `public struct LiveBuildIdentity: BuildIdentity`: `SecCodeCopySelf` → `SecCodeCopySigningInformation(_, [.signingInformation], _)`;
+  `hardenedRuntime` = `kSecCodeInfoFlags` contains `kSecCodeSignatureRuntime` (0x10000); `debuggable` =
+  `kSecCodeInfoEntitlementsDict["com.apple.security.get-task-allow"] == true`. Any failure reads as
+  `hardenedRuntime == false`.
+- `ConnectError.unhardenedBuild` with description `this build can't hold an App Store Connect key: it isn't
+  hardened. Build and sign a release: swift build -c release && scripts/sign.sh`.
+- `ConnectKeys.Environment` gains `identity: BuildIdentity` (`live()` → `LiveBuildIdentity()`); `add` and `check`
+  throw `unhardenedBuild` before touching the store or the network when `!identity.hardenedRuntime || identity.debuggable`.
+  `list`, `remove` and `use` don't read key data and are not gated. Test fake `FixedBuildIdentity(hardened:debuggable:)`;
+  the CLITests helper uses `hardened: true, debuggable: false`.
+- `scripts/sign.sh [path]`: `codesign --force --sign - --options runtime "$path"` (default `.build/release/chauffeur`),
+  then verifies with `codesign -d -vv` that the flags include `runtime` and the entitlements have no
+  `get-task-allow`; non-zero exit otherwise. `scripts/check.sh` runs it after the release build step.
+  `scripts/build-mcpb.sh` replaces its plain `codesign --force --sign -` with `scripts/sign.sh`. CONTRIBUTING's
+  Releasing section gains the step and the Homebrew formula note (`codesign --force --sign - --options runtime` in
+  its install block). README's key subsection says key commands run from the signed release build.
+- Verification (implementer, live): after `scripts/sign.sh`, `DYLD_INSERT_LIBRARIES=<a tiny dylib> .build/release/chauffeur --version`
+  does not run the dylib's constructor (compare with the unsigned build); `.build/debug/chauffeur keys list` works
+  but `keys check` reports `unhardenedBuild`; the signed release build's `keys check` reaches the presence prompt
+  (stop there: the owner watches that step in Task 13).
+
+Steps: failing tests first (`BuildIdentityTests` with the fake; `ConnectKeysTests.unhardenedBuildsRefuseKeyCommands`),
+implement, `scripts/check.sh`, commit `Connect: only a hardened build may hold a key; scripts/sign.sh`.
