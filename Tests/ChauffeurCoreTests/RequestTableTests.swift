@@ -15,6 +15,16 @@ import Testing
             #expect(!RequestTable.forbiddenPatch.contains(row.resource), "\(kind)")
         }
     }
+    @Test func noPostOnTheForbiddenResources() {
+        #expect(
+            RequestTable.forbiddenPost == [
+                "certificates", "bundleIds", "profiles", "userInvitations", "webhooks", "inAppPurchases",
+                "subscriptions", "appPriceSchedules", "appAvailabilities",
+            ])
+        for (kind, row) in RequestTable.rows where row.method == .post {
+            #expect(!RequestTable.forbiddenPost.contains(row.resource), "\(kind)")
+        }
+    }
     @Test func buildsAndSubmissionsCannotExpireOrCancel() {
         for row in RequestTable.rows.values where row.resource == "builds" { #expect(!row.fields.contains("expired")) }
         for row in RequestTable.rows.values where row.resource == "reviewSubmissions" {
@@ -27,7 +37,9 @@ import Testing
     @Test func theNeverLineIsTheWholeDenyList() {
         #expect(
             RequestTable.never() == [
-                "expire a build", "cancel a submission", "remove a tester", "delete a webhook", "change pricing",
+                "expire a build", "cancel a submission", "remove a tester",
+                "delete or revoke a certificate, identifier or profile", "invite or remove a user",
+                "change pricing or availability", "touch in-app purchases", "manage webhooks",
             ])
         #expect(RequestTable.never(in: RequestTable.rows) == RequestTable.denied.map(\.text))
     }
@@ -40,9 +52,25 @@ import Testing
             (row(.patch, "builds", ["expired"]), row(.get, "builds")),
             (row(.patch, "reviewSubmissions", ["canceled"]), row(.get, "reviewSubmissions")),
             (row(.post, "betaTesters"), row(.get, "betaTesters")),
-            (row(.patch, "webhooks"), row(.get, "webhooks")),
-            (row(.patch, "appPrices"), row(.get, "appPrices")),
+            (row(.post, "certificates"), row(.get, "certificates")),
+            (row(.patch, "userInvitations"), row(.get, "userInvitations")),
+            (row(.post, "appAvailabilities"), row(.get, "appAvailabilities")),
+            (row(.post, "subscriptionGroups"), row(.get, "subscriptionGroups")),
+            (row(.post, "webhooks"), row(.get, "webhooks")),
         ]
+        // Every resource each entry names is caught, and a GET on it never is.
+        let named: [(entry: Int, resources: [String])] = [
+            (3, ["certificates", "bundleIds", "profiles"]), (4, ["users", "userInvitations"]),
+            (5, ["appPriceSchedules", "appPrices", "appAvailabilities", "appAvailabilityV2"]),
+            (6, ["inAppPurchases", "inAppPurchasesV2", "subscriptions", "subscriptionGroups"]), (7, ["webhooks"]),
+        ]
+        for (index, resources) in named {
+            for resource in resources {
+                #expect(RequestTable.denied[index].violates(row(.post, resource)), "\(resource)")
+                #expect(RequestTable.denied[index].violates(row(.put, resource)), "\(resource)")
+                #expect(!RequestTable.denied[index].violates(row(.get, resource)), "\(resource)")
+            }
+        }
         #expect(cases.count == RequestTable.denied.count)
         let all = RequestTable.denied.map(\.text)
         for (entry, pair) in zip(RequestTable.denied, cases) {
@@ -54,7 +82,13 @@ import Testing
         }
     }
     @Test func pathsAndQueries() {
-        #expect(RequestTable.pathAndQuery(for: .probeUsers) == "/v1/users?limit=1")
+        #expect(
+            RequestTable.pathAndQuery(for: .probeFinance(month: "2026-09"))
+                == "/v1/financeReports?filter[regionCode]=US&filter[reportDate]=2026-09&filter[reportType]=FINANCIAL"
+                + "&filter[vendorNumber]=0")
+        #expect(RequestTable.rows[.probeFinance]?.accept == "application/a-gzip")
+        #expect(RequestTable.rows[.probeFinance]?.resource == "financeReports")
+        #expect(RequestTable.rows[.probeApps]?.accept == "application/json")
         #expect(RequestTable.pathAndQuery(for: .build(id: "b1")) == "/v1/builds/b1")
         #expect(
             RequestTable.pathAndQuery(for: .apps(bundleID: "dev.chauffeur.fixture"))

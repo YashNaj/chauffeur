@@ -36,7 +36,8 @@ public final class ConnectClient {
         let token = try ConnectToken.mint(
             key, lifetime: .call, scope: ["\(row.method.rawValue) \(pathAndQuery)"], now: now)
         return ConnectRequest(
-            method: row.method, pathAndQuery: pathAndQuery, shape: Self.shape(row), token: token, body: nil)
+            method: row.method, pathAndQuery: pathAndQuery, shape: Self.shape(row), token: token, body: nil,
+            accept: row.accept)
     }
 
     /// Sends `op` and returns whatever came back. Throws only `ConnectError.transport`.

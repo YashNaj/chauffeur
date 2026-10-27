@@ -17,10 +17,16 @@ public struct ConnectRequest: Sendable, CustomStringConvertible, CustomDebugStri
     /// Method and path with ids replaced by placeholders, e.g. `GET /v1/builds/{id}`. Safe to log.
     public let shape: String
     public let body: Data?
+    /// The `Accept` header, from the request's table row.
+    public let accept: String
     let token: String
 
-    init(method: Method, pathAndQuery: String, shape: String, token: String, body: Data?) {
+    init(
+        method: Method, pathAndQuery: String, shape: String, token: String, body: Data?,
+        accept: String = "application/json"
+    ) {
         self.method = method
+        self.accept = accept
         // Scheme and host are set on the components, never concatenated, so the path cannot move the request.
         var components = URLComponents()
         components.scheme = "https"
@@ -44,7 +50,7 @@ public struct ConnectRequest: Sendable, CustomStringConvertible, CustomDebugStri
 
     /// What the transport sends. Never logged: it carries the token.
     public var headers: [String: String] {
-        var h = ["Authorization": "Bearer \(token)", "Accept": "application/json"]
+        var h = ["Authorization": "Bearer \(token)", "Accept": accept]
         if body != nil { h["Content-Type"] = "application/json" }
         return h
     }

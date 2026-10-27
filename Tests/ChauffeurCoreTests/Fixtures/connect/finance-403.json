@@ -1,0 +1,19 @@
+{
+  "body" : {
+    "errors" : [
+      {
+        "code" : "FORBIDDEN_ERROR",
+        "detail" : "The API key in use does not allow this request",
+        "id" : "5787c856-5002-4459-afa2-5da78baa0daf",
+        "status" : "403",
+        "title" : "This request is forbidden for security reasons"
+      }
+    ]
+  },
+  "headers" : {
+    "Content-Type" : "application/json",
+    "X-Rate-Limit" : "user-hour-lim:3600;user-hour-rem:3569;"
+  },
+  "source" : "recorded 2026-10-27",
+  "status" : 403
+}

@@ -7,13 +7,12 @@ import Testing
     let cwd = FileManager.default.temporaryDirectory
 
     func env(
-        users: String = "users-403", certificates: String = "certificates-403", apps: String = "apps-200",
+        apps: String = "apps-200", finance: String = "finance-403",
         store: MemoryKeyStore = MemoryKeyStore(), presence: Bool = true, file: String? = nil
     ) throws -> (ConnectKeys.Environment, MemoryKeyStore, ScriptedTransport) {
         let t = ScriptedTransport([
-            "GET /v1/users": try Fixtures.connect(users),
-            "GET /v1/certificates": try Fixtures.connect(certificates),
             "GET /v1/apps": try Fixtures.connect(apps),
+            "GET /v1/financeReports": try Fixtures.connect(finance),
         ])
         let e = ConnectKeys.Environment(
             store: store, presence: ScriptedPresence(allow: presence), transport: t,
@@ -39,7 +38,9 @@ import Testing
         #expect(
             out.exit == 0
                 && out.text.hasPrefix(
-                    "key 7X2K9ABC1D · App Manager · issuer 69a6de70… · apps: Fixture (dev.chauffeur.fixture), ")
+                    "key 7X2K9ABC1D · App Manager (declared) · issuer 69a6de70… · apps: Notes \\\"quoted\\\" (dev.x.notes), "
+                        + "chauffeur-fixture (dev.chauffeur.fixture)\nrole check: not an Admin or Finance key (finance alarm)"
+                )
         )
         #expect(
             out.text.contains(
@@ -49,27 +50,30 @@ import Testing
             try store.list() == [
                 StoredKey(
                     keyID: "7X2K9ABC1D", issuer: TestKeys.issuer, role: .appManager,
-                    apps: ["Fixture (dev.chauffeur.fixture)", #"Notes \"quoted\" (dev.x.notes)"#],
+                    apps: [#"Notes \"quoted\" (dev.x.notes)"#, "chauffeur-fixture (dev.chauffeur.fixture)"],
                     added: "2027-01-15T08:00:00Z", presence: true)
             ])
-        #expect(t.requests.map(\.shape) == ["GET /v1/users", "GET /v1/certificates", "GET /v1/apps"])
+        #expect(t.requests.map(\.shape) == ["GET /v1/apps", "GET /v1/financeReports"])
         #expect(!out.text.contains("PRIVATE KEY") && out.data?["keyID"] == "7X2K9ABC1D")
+        #expect(out.data?["roleCheck"] == "not-finance-capable")
     }
 
-    @Test func addRefusesAnAdminKeyAndStoresNothing() throws {
-        let (e, store, t) = try env(users: "users-200")
+    @Test func addRefusesAFinanceCapableKeyAndStoresNothing() throws {
+        let (e, store, t) = try env(finance: "finance-400")
         let out = try add(e, cwd)
-        #expect(out.exit == 1 && out.text.hasPrefix("refused: Admin key. This key can remove every other Admin"))
-        #expect(try store.list().isEmpty && t.requests.count == 1)
+        #expect(out.exit == 1 && out.text == Probe.message(.refusedFinance))
+        #expect(try store.list().isEmpty && t.requests.count == 2)
     }
 
-    @Test func addRefusesACertificatesKey() throws {
-        let (e, store, _) = try env(certificates: "certificates-200")
+    @Test func addStoresTheDeclaredRoleWhenTheAlarmProvesNothing() throws {
+        let (e, store, _) = try env(finance: "finance-403-agreements")
         let out = try add(e, cwd)
         #expect(
-            out.exit == 1
-                && out.text.hasPrefix("refused: this key reaches Certificates, Identifiers & Profiles"))
-        #expect(try store.list().isEmpty)
+            out.exit == 0
+                && out.text.contains(
+                    "\nrole check: unavailable (403 FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED) · taking App Manager as declared\n"
+                ))
+        #expect(try out.data?["roleCheck"] == "unavailable" && store.list().count == 1)
     }
 
     @Test func addRefusesABadFileBeforeAnyRequest() throws {
@@ -82,20 +86,20 @@ import Testing
         let (e, _, t) = try env()
         _ = try add(e, cwd)
         #expect(throws: ConnectError.duplicateKey("7X2K9ABC1D")) { try add(e, cwd) }
-        #expect(t.requests.count == 3)
+        #expect(t.requests.count == 2)
     }
 
     @Test func addStoresNothingWhenTheProbeCannotRun() throws {
-        let (e, store, _) = try env(users: "server-500")
+        let (e, store, _) = try env(apps: "server-500")
         #expect(throws: ConnectError.self) { try add(e, cwd) }
         #expect(try store.list().isEmpty)
-        let (e2, store2, _) = try env(users: "unauthorized-401")
+        let (e2, store2, _) = try env(apps: "unauthorized-401")
         let out = try add(e2, cwd)
         #expect(try out.exit == 1 && out.text == ConnectError.unauthorized.description && store2.list().isEmpty)
     }
 
     @Test func addStoresNothingWhenRateLimited() throws {
-        let (e, store, _) = try env(users: "rate-limited-429")
+        let (e, store, _) = try env(apps: "rate-limited-429")
         let out = try add(e, cwd)
         #expect(
             try out.exit == 1 && out.text.hasPrefix("rate limited by App Store Connect") && store.list().isEmpty)
@@ -121,13 +125,27 @@ import Testing
         let out = try ConnectKeys.check(keyID: nil, cwd: root, env: e2)
         #expect(
             out.exit == 0 && out.text.hasSuffix("\nkey 7X2K9ABC1D: ok (2 apps)") && presence.asked.count == 1
-                && t.requests.count == 6)
+                && t.requests.count == 4)
+        #expect(out.data?["roleCheck"] == "not-finance-capable")
+    }
+
+    @Test func checkReportsAFinanceCapableKeyItStillHolds() throws {
+        let (e, store, _) = try env()
+        _ = try add(e, cwd)
+        let (e2, _, _) = try env(finance: "finance-400", store: store)
+        let root = try tempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let out = try ConnectKeys.check(keyID: "7X2K9ABC1D", cwd: root, env: e2)
+        #expect(
+            out.exit == 1
+                && out.text == Probe.message(.refusedFinance) + "\nit is still stored: chauffeur keys remove 7X2K9ABC1D"
+        )
     }
 
     @Test func checkReportsARevokedKey() throws {
         let (e, store, _) = try env()
         _ = try add(e, cwd)
-        let (e2, _, _) = try env(users: "unauthorized-401", store: store)
+        let (e2, _, _) = try env(apps: "unauthorized-401", store: store)
         let root = try tempDir()
         defer { try? FileManager.default.removeItem(at: root) }
         let out = try ConnectKeys.check(keyID: "7X2K9ABC1D", cwd: root, env: e2)

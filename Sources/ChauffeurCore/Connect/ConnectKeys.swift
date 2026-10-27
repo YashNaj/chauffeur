@@ -92,8 +92,9 @@ public enum ConnectKeys {
         if try env.store.list().contains(where: { $0.keyID == keyID }) {
             throw ConnectError.duplicateKey(keyID)
         }
-        let verdict = try Probe.run(ConnectClient(key: key, role: role, transport: env.transport, now: env.now))
-        guard case .accepted(let apps) = verdict else {
+        let client = ConnectClient(key: key, role: role, transport: env.transport, now: env.now)
+        let verdict = try Probe.run(client, now: env.now())
+        guard case .accepted(let apps, let roleCheck) = verdict else {
             return Output(Probe.message(verdict), exit: 1)
         }
         let stored = StoredKey(
@@ -104,13 +105,14 @@ public enum ConnectKeys {
             ? "in your login keychain, Touch ID to use"
             : "in your login keychain (no presence: any process running as you can read it)"
         let text = [
-            CapabilitySheet.render(keyID: keyID, role: role, issuer: issuer, apps: apps),
+            CapabilitySheet.render(keyID: keyID, role: role, issuer: issuer, apps: apps, roleCheck: roleCheck),
             "stored key \(keyID) (\(role.title), \(apps.count) apps) \(place)",
             "hint: \(file) is still on disk; keep a copy somewhere safe, then delete it",
             #"note: a rebuilt chauffeur asks the keychain once ("Always Allow" remembers that build)"#,
         ].joined(separator: "\n")
         let data: JSON = .object([
             "keyID": .string(keyID), "role": .string(role.rawValue), "apps": JSON(apps), "presence": .bool(presence),
+            "roleCheck": .string(name(roleCheck)),
         ])
         return Output(text, data: data)
     }
@@ -121,13 +123,17 @@ public enum ConnectKeys {
         let chosen = try resolve(flag: keyID, config: Target.connectKey(from: cwd), stored: env.store.list())
         let (key, stored) = try KeyLoader.load(keyID: chosen.keyID, store: env.store, presence: env.presence)
         let client = ConnectClient(key: key, role: stored.role, transport: env.transport, now: env.now)
-        let verdict = try Probe.run(client)
+        let verdict = try Probe.run(client, now: env.now())
         switch verdict {
-        case .accepted(let apps):
+        case .accepted(let apps, let roleCheck):
             let sheet = CapabilitySheet.render(
-                keyID: stored.keyID, role: stored.role, issuer: stored.issuer, apps: apps)
-            return Output(sheet + "\nkey \(stored.keyID): ok (\(apps.count) apps)")
-        case .refusedAdmin, .refusedCertificates:
+                keyID: stored.keyID, role: stored.role, issuer: stored.issuer, apps: apps, roleCheck: roleCheck)
+            let data: JSON = .object([
+                "keyID": .string(stored.keyID), "role": .string(stored.role.rawValue), "apps": JSON(apps),
+                "roleCheck": .string(name(roleCheck)),
+            ])
+            return Output(sheet + "\nkey \(stored.keyID): ok (\(apps.count) apps)", data: data)
+        case .refusedFinance:
             return Output(
                 Probe.message(verdict) + "\nit is still stored: chauffeur keys remove \(stored.keyID)", exit: 1)
         case .unauthorized, .rateLimited:
@@ -187,6 +193,14 @@ public enum ConnectKeys {
         }
         guard stored.count == 1, let only = stored.first else { throw ConnectError.noKey(known: ids) }
         return only
+    }
+
+    /// The `roleCheck` value in `--json` output. Apple's code stays out of it: it is untrusted text.
+    private static func name(_ roleCheck: RoleCheck) -> String {
+        switch roleCheck {
+        case .notFinanceCapable: return "not-finance-capable"
+        case .unavailable: return "unavailable"
+        }
     }
 
     private static func timestamp(_ date: Date) -> String {

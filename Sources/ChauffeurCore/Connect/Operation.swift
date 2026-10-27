@@ -10,9 +10,9 @@ public enum Method: String, Sendable, CaseIterable {
 
 /// Every request the client can send. Each case maps to one row of `RequestTable.rows`.
 public enum Operation: Equatable, Sendable {
-    case probeUsers
-    case probeCertificates
     case probeApps
+    /// The finance alarm: a report for `month` (`yyyy-MM`) under a vendor number that can't exist.
+    case probeFinance(month: String)
     case apps(bundleID: String?)
     case builds(appID: String, version: String?, buildNumber: String?)
     case build(id: String)
@@ -29,16 +29,15 @@ public enum Operation: Equatable, Sendable {
 
     /// One case per `Operation` case, same names, so `Kind.allCases` enumerates the table.
     public enum Kind: String, CaseIterable, Sendable {
-        case probeUsers, probeCertificates, probeApps, apps, builds, build, buildBetaDetail
+        case probeApps, probeFinance, apps, builds, build, buildBetaDetail
         case betaGroups, preReleaseVersions, appStoreVersions, appStoreVersion
         case appStoreVersionLocalizations, reviewSubmissions, reviewSubmission, buildUpload, buildUploadFiles
     }
 
     public var kind: Kind {
         switch self {
-        case .probeUsers: .probeUsers
-        case .probeCertificates: .probeCertificates
         case .probeApps: .probeApps
+        case .probeFinance: .probeFinance
         case .apps: .apps
         case .builds: .builds
         case .build: .build
@@ -58,7 +57,7 @@ public enum Operation: Equatable, Sendable {
     /// Values for the `{id}` placeholder in the row's path template.
     public var pathParameters: [String: String] {
         switch self {
-        case .probeUsers, .probeCertificates, .probeApps, .apps, .builds, .betaGroups, .preReleaseVersions,
+        case .probeApps, .probeFinance, .apps, .builds, .betaGroups, .preReleaseVersions,
             .reviewSubmissions:
             return [:]
         case .build(let id), .appStoreVersion(let id), .reviewSubmission(let id), .buildUpload(let id):
@@ -74,8 +73,11 @@ public enum Operation: Equatable, Sendable {
     public var query: [(name: String, value: String)] {
         var pairs: [(name: String, value: String)]
         switch self {
-        case .probeUsers, .probeCertificates:
-            pairs = [("limit", "1")]
+        case .probeFinance(let month):
+            pairs = [
+                ("filter[regionCode]", "US"), ("filter[reportDate]", month), ("filter[reportType]", "FINANCIAL"),
+                ("filter[vendorNumber]", "0"),
+            ]
         case .probeApps:
             pairs = [("limit", "200")]
         case .apps(let bundleID):

@@ -125,3 +125,48 @@ final class ScriptedPresence: Presence, @unchecked Sendable {
         guard allow else { throw ConnectError.presenceDenied("cancelled") }
     }
 }
+
+/// Wraps the real transport and writes each answer to `Fixtures/connect/<label>-<resource>-<status>.json`, with the
+/// headers cut to `X-Rate-Limit` and `Content-Type`. A body that isn't JSON (a gzip report) is stored as `{}`. Never
+/// writes the request: it carries the token.
+final class RecordingTransport: ConnectTransport, @unchecked Sendable {
+    private let inner: ConnectTransport
+    private let label: String
+    private let directory: URL
+    private let lock = NSLock()
+    private var paths: [URL] = []
+
+    init(label: String, directory: URL, inner: ConnectTransport = URLSessionTransport()) {
+        self.label = label
+        self.directory = directory
+        self.inner = inner
+    }
+
+    var written: [URL] {
+        lock.lock()
+        defer { lock.unlock() }
+        return paths
+    }
+
+    func perform(_ request: ConnectRequest) throws -> ConnectResponse {
+        let response = try inner.perform(request)
+        let resource = request.url.path.split(separator: "/").dropFirst().first.map(String.init) ?? "unknown"
+        var headers: [String: String] = [:]
+        for name in ["X-Rate-Limit", "Content-Type"] { headers[name] = response.header(name) }
+        let body = (try? JSONSerialization.jsonObject(with: response.body)) ?? [String: Any]()
+        let day = ISO8601DateFormatter.string(
+            from: Date(), timeZone: TimeZone(identifier: "UTC") ?? .current,
+            formatOptions: [.withFullDate])
+        let record: [String: Any] = [
+            "status": response.status, "headers": headers, "body": body, "source": "recorded \(day)",
+        ]
+        let data = try JSONSerialization.data(
+            withJSONObject: record, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+        let url = directory.appendingPathComponent("\(label)-\(resource)-\(response.status).json")
+        try (data + Data("\n".utf8)).write(to: url)
+        lock.lock()
+        paths.append(url)
+        lock.unlock()
+        return response
+    }
+}

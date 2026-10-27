@@ -10,27 +10,33 @@ public struct RequestRow: Sendable {
     public let role: ConnectRole
     /// Body attributes the encoder may emit. Empty for GET.
     public let fields: [String]
+    /// The `Accept` header the request carries.
+    public let accept: String
 
-    public init(method: Method, path: String, resource: String, role: ConnectRole, fields: [String]) {
+    public init(
+        method: Method, path: String, resource: String, role: ConnectRole, fields: [String],
+        accept: String = "application/json"
+    ) {
         self.method = method
         self.path = path
         self.resource = resource
         self.role = role
         self.fields = fields
+        self.accept = accept
     }
 }
 
 /// The static table of every request chauffeur can send, and the list of what it refuses to.
 public enum RequestTable {
-    private static func get(_ path: String) -> RequestRow {
+    private static func get(_ path: String, accept: String = "application/json") -> RequestRow {
         let resource = path.dropFirst("/v1/".count).split(separator: "/").first.map(String.init) ?? ""
-        return RequestRow(method: .get, path: path, resource: resource, role: .developer, fields: [])
+        return RequestRow(method: .get, path: path, resource: resource, role: .developer, fields: [], accept: accept)
     }
 
     public static let rows: [Operation.Kind: RequestRow] = [
-        .probeUsers: get("/v1/users"),
-        .probeCertificates: get("/v1/certificates"),
         .probeApps: get("/v1/apps"),
+        // Finance reports are served gzipped, so the alarm asks for what a real report request would.
+        .probeFinance: get("/v1/financeReports", accept: "application/a-gzip"),
         .apps: get("/v1/apps"),
         .builds: get("/v1/builds"),
         .build: get("/v1/builds/{id}"),
@@ -51,6 +57,12 @@ public enum RequestTable {
         "users", "certificates", "bundleIds", "profiles", "webhooks", "betaTesters",
     ]
 
+    /// Resources a POST may never target.
+    public static let forbiddenPost: Set<String> = [
+        "certificates", "bundleIds", "profiles", "userInvitations", "webhooks", "inAppPurchases", "subscriptions",
+        "appPriceSchedules", "appAvailabilities",
+    ]
+
     public struct Denied: Sendable {
         public let text: String
         public let violates: @Sendable (RequestRow) -> Bool
@@ -68,10 +80,19 @@ public enum RequestTable {
             (($0.resource == "betaTesters" || $0.resource == "betaTesterUsages") && $0.method != .get)
                 || $0.path.contains("/relationships/betaTesters")
         },
-        Denied(text: "delete a webhook") { $0.resource == "webhooks" && $0.method != .get },
-        Denied(text: "change pricing") {
-            ($0.resource.hasPrefix("appPrice") || $0.resource.hasPrefix("appPricePoints")) && $0.method != .get
+        Denied(text: "delete or revoke a certificate, identifier or profile") {
+            ["certificates", "bundleIds", "profiles"].contains($0.resource) && $0.method != .get
         },
+        Denied(text: "invite or remove a user") {
+            ["users", "userInvitations"].contains($0.resource) && $0.method != .get
+        },
+        Denied(text: "change pricing or availability") {
+            ($0.resource.hasPrefix("appPrice") || $0.resource.hasPrefix("appAvailabilit")) && $0.method != .get
+        },
+        Denied(text: "touch in-app purchases") {
+            ($0.resource.hasPrefix("inAppPurchase") || $0.resource.hasPrefix("subscription")) && $0.method != .get
+        },
+        Denied(text: "manage webhooks") { $0.resource == "webhooks" && $0.method != .get },
     ]
 
     /// The texts of every deny entry that no row violates.
