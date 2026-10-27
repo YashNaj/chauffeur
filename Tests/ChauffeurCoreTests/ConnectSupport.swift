@@ -52,51 +52,12 @@ extension Fixtures {
         struct Recorded: Decodable {
             var status: Int
             var headers: [String: String]?
-            var body: JSONValue
+            var body: JSON
         }
         let url = try #require(
             Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Fixtures/connect"))
         let recorded = try JSONDecoder().decode(Recorded.self, from: Data(contentsOf: url))
-        let body = try JSONEncoder().encode(recorded.body)
+        let body = Data(recorded.body.line().utf8)
         return ConnectResponse(status: recorded.status, headers: recorded.headers ?? [:], body: body)
-    }
-}
-
-/// Any JSON value, so a fixture's `body` can be re-encoded as bytes.
-enum JSONValue: Codable {
-    case null
-    case bool(Bool)
-    case number(Double)
-    case string(String)
-    case array([JSONValue])
-    case object([String: JSONValue])
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.singleValueContainer()
-        if c.decodeNil() {
-            self = .null
-        } else if let v = try? c.decode(Bool.self) {
-            self = .bool(v)
-        } else if let v = try? c.decode(Double.self) {
-            self = .number(v)
-        } else if let v = try? c.decode(String.self) {
-            self = .string(v)
-        } else if let v = try? c.decode([JSONValue].self) {
-            self = .array(v)
-        } else {
-            self = .object(try c.decode([String: JSONValue].self))
-        }
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var c = encoder.singleValueContainer()
-        switch self {
-        case .null: try c.encodeNil()
-        case .bool(let v): try c.encode(v)
-        case .number(let v): try c.encode(v)
-        case .string(let v): try c.encode(v)
-        case .array(let v): try c.encode(v)
-        case .object(let v): try c.encode(v)
-        }
     }
 }

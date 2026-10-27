@@ -2,7 +2,15 @@ import Foundation
 
 /// A call to App Store Connect. The host is fixed here: the only way to build one takes a path and query.
 public struct ConnectRequest: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
-    static let host = "https://api.appstoreconnect.apple.com"
+    static let host = "api.appstoreconnect.apple.com"
+    /// Built once from a literal that cannot fail to parse.
+    private static let base: URL = {
+        var c = URLComponents()
+        c.scheme = "https"
+        c.host = host
+        c.path = "/"
+        return c.url ?? URL(fileURLWithPath: "/")
+    }()
 
     public let method: Method
     public let url: URL
@@ -13,8 +21,18 @@ public struct ConnectRequest: Sendable, CustomStringConvertible, CustomDebugStri
 
     init(method: Method, pathAndQuery: String, shape: String, token: String, body: Data?) {
         self.method = method
-        // The host is a constant, so this only fails on a malformed path; fall back to the bare host.
-        self.url = URL(string: Self.host + pathAndQuery) ?? URL(fileURLWithPath: "/")
+        // Scheme and host are set on the components, never concatenated, so the path cannot move the request.
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = Self.host
+        let split = pathAndQuery.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+        let path = String(split.first ?? "")
+        components.path = path.hasPrefix("/") ? path : "/" + path
+        // URLComponents traps on the literal brackets of filter[...] keys, so the query is appended to the URL it
+        // built (Foundation writes them as %5B/%5D). The host is already fixed by then, and a query cannot move it.
+        let hostURL = components.url ?? Self.base
+        self.url =
+            split.count == 2 ? URL(string: hostURL.absoluteString + "?" + split[1]) ?? hostURL : hostURL
         self.shape = shape
         self.token = token
         self.body = body
