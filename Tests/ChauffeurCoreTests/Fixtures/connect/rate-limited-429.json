@@ -1,0 +1,16 @@
+{
+  "status": 429,
+  "headers": {"X-Rate-Limit": "user-hour-lim:3600;user-hour-rem:0"},
+  "body": {
+    "errors": [
+      {
+        "id": "2c4e6a8b-1d3f-4b5a-9c7e-3f4a5b6c7d8e",
+        "status": "429",
+        "code": "RATE_LIMIT_EXCEEDED",
+        "title": "The request rate limit has been reached.",
+        "detail": "We've received too many requests for this API. Please wait and try again or slow down your request rate."
+      }
+    ]
+  },
+  "source": "documented"
+}

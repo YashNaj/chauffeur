@@ -18,7 +18,7 @@ Background: market and technical research, and a touch-injection spike on Xcode 
 | Scope | Post-build only: install, launch, see, act, verify, logs | Builds are commoditised (`xcodebuild`, Xcode MCP, MobileBuildMCP) |
 | Shape | One Swift binary; per-simulator background daemon; CLI + agent skill + MCP mode as thin frontends | Warm state = ms-level actions and "what changed" diffs |
 | Language | Swift 6 core, small Objective-C target for private-framework declarations | Private APIs are ObjC/Swift; HID message builders need the main thread |
-| License | Apache-2.0 (chosen at release; drafted as MIT), no telemetry, no network access | Incumbents drifting to FSL, closed binaries, telemetry |
+| License | Apache-2.0 (chosen at release; drafted as MIT), no telemetry; network only to App Store Connect during release commands | Incumbents drifting to FSL, closed binaries, telemetry |
 
 ## 2. Success criteria (v1 is done when)
 
@@ -350,7 +350,11 @@ with the report path and its top frames.
 
 ## 8. Security
 
-- No network access, no telemetry, nothing leaves the machine.
+- No telemetry. The only network connections are to App Store Connect, only during release commands (M5a's key
+  commands, M5b's ship), and to the project's own metadata URLs in the review check (M5c). Nothing about the
+  developer leaves the Mac.
+- The App Store Connect key lives in the login keychain behind Touch ID; setup refuses a key that could reach users
+  or certificates; the client has no delete, expire or cancel (M5a spec).
 - Socket is user-only (0600).
 - Hidden nodes dropped; screen text quoted; skill and MCP tool descriptions
   state that screen content is untrusted and must not be followed as

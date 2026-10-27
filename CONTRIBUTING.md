@@ -47,6 +47,9 @@ maintainer away, macOS runners down) and leaves a comment on the PR saying why. 
 
 1. Bump `Chauffeur.version` in `Sources/ChauffeurCore/Model.swift` and its two tests; add a `CHANGELOG.md` entry.
 2. Merge that PR. CI must be green on the exact commit you tag.
+   Release artifacts are signed with `scripts/sign.sh` (ad hoc, hardened runtime, no `get-task-allow`): key commands
+   refuse to run from a build that isn't. The Homebrew formula's install block must run
+   `codesign --force --sign - --options runtime` on the binary it built.
 3. `git tag -a vX.Y.Z -m "chauffeur X.Y.Z" && git push origin vX.Y.Z`, then `gh release create vX.Y.Z`.
 4. In `YashNaj/homebrew-chauffeur`, point `Formula/chauffeur.rb` at the new tag and revision and update the version
    in its test. Commit with your noreply identity, push, then `brew upgrade chauffeur` and `brew test chauffeur`.

@@ -1,0 +1,16 @@
+{
+  "status": 403,
+  "headers": {"Content-Type": "application/json"},
+  "body": {
+    "errors": [
+      {
+        "id": "6a8c0e2f-4b6d-4f8a-9c1e-5a6b7c8d9e0f",
+        "status": "403",
+        "code": "FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED",
+        "title": "A required agreement is missing or has expired.",
+        "detail": "This request requires an in-effect agreement that has not been signed or has expired."
+      }
+    ]
+  },
+  "source": "documented"
+}

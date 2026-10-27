@@ -10,12 +10,18 @@ import Testing
         booted: [DeviceInfo], cwd: URL = FileManager.default.temporaryDirectory, recorder: Recorder = Recorder(),
         vars: [String: String] = [:]
     ) -> CLI.Environment {
-        CLI.Environment(
+        var e = CLI.Environment(
             env: vars, cwd: cwd, devices: { booted },
             send: { udid, args in
                 recorder.calls.append((udid, args))
                 return Output("from daemon")
             })
+        // A fake key store by default, so no unit test reads the login keychain.
+        e.connect = ConnectKeys.Environment(
+            store: MemoryKeyStore(), presence: ScriptedPresence(allow: true), transport: ScriptedTransport([:]),
+            readFile: { _ in "" }, now: Date.init,
+            identity: FixedBuildIdentity(hardened: true, debuggable: false))
+        return e
     }
 
     let a = DeviceInfo(udid: "AAAA-1", name: "iPhone 17 Pro", runtime: "iOS 26.2", state: "Booted")
@@ -94,5 +100,27 @@ import Testing
         let rec = Recorder()
         _ = CLI.handle(["find", "OK"], env(booted: [a, b], cwd: dir, recorder: rec))
         #expect(rec.calls[0].0 == "BBBB-2")
+    }
+
+    @Test func keysCommandsNeverReachTheDaemon() throws {
+        let rec = Recorder()
+        let e = env(booted: [a], recorder: rec)
+        #expect(CLI.handle(["keys", "list"], e).text.hasPrefix("no keys stored"))
+        let bad = CLI.handle(
+            ["keys", "add", "k.p8", "--issuer", TestKeys.issuer, "--key-id", "7X2K9ABC1D", "--role", "admin"], e)
+        #expect(bad.exit == 64 && bad.text.hasPrefix("--role must be developer or app-manager"))
+        #expect(CLI.handle(["keys"], e).exit == 64 && CLI.handle(["keys", "frob"], e).exit == 64)
+        let missing = CLI.handle(["keys", "remove", "Z"], e)
+        #expect(missing.exit == 1 && missing.text == "no stored key Z; stored: none")
+        #expect(
+            CLI.handle(["--json", "keys", "remove", "Z"], e).text.hasPrefix(
+                #"{"data":null,"exit":1,"text":"no stored key Z"#))
+        #expect(rec.calls.isEmpty)
+    }
+
+    @Test func usageListsKeys() {
+        #expect(
+            Usage.text.contains(
+                "keys add <AuthKey.p8> --issuer <uuid> --key-id <id> --role developer|app-manager [--no-presence]"))
     }
 }

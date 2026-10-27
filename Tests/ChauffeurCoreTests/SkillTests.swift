@@ -94,4 +94,11 @@ import Testing
         #expect(Usage.text.contains("6 effect still in flight (chauffeur wait)"))
         #expect(Skill.skillMarkdown.contains("`chauffeur wait`"))
     }
+
+    @Test func theSkillKeepsKeysWithHumans() {
+        #expect(
+            Skill.skillMarkdown.contains(
+                "- App Store Connect keys belong to the human: never run `chauffeur keys add`, `remove` or `use`. If a command reports no key, say so and stop."
+            ))
+    }
 }

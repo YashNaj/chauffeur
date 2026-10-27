@@ -50,16 +50,27 @@ public enum Target {
         return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 
+    /// The project's pinned App Store Connect key: the nearest `.chauffeur.json` that sets `connectKey`.
+    public static func connectKey(from dir: URL) -> String? {
+        nearest(from: dir) { $0["connectKey"] as? String }
+    }
+
     /// Sets `udid` in `dir`'s `.chauffeur.json`, keeping every other key (`chauffeur use`).
     public static func writeConfig(udid: String, in dir: URL) throws {
+        try setConfig("udid", to: udid, in: dir)
+    }
+
+    /// Sets `key` in `dir`'s `.chauffeur.json`, keeping every other key (`chauffeur use`, `chauffeur keys use`).
+    public static func setConfig(_ key: String, to value: Any, in dir: URL) throws {
         let file = dir.appendingPathComponent(configName)
         let exists = FileManager.default.fileExists(atPath: file.path)
         guard var object = config(in: dir) ?? (exists ? nil : [:]) else {
             throw ChauffeurError.failed(
-                "\(file.path) is not a JSON object; fix or remove it, then run chauffeur use again")
+                "\(file.path) is not a JSON object; fix or remove it, then run chauffeur use or chauffeur keys use again"
+            )
         }
-        object["udid"] = udid
+        object[key] = value
         let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
-        try data.write(to: dir.appendingPathComponent(configName))
+        try data.write(to: file)
     }
 }

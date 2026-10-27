@@ -14,7 +14,7 @@ BUILD="$STAGE/build"
 mkdir -p "$STAGE/bundle/server" "$OUT"
 cp "$BUILD/release/chauffeur" "$STAGE/bundle/server/chauffeur"
 strip -S "$STAGE/bundle/server/chauffeur"
-codesign --force --sign - "$STAGE/bundle/server/chauffeur" 2>/dev/null
+"$ROOT/scripts/sign.sh" "$STAGE/bundle/server/chauffeur" >/dev/null
 if LEFT=$(grep -aoE "($ROOT|$STAGE|/Users/[^/]+/|/private/(tmp|var)/|/var/folders/)" "$STAGE/bundle/server/chauffeur" | sort -u) && [ -n "$LEFT" ]; then
   echo "build-mcpb: the binary still carries local paths:" >&2; echo "$LEFT" >&2; exit 1
 fi

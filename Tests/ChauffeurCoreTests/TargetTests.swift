@@ -62,6 +62,20 @@ import Testing
         #expect(Target.telemetryHosts(from: root) == ["events.example.com"])
     }
 
+    @Test func connectKeyRoundTripsAndKeepsTheRest() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("cht-pin-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent(Target.configName)
+        try Data(#"{"udid":"AAAA-1","telemetryHosts":["events.example.com"]}"#.utf8).write(to: file)
+        try Target.setConfig("connectKey", to: "7X2K9ABC1D", in: root)
+        #expect(Target.connectKey(from: root.appendingPathComponent("sub")) == "7X2K9ABC1D")
+        #expect(
+            Target.readConfig(from: root) == "AAAA-1" && Target.telemetryHosts(from: root) == ["events.example.com"])
+        try Target.writeConfig(udid: "BBBB-2", in: root)
+        #expect(Target.connectKey(from: root) == "7X2K9ABC1D" && Target.readConfig(from: root) == "BBBB-2")
+    }
+
     @Test func telemetryHostsAreFoundFromSubdirectories() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("cht-tel-\(UUID().uuidString)")
         let sub = root.appendingPathComponent("a/b")

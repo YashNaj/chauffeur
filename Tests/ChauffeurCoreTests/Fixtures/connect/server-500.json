@@ -1,0 +1,16 @@
+{
+  "status": 500,
+  "headers": {},
+  "body": {
+    "errors": [
+      {
+        "id": "5e7a9c1b-2d4f-4a6c-8e0b-4f5a6b7c8d9e",
+        "status": "500",
+        "code": "UNEXPECTED_ERROR",
+        "title": "An unexpected error occurred.",
+        "detail": "An unexpected error occurred on the server side. If this issue continues, contact us at https://developer.apple.com/contact/."
+      }
+    ]
+  },
+  "source": "documented"
+}

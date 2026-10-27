@@ -8,3 +8,5 @@ spikes/hid-tap/hid-tap
 __pycache__/
 *.pyc
 .claude/settings.local.json
+# the per-project pin chauffeur use / keys use writes; a machine's own, never the repo's
+.chauffeur.json
