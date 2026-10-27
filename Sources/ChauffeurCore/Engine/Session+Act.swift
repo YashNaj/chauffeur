@@ -38,7 +38,7 @@ extension Session {
     /// Sends a gesture and reports what really happened (spec §6.2).
     func act(
         _ label: String, target: Node?, before: Snapshot, baselineSettled: Bool = true, capMs: Int = 1500,
-        needsMove: Bool = false, gesture: (TouchTransport) -> Bool
+        needsMove: Bool = false, network: NetStart? = nil, gesture: (TouchTransport) -> Bool
     ) throws -> ActionReport {
         let all = try transportsReady()
         let order = (all[preferred...] + all[..<preferred]).filter { !needsMove || $0.supportsMove }
@@ -48,6 +48,7 @@ extension Session {
         while true {
             let transport = order[index]
             let cursor = touchLog.cursor
+            let net = network.map { tapNet($0) }
             let sent = gesture(transport)
             let (after, settle) = try observe(minMs: 150, capMs: capMs)
             let evidence: Evidence =
@@ -79,7 +80,14 @@ extension Session {
                 diff: outcome == .changed ? Diff.lines(from: before, to: after) : [],
                 transport: transport.name, retriedFrom: retriedFrom,
                 hints: Verifier.hints(outcome: outcome, target: target), capMs: capMs)
-            if outcome == .noEffect, let frame = target?.frame,
+            if let net {
+                applyNetwork(&report, net: net, target: target)
+                if report.outcome == .pending {
+                    pendingTap = PendingTap(report: report, before: before, net: net, target: target)
+                }
+                try judgeScreenAgain(&report, before: before, net: net, capMs: capMs)
+            }
+            if report.outcome == .noEffect, let frame = target?.frame,
                 let shot = try? capture(
                     screen: before.size, zoom: Verifier.evidenceRegion(target: frame, screen: before.size))
             {
@@ -118,12 +126,18 @@ extension Session {
         guard let target = a.next() else { throw ChauffeurError.usage(a.usage) }
         try a.done()
         let (device, _) = try connect()
+        let network = netStart()
+        let udid = self.udid
+        let clipboard = Background { Session.readClipboard(udid: udid) }
         let (before, settled) = try baseline()
         let aimed = try aim(target, in: before)
         if let refusal = Geometry.refusal(for: aimed.point, screen: device.size, allowEdge: allowEdge) {
             return Output("tap \(aimed.label) refused: \(refusal)", exit: 1)
         }
-        var report = try act("tap \(aimed.label)", target: aimed.node, before: before, baselineSettled: settled) {
+        let clipboardBefore = clipboard.result(waitingAtMost: 2000) ?? nil
+        var report = try act(
+            "tap \(aimed.label)", target: aimed.node, before: before, baselineSettled: settled, network: network
+        ) {
             Gestures.tap($0, at: aimed.point, screen: device.size, holdMs: holdMs)
         }
         // Right after typing, a switch can ignore the first touch that reaches the app (F1, M2 dogfood; reproduced in
@@ -139,8 +153,10 @@ extension Session {
                 report.evidenceShot = nil
                 return Output(report.render(), exit: report.exitCode, data: report.json)
             }
-            var second = try act("tap \(aimed.label)", target: aimed.node, before: again, baselineSettled: settledAgain)
-            {
+            var second = try act(
+                "tap \(aimed.label)", target: aimed.node, before: again, baselineSettled: settledAgain,
+                network: netStart()
+            ) {
                 Gestures.tap($0, at: aimed.point, screen: device.size, holdMs: holdMs)
             }
             if second.outcome == .changed {
@@ -148,6 +164,15 @@ extension Session {
                     "the first touch reached the app but the switch ignored it; chauffeur tapped once more")
             }
             report = second
+        }
+        // A copy changes nothing on screen; read the pasteboard again only then (spec §7: a read costs ~100 ms).
+        if report.outcome == .noEffect,
+            let copied = ClipboardMark.copied(before: clipboardBefore, after: Session.readClipboard(udid: udid))
+        {
+            report.outcome = .changed
+            report.copiedCharacters = copied
+            report.hints = []
+            report.evidenceShot = nil
         }
         return Output(report.render(), exit: report.exitCode, data: report.json)
     }
@@ -188,6 +213,7 @@ extension Session {
         let submit = a.flag("--submit")
         guard let ref = a.next(), let text = a.text(), !text.isEmpty else { throw ChauffeurError.usage(a.usage) }
         let (device, _) = try connect()
+        let network = netStart()
         let (before, settled) = try baseline()
         let field = try before.resolve(ref: ref, refs: refs)
         guard Perception.textEntry.contains(field.role) else {
@@ -217,6 +243,7 @@ extension Session {
         let keyboard = Keyboard(hid: hid)
         let method: String
         let sent: Bool
+        let typingNet = tapNet(network)
         if Keys.typeable(text) && text.count <= 15 {
             method = "keys"
             sent = keyboard.type(text)
@@ -244,8 +271,15 @@ extension Session {
         let verdict = TypeCheck.verify(
             typed: text, before: focused.node(identity: field.identity) ?? field,
             after: now, submitted: false)
-        let report = TypeReport(
+        var report = TypeReport(
             action: label, method: method, verdict: verdict, value: now?.value, settledMs: settle.elapsedMs)
+        if verdict == .ok {
+            // One look, no window: typing is verified by the field, so a late request can't make it a false NO EFFECT.
+            clock.sleep(ms: NetJudge.graceMs)
+            var previous: [FlowActivity] = []
+            report.requests = netItems(typingNet, previous: &previous)
+            report.requestElapsedMs = clock.nowMs() - typingNet.touchMs
+        }
         guard submit, verdict == .ok else { return Output(report.render(), exit: report.exitCode, data: report.json) }
 
         guard keyboard.press(Keys.returnKey) else {

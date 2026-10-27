@@ -114,6 +114,14 @@ import Testing
             r?["result"]?["content"] == [["type": "text", "text": "type e2 \"--submit\" → TEXT MISMATCH via keys"]])
     }
 
+    @Test func actWaitFinishesAPendingTap() throws {
+        #expect(
+            try MCPTools.argv(tool: "act", arguments: ["action": "wait"], payloadFile: { _ in "" }) == ["wait"])
+        #expect(
+            try MCPTools.argv(tool: "act", arguments: ["action": "wait", "timeout": 45], payloadFile: { _ in "" })
+                == ["wait", "--timeout", "45"])
+    }
+
     @Test func everyToolMapsToTheCLI() throws {
         func argv(_ tool: String, _ arguments: JSON) throws -> [String] {
             try MCPTools.argv(tool: tool, arguments: arguments) { _ in "/tmp/p.json" }
@@ -236,5 +244,10 @@ import Testing
 
     @Test func instructionsSayWhenToLookAtPixels() {
         #expect(MCPServer.instructions.contains("Take a screenshot to check how something looks"))
+    }
+
+    @Test func actDescribesPending() throws {
+        let act = try #require(MCPTools.definitions.first { $0["name"]?.string == "act" })
+        #expect(act["description"]?.string?.contains("PENDING") == true)
     }
 }

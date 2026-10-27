@@ -1,0 +1,18 @@
+{"level": "default", "sender": "CFNetwork", "message": "Task <005408CE-FA0F-412F-8138-526F891829ED>.<6> resuming, timeouts(60.0, 604800.0) qos(0x21) voucher(<OS_voucher: 0x1071d1130>) activity(00000000-0000-0000-0000-000000000000)"}
+{"level": "default", "sender": "Network", "message": "[C7 C48C1DF5-5BC7-44F3-8510-42662A7318ED Hostname#30567227:8765 tcp, url: http://localhost:8765/fast, definite, attribution: developer, context: com.apple.CFNetwork.NSURLSession.{B3A24AA7-65DD-4E9E-BED6-74A7BA667A0E}{(null)}{Y}{2}{0x0} (private), proc: 1AB56B07-2A64-3A39-9727-BC2722EFE10D, delegated upid: 0] start"}
+{"level": "default", "sender": "CFNetwork", "message": "Task <005408CE-FA0F-412F-8138-526F891829ED>.<6> setting up Connection 7"}
+{"level": "default", "sender": "CFNetwork", "message": "Task <005408CE-FA0F-412F-8138-526F891829ED>.<6> now using Connection 7"}
+{"level": "default", "sender": "CFNetwork", "message": "Task <005408CE-FA0F-412F-8138-526F891829ED>.<6> sent request, body N 0"}
+{"level": "default", "sender": "CFNetwork", "message": "Task <005408CE-FA0F-412F-8138-526F891829ED>.<6> received response, status 200 content K"}
+{"level": "default", "sender": "CFNetwork", "message": "Task <005408CE-FA0F-412F-8138-526F891829ED>.<6> response ended"}
+{"level": "default", "sender": "CFNetwork", "message": "Task <005408CE-FA0F-412F-8138-526F891829ED>.<6> done using Connection 7"}
+{"level": "default", "sender": "CFNetwork", "message": "Task <005408CE-FA0F-412F-8138-526F891829ED>.<6> summary for task success {transaction_duration_ms=8, response_status=200, connection=7, protocol=\"http/1.1\", domain_lookup_duration_ms=1, connect_duration_ms=1, secure_connection_duration_ms=0, private_relay=false, request_start_ms=3, request_duration_ms=0, response_start_ms=6, response_duration_ms=1, request_bytes=206, request_throughput_kbps=400, response_bytes=110, response_throughput_kbps=60, cache_hit=false}"}
+{"level": "default", "sender": "CFNetwork", "message": "Task <005408CE-FA0F-412F-8138-526F891829ED>.<6> finished successfully"}
+{"level": "default", "sender": "CFNetwork", "message": "Task <F230B378-BAE0-497B-9678-B5343E934411>.<7> resuming, timeouts(60.0, 604800.0) qos(0x21) voucher(<OS_voucher: 0x1071d1270>) activity(00000000-0000-0000-0000-000000000000)"}
+{"level": "default", "sender": "CFNetwork", "message": "Task <F230B378-BAE0-497B-9678-B5343E934411>.<7> now using Connection 7"}
+{"level": "default", "sender": "CFNetwork", "message": "Task <F230B378-BAE0-497B-9678-B5343E934411>.<7> sent request, body N 0"}
+{"level": "default", "sender": "CFNetwork", "message": "Task <F230B378-BAE0-497B-9678-B5343E934411>.<7> received response, status 500 content K"}
+{"level": "default", "sender": "CFNetwork", "message": "Task <F230B378-BAE0-497B-9678-B5343E934411>.<7> response ended"}
+{"level": "default", "sender": "CFNetwork", "message": "Task <F230B378-BAE0-497B-9678-B5343E934411>.<7> done using Connection 7"}
+{"level": "default", "sender": "CFNetwork", "message": "Task <F230B378-BAE0-497B-9678-B5343E934411>.<7> summary for task success {transaction_duration_ms=3, response_status=500, connection=7, protocol=\"http/1.1\", reused=1, reused_after_ms=1000, request_start_ms=0, request_duration_ms=0, response_start_ms=2, response_duration_ms=1, request_bytes=206, request_throughput_kbps=800, response_bytes=110, response_throughput_kbps=80, cache_hit=false}"}
+{"level": "default", "sender": "CFNetwork", "message": "Task <F230B378-BAE0-497B-9678-B5343E934411>.<7> finished successfully"}

@@ -55,4 +55,16 @@ FOUNDATION_EXPORT NSString *const CHBridgeErrorDomain;
 - (BOOL)usagePage:(uint32_t)page usage:(uint32_t)usage down:(BOOL)down NS_SWIFT_NAME(usage(page:usage:down:));
 @end
 
+/// Per-connection network statistics for processes on this Mac (simulator apps are Mac processes), from Apple's
+/// private NetworkStatistics framework, loaded at run time (M4b spec §2, Findings §1).
+@interface CHNetStats : NSObject
+- (instancetype)init NS_UNAVAILABLE;
+/// Swift: `try CHNetStats.open()`. A bare `initWithError:` would import as NSObject's non-throwing `init()`.
++ (nullable instancetype)statsWithError:(NSError **)error NS_SWIFT_NAME(open());
+/// Fresh: queries every source, then returns the open flows of `pids` and the ones that closed in the last two
+/// minutes. Each flow: id, pid, process, provider (TCP or UDP), remote ("ip:port", empty until known), tx, rx
+/// (bytes), openedMs, closedMs (uptime milliseconds, the clock `DispatchTime` uses).
+- (NSArray<NSDictionary<NSString *, id> *> *)flowsForPids:(NSArray<NSNumber *> *)pids NS_SWIFT_NAME(flows(pids:));
+@end
+
 NS_ASSUME_NONNULL_END

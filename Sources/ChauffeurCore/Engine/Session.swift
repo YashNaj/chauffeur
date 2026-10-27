@@ -62,6 +62,13 @@ public final class Session {
     var relaunchedForAccessibility: Set<String> = []
     /// Seam for unit tests: how an app is relaunched (default: `launchCommand`).
     var relaunch: ((String) -> Output)?
+    /// The activity layer (M4b spec §2), built on the first tap; nil when NetworkStatistics is unavailable.
+    var flowSource: FlowSource?
+    var flowSourceTried = false
+    /// The last tap that came back PENDING, for a bare `wait` (M4b spec §9). Any other action forgets it.
+    var pendingTap: PendingTap?
+    /// Test seam: the project's telemetry entries (default: `.chauffeur.json` from the client's directory).
+    var telemetryOverride: [String]?
     /// Where the launched app's log lines start in `logTap` (crash evidence is this launch's lines only).
     var appLogCursor: Int?
     let clock = SystemClock()
@@ -235,6 +242,7 @@ public final class Session {
         let cursor = logTap.cursor
         let previousActionCursor = lastActionLogCursor
         if Self.logged.contains(command) { lastActionLogCursor = cursor }
+        if Self.logged.contains(command) { pendingTap = nil }
         // A crash since the previous command must be noticed before this command can stop following the app
         // (launch, install, terminate and permission changes all do) and so hide it.
         let noticed = Self.watched.contains(command) ? detectCrash() : nil
@@ -338,52 +346,5 @@ public final class Session {
         return Output(
             hits.map { snap.line($0, all: false).trimmingCharacters(in: .whitespaces) }.joined(separator: "\n"),
             data: ["matches": .array(hits.map { $0.json(all: false) })])
-    }
-
-    /// Waits stay below the client's reply timeout, so a long wait can't look like a dead daemon (C1).
-    nonisolated static let maxWaitSeconds = 300.0
-    nonisolated static func waitTimeout(_ seconds: Double?) -> Double {
-        min(seconds ?? 10, maxWaitSeconds)
-    }
-
-    func waitCommand(_ argv: [String]) throws -> Output {
-        var a = try Args(
-            argv, flags: ["--gone"], options: ["--timeout"],
-            usage: "usage: chauffeur wait \"<query>\" [--gone] [--timeout <s>]")
-        let gone = a.flag("--gone")
-        let timeout = Self.waitTimeout(try a.number("--timeout", in: 0...86_400))
-        guard let query = a.text() else { throw ChauffeurError.usage(a.usage) }
-        let start = clock.nowMs()
-        var lastHeader = "no tree yet"
-        while true {
-            do {
-                let snap = try observe(minMs: 0, capMs: 500).snapshot
-                lastHeader = snap.header
-                let hits = snap.find(query)
-                let elapsed = clock.nowMs() - start
-                if gone && hits.isEmpty {
-                    return Output("gone after \(elapsed)ms", data: ["gone": true, "elapsedMs": JSON(elapsed)])
-                }
-                if !gone && !hits.isEmpty {
-                    return Output(
-                        "found after \(elapsed)ms\n"
-                            + hits.map { snap.line($0, all: false).trimmingCharacters(in: .whitespaces) }.joined(
-                                separator: "\n"),
-                        data: [
-                            "found": true, "elapsedMs": JSON(elapsed),
-                            "matches": .array(hits.map { $0.json(all: false) }),
-                        ])
-                }
-            } catch let error as ChauffeurError where error.appNotUpYet {
-                // app still launching; keep waiting
-            }
-            if Double(clock.nowMs() - start) >= timeout * 1000 {
-                return Output(
-                    (gone ? "still present" : "not found") + " after \(Geometry.fmt(timeout))s: "
-                        + Perception.quote(query) + "\nscreen: " + lastHeader, exit: 4,
-                    data: [gone ? "gone" : "found": false, "screen": .string(lastHeader)])
-            }
-            clock.sleep(ms: 100)
-        }
     }
 }

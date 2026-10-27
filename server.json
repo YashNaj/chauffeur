@@ -4,7 +4,7 @@
   "title": "chauffeur",
   "description": "Drive the iOS Simulator from a coding agent, with every action verified.",
   "repository": { "url": "https://github.com/YashNaj/chauffeur", "source": "github" },
-  "version": "0.1.0",
+  "version": "0.2.0",
   "packages": [
     {
       "registryType": "mcpb",

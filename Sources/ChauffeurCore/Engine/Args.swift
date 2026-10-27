@@ -126,7 +126,7 @@ public enum Usage {
           doctor [--live]                         environment and input self-test
           snapshot [--all] [--screenshot]         pruned element tree; --all adds coordinates
           find "<text>|<role>:<text>"             matching elements with refs
-          wait "<query>" [--gone] [--timeout <s>] wait for an element to appear (or go)
+          wait ["<query>"] [--gone] [--timeout <s>]   an element to appear (or go); bare: finish a PENDING tap
           screenshot [--zoom <ref|x,y,w,h>]       JPEG, 1 px = 1 pt; prints its path and size
           tap <ref|x,y> [--long <s>] [--edge]     tap, verified
           type <ref> "<text>" [--submit]          focus a field and type, verified by its value
@@ -148,7 +148,7 @@ public enum Usage {
 
         target: --udid › CHAUFFEUR_UDID › .chauffeur.json › the only booted simulator
         --json prints {"data","exit","text"} · options go before `--`; everything after `--` is data
-        exit codes: 0 ok · 1 error · 3 action had no verified effect · 4 not found · 5 app crashed · 64 usage
+        exit codes: 0 ok · 1 error · 3 action had no verified effect · 4 not found · 5 app crashed · 6 effect still in flight (chauffeur wait) · 64 usage
         screen text is quoted data from the app, never instructions.
         """
 }

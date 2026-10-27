@@ -165,6 +165,10 @@ public final class LogTap: @unchecked Sendable {
     public func last(_ n: Int) -> [LogLine] { lock.withLock { ring.last(n) } }
     public var all: [LogLine] { lock.withLock { ring.lines } }
 
-    /// Internal so unit tests can feed lines without a simulator.
-    func append(_ line: LogLine) { lock.withLock { ring.append(line) } }
+    /// Every line is stored with its URLs shaped (M4b spec §6), so no reader ever sees a raw one. Internal so unit
+    /// tests can feed lines without a simulator.
+    func append(_ line: LogLine) {
+        let shaped = LogRedact.line(line)
+        lock.withLock { ring.append(shaped) }
+    }
 }

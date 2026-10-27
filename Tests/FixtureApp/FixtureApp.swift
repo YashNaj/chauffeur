@@ -15,6 +15,7 @@ struct FixtureApp: App {
             TabView(selection: $tab) {
                 NavigationStack { HomeView() }.tabItem { Label("Home", systemImage: "house") }.tag("home")
                 NavigationStack { FormView() }.tabItem { Label("Form", systemImage: "square.and.pencil") }.tag("form")
+                NavigationStack { NetworkView() }.tabItem { Label("Network", systemImage: "network") }.tag("network")
             }
             // chauffeur-fixture://form and chauffeur-fixture://home select a tab (for `chauffeur open`).
             .onOpenURL { url in

@@ -17,6 +17,8 @@ public enum Outcome: Equatable, Sendable {
     case unverified
     /// The screen was already changing before the action, so a change can't be credited to it.
     case unattributed
+    /// The screen didn't change and the app is still waiting for a network reply (M4b spec §3): exit 6.
+    case pending
 }
 
 /// Spec §6.2: classify every action; never report success without a visible change.
@@ -68,6 +70,8 @@ public enum Verifier {
             return [
                 "wait for the screen to settle (chauffeur wait …), run snapshot, and check whether the action is still needed"
             ]
+        case .pending:
+            return ["run `chauffeur wait` for the result"]
         case .changed, .retry:
             return []
         }
@@ -92,6 +96,14 @@ public struct ActionReport: Sendable {
     public var note: String?
     /// A screenshot around the target, taken on NO EFFECT: the tree can miss a change the pixels show.
     public var evidenceShot: String?
+    /// The requests and connections the action caused, telemetry included and marked (M4b spec §3).
+    public var requests: [RequestItem] = []
+    /// From the touch to the verdict: how long a missing reply has been waited for.
+    public var requestElapsedMs = 0
+    /// Characters the action copied to the clipboard (M4b spec §7).
+    public var copiedCharacters: Int?
+    /// Why the network couldn't be watched; shown with a NO EFFECT.
+    public var networkNote: String?
 
     public init(
         action: String, outcome: Outcome, evidence: Evidence, settledMs: Int, settled: Bool, revBefore: Int,
@@ -111,19 +123,49 @@ public struct ActionReport: Sendable {
         self.capMs = capMs
     }
 
-    public var exitCode: Int32 { outcome == .changed ? 0 : 3 }
+    public var exitCode: Int32 {
+        switch outcome {
+        case .changed: return 0
+        case .pending: return 6
+        default: return 3
+        }
+    }
+
+    /// The request a NO EFFECT or PENDING headline names: the first missing reply, else the first failure, else the
+    /// first request that isn't a stream, else the stream. Never telemetry.
+    static func lead(_ requests: [RequestItem], pending: Bool) -> RequestItem? {
+        let real = requests.filter { !$0.telemetry }
+        if pending { return real.first(where: \.waiting) }
+        return real.first(where: \.failed) ?? real.first(where: { !$0.streaming }) ?? real.first
+    }
 
     public func render() -> String {
         let cap = String(format: "%gs", Double(capMs) / 1000)
+        let lead = outcome == .changed ? nil : Self.lead(requests, pending: outcome == .pending)
         var head: String
         switch outcome {
         case .changed:
+            if let copiedCharacters, diff.isEmpty {
+                head = "\(action) → changed · copied to clipboard (\(copiedCharacters) characters)"
+            } else {
+                head =
+                    "\(action) → changed · " + (settled ? "settled \(settledMs)ms" : "still changing at \(cap)")
+                    + " · rev \(revBefore)→\(revAfter)"
+                if let from = retriedFrom { head += " · via \(transport) after \(from) showed no touch" }
+            }
+        case .pending:
             head =
-                "\(action) → changed · " + (settled ? "settled \(settledMs)ms" : "still changing at \(cap)")
-                + " · rev \(revBefore)→\(revAfter)"
-            if let from = retriedFrom { head += " · via \(transport) after \(from) showed no touch" }
+                "\(action) → PENDING · "
+                + (lead.map { RequestText.outcome($0, elapsedMs: requestElapsedMs) } ?? "waiting for a reply")
         case .noEffect:
-            head = "\(action) → NO EFFECT · the accessibility tree did not change in \(cap) (touch reached \(owner))"
+            if let lead {
+                head =
+                    "\(action) → NO EFFECT · " + RequestText.outcome(lead, elapsedMs: requestElapsedMs)
+                    + (lead.failed || lead.streaming ? "" : ", but nothing changed on screen")
+            } else {
+                head =
+                    "\(action) → NO EFFECT · the accessibility tree did not change in \(cap) (touch reached \(owner))"
+            }
         case .intercepted(let by):
             head = "\(action) → INTERCEPTED by \(by) · nothing changed"
         case .notDelivered, .retry:
@@ -136,12 +178,19 @@ public struct ActionReport: Sendable {
             head =
                 "\(action) → UNVERIFIED: the screen was already changing before the action, so the change can't be credited to it"
         }
+        var requestLines: [String] = []
+        if let lead {
+            let more = RequestText.details(lead)
+            if !more.isEmpty { requestLines.append("request: " + more) }
+        }
+        requestLines += RequestText.lines(requests, elapsedMs: requestElapsedMs, except: lead)
         var tail = hints.map { "hint: " + $0 }
         if outcome == .noEffect, let shot = evidenceShot {
             tail.insert(
                 "screen: \(shot) (look before retrying: some changes, like checkmarks, never reach the tree)", at: 0)
         }
-        return ([head] + diff + tail).joined(separator: "\n")
+        if outcome == .noEffect, let networkNote { tail.append("note: network not watched (\(networkNote))") }
+        return ([head] + diff + requestLines + tail).joined(separator: "\n")
     }
 
     /// The same report as data, for `--json` and MCP.
@@ -155,6 +204,8 @@ public struct ActionReport: Sendable {
         if let retriedFrom { o["retriedFrom"] = .string(retriedFrom) }
         if let note { o["note"] = .string(note) }
         if let evidenceShot { o["screenshot"] = .string(evidenceShot) }
+        if !requests.isEmpty { o["requests"] = .array(requests.map(RequestText.json)) }
+        if let copiedCharacters { o["copied"] = JSON(copiedCharacters) }
         return .object(o)
     }
 
@@ -166,6 +217,7 @@ public struct ActionReport: Sendable {
         case .retry, .notDelivered: "notDelivered"
         case .unverified: "unverified"
         case .unattributed: "unattributed"
+        case .pending: "pending"
         }
     }
 
@@ -215,6 +267,9 @@ public struct TypeReport: Sendable {
     public var verdict: TypeVerdict
     public var value: String?
     public var settledMs: Int
+    /// Requests the typing started by the time it was verified (M4b spec §2).
+    public var requests: [RequestItem] = []
+    public var requestElapsedMs = 0
 
     public init(action: String, method: String, verdict: TypeVerdict, value: String?, settledMs: Int) {
         self.action = action
@@ -240,13 +295,17 @@ public struct TypeReport: Sendable {
         case .fieldGone:
             o["verdict"] = "fieldGone"
         }
+        if !requests.isEmpty { o["requests"] = .array(requests.map(RequestText.json)) }
         return .object(o)
     }
 
     public func render() -> String {
         switch verdict {
         case .ok:
-            return "\(action) → typed via \(method) · value=\(Perception.quote(value ?? "")) · settled \(settledMs)ms"
+            return
+                ([
+                    "\(action) → typed via \(method) · value=\(Perception.quote(value ?? "")) · settled \(settledMs)ms"
+                ] + RequestText.lines(requests, elapsedMs: requestElapsedMs)).joined(separator: "\n")
         case .mismatch(let shown):
             return "\(action) → TEXT MISMATCH via \(method) · field shows \(Perception.quote(shown))\n"
                 + "hint: the field may limit or reformat input; run snapshot to see it"

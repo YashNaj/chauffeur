@@ -64,18 +64,21 @@ public enum MCPTools {
             "act", title: "Act on the screen",
             description:
                 "Act on the simulator and get a verified result: 'changed' with a diff of the screen, or NO EFFECT, "
-                + "INTERCEPTED, NOT DELIVERED, UNVERIFIED or APP CRASHED with a hint — never a false success. tap: target is "
+                + "INTERCEPTED, NOT DELIVERED, UNVERIFIED or APP CRASHED with a hint — never a false success. "
+                + "PENDING (the app is waiting for a network reply): act with action wait finishes it. tap: target is "
                 + "a ref or x,y point (long: hold seconds). type: target is a text field ref, text is typed (submit presses "
                 + "Return). scroll: direction, optional in (container ref) and until (text to scroll to). swipe: from and to "
                 + "points. button: home, lock, siri, volume-up, volume-down. batch: commands is chauffeur commands separated "
                 + "by ';', stopping at the first failure.",
             properties: [
                 "action": prop(
-                    "string", "what to do", ["enum": ["tap", "type", "scroll", "swipe", "button", "batch"]]),
+                    "string", "what to do", ["enum": ["tap", "type", "scroll", "swipe", "button", "wait", "batch"]]),
                 "target": prop("string", "tap: a ref (e4) or a point (201,344); type: a text field ref"),
                 "text": prop("string", "type: the text to enter"),
                 "submit": prop("boolean", "type: press Return afterwards"),
                 "long": prop("number", "tap: hold for this many seconds", ["minimum": 0.05, "maximum": 30]),
+                "timeout": prop(
+                    "number", "wait: seconds to wait for a PENDING tap (default 30)", ["minimum": 0, "maximum": 300]),
                 "edge": prop("boolean", "tap or swipe within 6 pt of a screen edge (triggers system gestures)"),
                 "direction": prop(
                     "string", "scroll: which way the content moves into view",
@@ -255,10 +258,12 @@ public enum MCPTools {
                     + ["--", try a.required("from", for: "act swipe"), try a.required("to", for: "act swipe")]
             case "button":
                 argv = ["button", "--", try a.required("button", for: "act button")]
+            case "wait":
+                argv = ["wait"] + (try a.number("timeout").map { ["--timeout", $0] } ?? [])
             case "batch":
                 argv = ["do", "--", try a.required("commands", for: "act batch")]
             default:
-                throw MCPToolError.invalid("act action must be tap, type, scroll, swipe, button or batch")
+                throw MCPToolError.invalid("act action must be tap, type, scroll, swipe, button, wait or batch")
             }
         case "screenshot":
             argv = ["screenshot"] + (try a.string("zoom").map { ["--zoom", $0] } ?? [])

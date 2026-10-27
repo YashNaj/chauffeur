@@ -18,6 +18,8 @@ Xcode 27 ships its own MCP server for driving the Simulator, so I put the two he
 each, with Claude Code on Sonnet and on Opus, giving the agent either chauffeur's tools or Xcode's (`xcrun mcpbridge`)
 and nothing else. That's 180 runs.
 
+The figures were measured with chauffeur 0.1.x, before M4b's network evidence.
+
 **Sonnet**
 
 | | chauffeur | Xcode 27 MCP |

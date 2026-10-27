@@ -38,7 +38,7 @@ extension Session {
                 exit = 1
                 break
             }
-            let out = runOne(command)
+            let out = Self.throughPending(runOne(command)) { runOne(["wait"]) }
             parts.append(tag + " " + out.text)
             results.append([
                 "argv": JSON(Self.shown(command)), "exit": JSON(Int(out.exit)), "text": .string(out.text),
@@ -54,5 +54,13 @@ extension Session {
         return Output(
             parts.joined(separator: "\n"), exit: exit,
             data: ["results": .array(results), "total": JSON(commands.count)])
+    }
+
+    /// A step that came back PENDING is finished by a bare `wait` before the batch judges it, so "tap Login, then tap
+    /// Profile" works (M4b spec §3, "Batches").
+    nonisolated static func throughPending(_ out: Output, wait: () -> Output) -> Output {
+        guard out.exit == 6 else { return out }
+        let waited = wait()
+        return Output(out.text + "\n" + waited.text, exit: waited.exit, data: waited.data)
     }
 }
