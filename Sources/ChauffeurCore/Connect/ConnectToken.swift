@@ -54,7 +54,7 @@ public enum ConnectToken {
 }
 
 /// Hands out one token and mints a fresh one when fewer than a minute remains.
-public struct TokenSession: Sendable, CustomStringConvertible {
+public struct TokenSession: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     private let key: ConnectKey
     private let lifetime: TokenLifetime
     private let scope: [String]?
@@ -76,4 +76,6 @@ public struct TokenSession: Sendable, CustomStringConvertible {
     }
 
     public var description: String { "token session for \(key)" }
+    public var debugDescription: String { description }
+    public var customMirror: Mirror { Mirror(self, children: []) }
 }

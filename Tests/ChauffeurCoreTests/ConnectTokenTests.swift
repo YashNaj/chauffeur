@@ -56,4 +56,15 @@ import Testing
         #expect(try s.token(now: now + 1141) != first)  // 59 s left: re-minted
         #expect(s.expiry == now + 1141 + 1200)
     }
+
+    @Test func aSessionPrintsNoToken() throws {
+        var s = TokenSession(key: try TestKeys.key(), lifetime: .session, scope: nil)
+        let token = try s.token(now: now)
+        #expect(token.split(separator: ".").count == 3)
+        #expect(!String(reflecting: s).contains(token))
+        #expect(Mirror(reflecting: s).children.isEmpty)
+        var dumped = ""
+        dump(s, to: &dumped)
+        #expect(!dumped.contains(token))
+    }
 }

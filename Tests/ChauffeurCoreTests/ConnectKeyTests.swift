@@ -37,4 +37,9 @@ import Testing
         #expect(ConnectRole(flag: "app-manager") == .appManager && ConnectRole(flag: "developer") == .developer)
         #expect(ConnectRole(flag: "admin") == nil && ConnectRole.appManager.title == "App Manager")
     }
+
+    @Test func aRoleSatisfiesItselfAndWhatIsBelowIt() {
+        #expect(ConnectRole.appManager.satisfies(.developer) && ConnectRole.appManager.satisfies(.appManager))
+        #expect(ConnectRole.developer.satisfies(.developer) && !ConnectRole.developer.satisfies(.appManager))
+    }
 }

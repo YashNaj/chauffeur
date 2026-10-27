@@ -41,9 +41,12 @@ import Testing
             "GET /v1/betaGroups": ScriptedTransport.response(
                 500, #"{"errors":[{"status":"500","code":"UNEXPECTED_ERROR","title":"An unexpected \"error\""}]}"#),
         ])
-        #expect(throws: ConnectError.forbidden(shape: "GET /v1/users", needs: .developer, have: .appManager)) {
-            try c.send(.probeUsers)
-        }
+        // The key's role covers the row, so the refusal is Apple's, with Apple's reason.
+        #expect(
+            throws: ConnectError.apple(
+                status: 403, shape: "GET /v1/users",
+                errors: [AppleError(status: "403", code: "FORBIDDEN_ERROR", title: "forbidden", detail: nil)])
+        ) { try c.send(.probeUsers) }
         #expect(throws: ConnectError.unauthorized) { try c.send(.build(id: "b")) }
         #expect(throws: ConnectError.rateLimited(remaining: 0)) { try c.send(.probeApps) }
         #expect(
@@ -76,5 +79,25 @@ import Testing
     @Test func transportErrorsPassThrough() throws {
         let (c, _) = try client([:])
         #expect(throws: ConnectError.transport("unscripted GET /v1/users")) { try c.send(.probeUsers) }
+    }
+
+    /// One operation of every kind, with every optional filter set.
+    static let sample: [ChauffeurCore.Operation] = [
+        .probeUsers, .probeCertificates, .probeApps, .apps(bundleID: "dev.x"),
+        .builds(appID: "a1", version: "1.0", buildNumber: "7"), .build(id: "b1"), .buildBetaDetail(buildID: "b1"),
+        .betaGroups(appID: "a1"), .preReleaseVersions(appID: "a1"), .appStoreVersions(appID: "a1"),
+        .appStoreVersion(id: "v1"), .appStoreVersionLocalizations(versionID: "v1"), .reviewSubmissions(appID: "a1"),
+        .reviewSubmission(id: "r1"), .buildUpload(id: "u1"), .buildUploadFiles(uploadID: "u1"),
+    ]
+
+    @Test func everyOperationBuildsTheURLTheTableDescribes() throws {
+        #expect(Self.sample.map(\.kind) == ChauffeurCore.Operation.Kind.allCases)
+        let (c, _) = try client([:])
+        for op in Self.sample {
+            let request = try c.request(for: op, now: now)
+            let prefix = "https://api.appstoreconnect.apple.com" + RequestTable.path(for: op)
+            #expect(request.url.absoluteString.hasPrefix(prefix), "\(op.kind)")
+            #expect((request.url.query != nil) == !op.query.isEmpty, "\(op.kind)")
+        }
     }
 }

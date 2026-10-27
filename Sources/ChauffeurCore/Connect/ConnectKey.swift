@@ -18,6 +18,20 @@ public enum ConnectRole: String, Codable, Sendable, CaseIterable {
     }
 }
 
+extension ConnectRole {
+    /// Whether a key with this role can do what `needed` can. Developer is below App Manager.
+    public func satisfies(_ needed: ConnectRole) -> Bool {
+        rank >= needed.rank
+    }
+
+    private var rank: Int {
+        switch self {
+        case .developer: return 0
+        case .appManager: return 1
+        }
+    }
+}
+
 /// The JSON stored beside the key in the keychain (in the item's comment). It never holds the key itself.
 public struct StoredKey: Codable, Equatable, Sendable {
     public var keyID: String

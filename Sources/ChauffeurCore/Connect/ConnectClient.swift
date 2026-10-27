@@ -74,7 +74,13 @@ public final class ConnectClient {
         let shape = Self.shape(op)
         switch status {
         case 401: return .unauthorized
-        case 403: return .forbidden(shape: shape, needs: RequestTable.rows[op.kind]?.role ?? .developer, have: role)
+        case 403:
+            // A key whose role covers the row was refused for a reason only Apple knows: pass Apple's reason on.
+            let needs = RequestTable.rows[op.kind]?.role ?? .developer
+            if role.satisfies(needs) {
+                return .apple(status: 403, shape: shape, errors: AppleError.parse(response.body))
+            }
+            return .forbidden(shape: shape, needs: needs, have: role)
         case 409: return .conflict(shape: shape, errors: AppleError.parse(response.body))
         case 429: return .rateLimited(remaining: rateLimit?.remaining ?? 0)
         default: return .apple(status: status, shape: shape, errors: AppleError.parse(response.body))
