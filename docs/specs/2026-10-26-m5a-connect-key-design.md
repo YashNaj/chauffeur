@@ -262,10 +262,11 @@ gains a row for `Connect` (App Store Connect: the key, tokens, the request table
 - The pin: `.chauffeur.json` round-trips `connectKey` and keeps `udid` and `telemetryHosts`.
 - `ConnectError` messages: 403 names the role; 409 carries `detail` escaped; 429 carries the wait.
 
-**Live (owner's team, keys created for the test and revoked after):** `keys add` with an App Manager key succeeds
-and prints the sheet; with an Admin key is refused with the Admin message; with a key that reaches certificates is
-refused with that message; `keys check` after revoking the key reports 401. The Touch ID prompt is observed by hand
-once per macOS version and noted in Findings.
+**Live (owner's team, keys created for the test and revoked after):** `keys add` with the owner's App Manager key
+succeeds and prints the sheet with `role check: not an Admin or Finance key`; with the Admin key it is refused with
+the finance-alarm text; with the revoked key it reports 401. `keys check` from a debug build reports the
+unhardened-build error. `scripts/sign.sh` on the release build blocks a `DYLD_INSERT_LIBRARIES` library. The Touch
+ID prompt is observed by hand once per macOS version and noted in Findings.
 
 ## Done when
 
