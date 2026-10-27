@@ -10,22 +10,27 @@ public enum ConnectKeys {
         public var transport: ConnectTransport
         public var readFile: @Sendable (URL) throws -> String
         public var now: @Sendable () -> Date
+        /// The running build's signature. `add` and `check` refuse to run from a build that isn't hardened.
+        public var identity: BuildIdentity
 
         public init(
             store: KeyStore, presence: Presence, transport: ConnectTransport,
-            readFile: @escaping @Sendable (URL) throws -> String, now: @escaping @Sendable () -> Date
+            readFile: @escaping @Sendable (URL) throws -> String, now: @escaping @Sendable () -> Date,
+            identity: BuildIdentity
         ) {
             self.store = store
             self.presence = presence
             self.transport = transport
             self.readFile = readFile
             self.now = now
+            self.identity = identity
         }
 
         public static func live() -> Environment {
             Environment(
                 store: KeychainStore(), presence: LocalPresence(), transport: URLSessionTransport(),
-                readFile: { try String(contentsOf: $0, encoding: .utf8) }, now: Date.init)
+                readFile: { try String(contentsOf: $0, encoding: .utf8) }, now: Date.init,
+                identity: LiveBuildIdentity())
         }
     }
 
@@ -81,6 +86,7 @@ public enum ConnectKeys {
     public static func add(
         file: String, issuer: String, keyID: String, role: ConnectRole, presence: Bool, cwd: URL, env: Environment
     ) throws -> Output {
+        try requireHardened(env)
         let url = file.hasPrefix("/") ? URL(fileURLWithPath: file) : cwd.appendingPathComponent(file)
         let pem: String
         do {
@@ -120,6 +126,7 @@ public enum ConnectKeys {
     /// Loads the resolved key (the flag's, else the project pin's, else the only one), asking for presence when it
     /// was stored with it, and probes it again.
     public static func check(keyID: String?, cwd: URL, env: Environment) throws -> Output {
+        try requireHardened(env)
         let chosen = try resolve(flag: keyID, config: Target.connectKey(from: cwd), stored: env.store.list())
         let (key, stored) = try KeyLoader.load(keyID: chosen.keyID, store: env.store, presence: env.presence)
         let client = ConnectClient(key: key, role: stored.role, transport: env.transport, now: env.now)
@@ -193,6 +200,11 @@ public enum ConnectKeys {
         }
         guard stored.count == 1, let only = stored.first else { throw ConnectError.noKey(known: ids) }
         return only
+    }
+
+    /// Refuses before any store or network call when this build could be injected into or debugged.
+    private static func requireHardened(_ env: Environment) throws {
+        guard env.identity.hardenedRuntime && !env.identity.debuggable else { throw ConnectError.unhardenedBuild }
     }
 
     /// The `roleCheck` value in `--json` output. Apple's code stays out of it: it is untrusted text.

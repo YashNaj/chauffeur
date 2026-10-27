@@ -19,7 +19,8 @@ import Testing
         // A fake key store by default, so no unit test reads the login keychain.
         e.connect = ConnectKeys.Environment(
             store: MemoryKeyStore(), presence: ScriptedPresence(allow: true), transport: ScriptedTransport([:]),
-            readFile: { _ in "" }, now: Date.init)
+            readFile: { _ in "" }, now: Date.init,
+            identity: FixedBuildIdentity(hardened: true, debuggable: false))
         return e
     }
 

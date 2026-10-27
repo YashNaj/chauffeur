@@ -8,7 +8,8 @@ import Testing
 
     func env(
         apps: String = "apps-200", finance: String = "finance-403",
-        store: MemoryKeyStore = MemoryKeyStore(), presence: Bool = true, file: String? = nil
+        store: MemoryKeyStore = MemoryKeyStore(), presence: Bool = true, file: String? = nil,
+        identity: BuildIdentity = FixedBuildIdentity(hardened: true, debuggable: false)
     ) throws -> (ConnectKeys.Environment, MemoryKeyStore, ScriptedTransport) {
         let t = ScriptedTransport([
             "GET /v1/apps": try Fixtures.connect(apps),
@@ -16,7 +17,8 @@ import Testing
         ])
         let e = ConnectKeys.Environment(
             store: store, presence: ScriptedPresence(allow: presence), transport: t,
-            readFile: { _ in file ?? TestKeys.pem() }, now: { Date(timeIntervalSince1970: 1_800_000_000) })
+            readFile: { _ in file ?? TestKeys.pem() }, now: { Date(timeIntervalSince1970: 1_800_000_000) },
+            identity: identity)
         return (e, store, t)
     }
 
@@ -186,6 +188,34 @@ import Testing
         #expect(throws: ConnectError.unknownKey("7X2K9ABC1D", known: [])) {
             try ConnectKeys.remove(keyID: "7X2K9ABC1D", env: e)
         }
+    }
+
+    @Test func unhardenedBuildsRefuseKeyCommands() throws {
+        let root = try tempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let (held, store, _) = try env()
+        _ = try add(held, root)
+        let builds = [
+            FixedBuildIdentity(hardened: false, debuggable: false),
+            FixedBuildIdentity(hardened: true, debuggable: true),
+            FixedBuildIdentity(hardened: false, debuggable: true),
+        ]
+        for build in builds {
+            let presence = ScriptedPresence(allow: true)
+            var (e, _, t) = try env(store: store, identity: build)
+            e.presence = presence
+            #expect(throws: ConnectError.unhardenedBuild) { try add(e, root) }
+            #expect(throws: ConnectError.unhardenedBuild) { try ConnectKeys.check(keyID: nil, cwd: root, env: e) }
+            #expect(t.requests.isEmpty && presence.asked.isEmpty && store.dataReads == 0)
+            #expect(try ConnectKeys.list(cwd: root, env: e).exit == 0)
+            #expect(try ConnectKeys.use(keyID: "7X2K9ABC1D", cwd: root, env: e).exit == 0)
+        }
+        #expect(
+            ConnectError.unhardenedBuild.description
+                == "this build can't hold an App Store Connect key: it isn't hardened. Build and sign a release: "
+                + "swift build -c release && scripts/sign.sh")
+        let (e, _, _) = try env(store: store, identity: FixedBuildIdentity(hardened: false, debuggable: true))
+        #expect(try ConnectKeys.remove(keyID: "7X2K9ABC1D", env: e).exit == 0 && store.list().isEmpty)
     }
 
     @Test func resolution() throws {

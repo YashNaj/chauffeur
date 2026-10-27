@@ -17,6 +17,17 @@ enum TestKeys {
     }
 }
 
+/// A build whose signature says what the test needs.
+struct FixedBuildIdentity: BuildIdentity {
+    var hardenedRuntime: Bool
+    var debuggable: Bool
+
+    init(hardened: Bool, debuggable: Bool) {
+        hardenedRuntime = hardened
+        self.debuggable = debuggable
+    }
+}
+
 /// Answers by request shape and records what it was asked. No test touches the network.
 final class ScriptedTransport: ConnectTransport, @unchecked Sendable {
     private let answers: [String: ConnectResponse]

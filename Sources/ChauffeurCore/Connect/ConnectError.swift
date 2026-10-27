@@ -47,6 +47,7 @@ public enum ConnectError: Error, Equatable, CustomStringConvertible {
     case duplicateKey(String)
     case presenceDenied(String)
     case keychain(OSStatus, String)
+    case unhardenedBuild
 
     private static func esc(_ s: String) -> String { Perception.escape(s, limit: 200) }
 
@@ -90,6 +91,10 @@ public enum ConnectError: Error, Equatable, CustomStringConvertible {
         case .keychain(let status, let what):
             let message = SecCopyErrorMessageString(status, nil) as String? ?? "unknown error"
             return "keychain: \(message) (\(status)) while \(what)"
+        case .unhardenedBuild:
+            return
+                "this build can't hold an App Store Connect key: it isn't hardened. Build and sign a release: "
+                + "swift build -c release && scripts/sign.sh"
         }
     }
 }
