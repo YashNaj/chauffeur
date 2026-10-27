@@ -86,4 +86,12 @@ import Testing
     @Test func skillSaysWhenToLookAtPixels() {
         #expect(Skill.skillMarkdown.contains("Take a screenshot to check how something looks"))
     }
+
+    @Test @MainActor func everySurfaceExplainsPending() {
+        for text in [Skill.skillMarkdown, Skill.agentsSection, MCPServer.instructions, Usage.text] {
+            #expect(text.contains("PENDING") || text.contains("6 effect still in flight"), "\(text.prefix(60))")
+        }
+        #expect(Usage.text.contains("6 effect still in flight (chauffeur wait)"))
+        #expect(Skill.skillMarkdown.contains("`chauffeur wait`"))
+    }
 }

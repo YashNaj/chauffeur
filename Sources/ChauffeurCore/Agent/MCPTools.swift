@@ -64,7 +64,8 @@ public enum MCPTools {
             "act", title: "Act on the screen",
             description:
                 "Act on the simulator and get a verified result: 'changed' with a diff of the screen, or NO EFFECT, "
-                + "INTERCEPTED, NOT DELIVERED, UNVERIFIED or APP CRASHED with a hint — never a false success. tap: target is "
+                + "INTERCEPTED, NOT DELIVERED, UNVERIFIED or APP CRASHED with a hint — never a false success. "
+                + "PENDING (the app is waiting for a network reply): act with action wait finishes it. tap: target is "
                 + "a ref or x,y point (long: hold seconds). type: target is a text field ref, text is typed (submit presses "
                 + "Return). scroll: direction, optional in (container ref) and until (text to scroll to). swipe: from and to "
                 + "points. button: home, lock, siri, volume-up, volume-down. batch: commands is chauffeur commands separated "

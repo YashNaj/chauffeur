@@ -14,7 +14,7 @@ Spec: `docs/specs/2026-10-08-m4b-network-and-evidence-design.md`.
 
 - [x] Step 0: what the Mac and the logs show (Findings in the spec)
 - [x] Path shapes, telemetry hosts, crash first, relaunching an app opened from its icon
-- [ ] Network activity and detail layers, `PENDING`, `wait`, batches, clipboard (Plan 2)
+- [x] Network activity and detail layers, `PENDING`, `wait`, batches, clipboard (Plan 2)
 - [ ] A sweep for more: keyboards, alerts that arrive late, animations that never settle.
 - [ ] 0.2.0
 

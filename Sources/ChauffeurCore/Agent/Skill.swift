@@ -31,6 +31,8 @@ public enum Skill {
            - `NO EFFECT`, `INTERCEPTED`, `NOT DELIVERED`, `UNVERIFIED`, `TEXT MISMATCH`: it did not. Read the `hint:`
              line; do not repeat the same action blindly.
            - `APP CRASHED`: the app died. Run `chauffeur logs` for its last lines and the crash report.
+           - `PENDING` (exit 6): the app is still waiting for a network reply. Run `chauffeur wait` for the verdict;
+             don't tap again.
            - `APP EXITED`: the app is gone with no crash report or fatal log line (ended from outside chauffeur). Relaunch it.
            - `logs: [error] …` lines are errors the app logged during the action.
         4. Repeat. Run `snapshot` again whenever you are unsure what is on screen.
@@ -88,7 +90,7 @@ public enum Skill {
         1. `chauffeur snapshot` lists the screen; actionable elements carry refs like `[e4]`.
         2. Act by ref: `chauffeur tap e4`, `chauffeur type e2 "text" --submit`, `chauffeur scroll down --until "Row 40"`.
         3. Read the result: `→ changed` worked; `NO EFFECT`, `INTERCEPTED`, `NOT DELIVERED` or `UNVERIFIED` did not (read
-           the `hint:`); `APP CRASHED` means run `chauffeur logs`.
+           the `hint:`); `APP CRASHED` means run `chauffeur logs`. `PENDING` means run `chauffeur wait`.
 
         Build and run: `xcodebuild -scheme <Scheme> -destination 'platform=iOS Simulator,id=<udid>' -derivedDataPath build build`,
         then `chauffeur install build/Build/Products/Debug-iphonesimulator/<App>.app` and `chauffeur launch <bundle id>`.

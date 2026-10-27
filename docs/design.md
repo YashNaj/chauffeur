@@ -434,7 +434,8 @@ this spec before the M1 plan is written.
 ## 13. Non-goals for v1
 
 Building apps; real devices; Android; cloud simulators; visual regression
-baselines; network inspection; recording video.
+baselines; network inspection beyond M4b's request evidence (bodies, headers and a traffic log are stage 2, see
+docs/specs/2026-10-08-m4b-network-and-evidence-design.md); recording video.
 
 ## 14. M0 findings (2026-10-06, Xcode 26.3 / iOS 26.2)
 

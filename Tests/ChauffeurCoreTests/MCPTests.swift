@@ -245,4 +245,9 @@ import Testing
     @Test func instructionsSayWhenToLookAtPixels() {
         #expect(MCPServer.instructions.contains("Take a screenshot to check how something looks"))
     }
+
+    @Test func actDescribesPending() throws {
+        let act = try #require(MCPTools.definitions.first { $0["name"]?.string == "act" })
+        #expect(act["description"]?.string?.contains("PENDING") == true)
+    }
 }
