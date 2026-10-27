@@ -15,6 +15,7 @@ struct ConnectLiveTests {
             StoredKey(
                 keyID: id, issuer: TestKeys.issuer, role: .developer, apps: ["A (a)"], added: "2026-10-26T20:00:00Z",
                 presence: false), pem: TestKeys.pem())
+        defer { try? s.remove(id) }
         #expect(try s.list().contains { $0.keyID == id && $0.apps == ["A (a)"] })
         #expect(try s.pem(for: id).hasPrefix("-----BEGIN PRIVATE KEY-----"))
         try s.remove(id)
