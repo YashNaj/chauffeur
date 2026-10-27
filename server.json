@@ -8,8 +8,8 @@
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/YashNaj/chauffeur/releases/download/v0.1.0/chauffeur.mcpb",
-      "fileSha256": "0c64cea83a639c61c9accd28a2cd2d9d6c29ba082ff6e126d24e4d1c055870f5",
+      "identifier": "https://github.com/YashNaj/chauffeur/releases/download/v0.2.0/chauffeur.mcpb",
+      "fileSha256": "8e833d11601407d1a3c742496cb2dea97afbff04fb4dd23670b6bb4dbce6c10f",
       "transport": { "type": "stdio" }
     }
   ]
