@@ -5,9 +5,9 @@ Put your name in **Owner** (in a PR) before starting a milestone. Each one start
 | Milestone | Status | Owner |
 |---|---|---|
 | M4a: guardrails and the contributor workflow | done | YashNaj |
-| M4b: network requests and other evidence | in progress | YashNaj |
+| M4b: network requests and other evidence | done (0.2.0) | YashNaj |
 | M4c: eval v2 | not started | |
-| M5a: the App Store Connect key | in progress | YashNaj |
+| M5a: the App Store Connect key | done | YashNaj |
 | M5b: `chauffeur ship` | spec drafted | YashNaj |
 | M5c: the review check | spec drafted | YashNaj |
 | M5d: the release honesty eval | spec drafted | YashNaj |
@@ -20,7 +20,7 @@ Spec: `docs/specs/2026-10-08-m4b-network-and-evidence-design.md`.
 - [x] Path shapes, telemetry hosts, crash first, relaunching an app opened from its icon
 - [x] Network activity and detail layers, `PENDING`, `wait`, batches, clipboard (Plan 2)
 - [ ] A sweep for more: keyboards, alerts that arrive late, animations that never settle.
-- [ ] 0.2.0
+- [x] 0.2.0, released 2026-10-27
 
 ## Web views in the tree (after M4b)
 
