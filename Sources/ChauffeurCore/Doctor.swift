@@ -44,6 +44,32 @@ public enum Doctor {
             text: "BackBoard log level: \(level)" + (daemonRunning ? " (raised by the running daemon)" : ""))
     }
 
+    /// The stored App Store Connect keys and the project's pin, from the keychain records alone: no key is read, so
+    /// `doctor` never asks for Touch ID.
+    public static func connectCheck(keys: [StoredKey], pinned: String?) -> Check {
+        func describe(_ key: StoredKey) -> String {
+            "\(key.keyID) (\(key.role.title), \(key.presence ? "presence" : "no presence"))"
+        }
+        if let pinned {
+            guard let key = keys.first(where: { $0.keyID == pinned }) else {
+                return Check(
+                    status: .fail,
+                    text: "connect key: \(pinned) is pinned in .chauffeur.json but not in your keychain "
+                        + "(chauffeur keys add, or keys use another)")
+            }
+            return Check(status: .ok, text: "connect key: \(describe(key)) · pinned for this project")
+        }
+        switch keys.count {
+        case 0: return Check(status: .ok, text: "connect key: none (chauffeur keys add)")
+        case 1: return Check(status: .ok, text: "connect key: \(describe(keys[0]))")
+        default:
+            return Check(
+                status: .warn,
+                text: "connect keys: \(keys.map(\.keyID).joined(separator: ", ")) · none pinned "
+                    + "(chauffeur keys use <key-id>)")
+        }
+    }
+
     /// Whether a daemon answers on the socket, plus its pid from the pidfile. The pidfile alone can lie: a crashed
     /// daemon's pid may now belong to another process, so only a listening socket counts as running.
     public static func daemonStatus(_ udid: String) -> (running: Bool, pid: Int32?) {
@@ -63,6 +89,11 @@ public enum Doctor {
         let dir = Xcode.developerDir()
         checks.append(
             Check(status: xcode.isEmpty ? .fail : .ok, text: (xcode.isEmpty ? "no Xcode found" : xcode) + " at \(dir)"))
+        do {
+            checks.append(connectCheck(keys: try e.connect.store.list(), pinned: Target.connectKey(from: e.cwd)))
+        } catch {
+            checks.append(Check(status: .warn, text: "connect key: \(error)"))
+        }
         do {
             checks.append(
                 Check(status: .ok, text: "SimulatorKit: " + (try CHSimulator.loadFrameworks(developerDir: dir))))

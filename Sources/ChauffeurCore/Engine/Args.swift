@@ -145,6 +145,8 @@ public enum Usage {
           do '<cmd>; <cmd>; …'                    run commands in order; stops at the first failure
           skill install [--agents claude,codex,cursor]   write the agent skill and the AGENTS.md section here
           mcp                                     MCP server over stdio: the same commands as tools
+          keys add <AuthKey.p8> --issuer <uuid> --key-id <id> --role developer|app-manager [--no-presence]
+          keys list | check [<key-id>] | remove <key-id> | use <key-id>   App Store Connect keys: for humans, never an agent
 
         target: --udid › CHAUFFEUR_UDID › .chauffeur.json › the only booted simulator
         --json prints {"data","exit","text"} · options go before `--`; everything after `--` is data

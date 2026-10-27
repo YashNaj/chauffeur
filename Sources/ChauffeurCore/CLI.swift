@@ -13,15 +13,18 @@ public enum CLI {
         public var cwd: URL
         public var devices: () throws -> [DeviceInfo]
         public var send: (String, [String]) throws -> Output
+        /// The App Store Connect key store and its probes, for `keys` and `doctor`. Never the daemon's.
+        public var connect: ConnectKeys.Environment
 
         public init(
             env: [String: String], cwd: URL, devices: @escaping () throws -> [DeviceInfo],
-            send: @escaping (String, [String]) throws -> Output
+            send: @escaping (String, [String]) throws -> Output, connect: ConnectKeys.Environment? = nil
         ) {
             self.env = env
             self.cwd = cwd
             self.devices = devices
             self.send = send
+            self.connect = connect ?? .live()
         }
 
         public static func live(executable: String) -> Environment {
@@ -32,7 +35,7 @@ public enum CLI {
                 devices: { try SimCtl.devices() },
                 send: { udid, args in
                     try DaemonClient.send(udid: udid, args: args, cwd: cwd.path, executable: executable)
-                })
+                }, connect: .live())
         }
     }
 
@@ -95,6 +98,8 @@ public enum CLI {
                 try Args(tail, usage: "usage: chauffeur mcp   (an MCP server on stdin/stdout; your agent starts it)")
                     .done()
                 return Output("", exit: MCPStdio.serve(env: e))
+            case "keys":
+                return try ConnectKeys.handle(tail, cwd: e.cwd, env: e.connect)
             case "skill":
                 var a = try Args(
                     tail, options: ["--agents"], usage: "usage: chauffeur skill install [--agents claude,codex,cursor]")
@@ -121,6 +126,8 @@ public enum CLI {
         } catch ChauffeurError.usage(let text) {
             return Output(text, exit: 64)
         } catch let error as ChauffeurError {
+            return Output(error.description, exit: 1)
+        } catch let error as ConnectError {
             return Output(error.description, exit: 1)
         } catch {
             return Output("\(error)", exit: 1)

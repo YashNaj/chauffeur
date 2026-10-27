@@ -95,4 +95,31 @@ import Testing
         _ = CLI.handle(["find", "OK"], env(booted: [a, b], cwd: dir, recorder: rec))
         #expect(rec.calls[0].0 == "BBBB-2")
     }
+
+    @Test func keysCommandsNeverReachTheDaemon() throws {
+        let rec = Recorder()
+        let store = MemoryKeyStore()
+        let connect = ConnectKeys.Environment(
+            store: store, presence: ScriptedPresence(allow: true), transport: ScriptedTransport([:]),
+            readFile: { _ in "" }, now: Date.init)
+        var e = env(booted: [a], recorder: rec)
+        e.connect = connect
+        #expect(CLI.handle(["keys", "list"], e).text.hasPrefix("no keys stored"))
+        let bad = CLI.handle(
+            ["keys", "add", "k.p8", "--issuer", TestKeys.issuer, "--key-id", "7X2K9ABC1D", "--role", "admin"], e)
+        #expect(bad.exit == 64 && bad.text.hasPrefix("--role must be developer or app-manager"))
+        #expect(CLI.handle(["keys"], e).exit == 64 && CLI.handle(["keys", "frob"], e).exit == 64)
+        let missing = CLI.handle(["keys", "remove", "Z"], e)
+        #expect(missing.exit == 1 && missing.text == "no stored key Z; stored: none")
+        #expect(
+            CLI.handle(["--json", "keys", "remove", "Z"], e).text.hasPrefix(
+                #"{"data":null,"exit":1,"text":"no stored key Z"#))
+        #expect(rec.calls.isEmpty)
+    }
+
+    @Test func usageListsKeys() {
+        #expect(
+            Usage.text.contains(
+                "keys add <AuthKey.p8> --issuer <uuid> --key-id <id> --role developer|app-manager [--no-presence]"))
+    }
 }

@@ -29,6 +29,54 @@ public enum ConnectKeys {
         }
     }
 
+    public static let usage =
+        "usage: chauffeur keys add <AuthKey.p8> --issuer <uuid> --key-id <id> --role developer|app-manager "
+        + "[--no-presence] · keys list · keys check [<key-id>] · keys remove <key-id> · keys use <key-id>"
+
+    /// Parses `keys <subcommand> …` and runs it. Nothing here reaches the daemon.
+    public static func handle(_ argv: [String], cwd: URL, env: Environment) throws -> Output {
+        var a = try Args(
+            argv, flags: ["--no-presence"], options: ["--issuer", "--key-id", "--role"], usage: usage)
+        let subcommand = a.next()
+        if subcommand != "add", !a.options.isEmpty || !a.flags.isEmpty {
+            throw ChauffeurError.usage("--issuer, --key-id, --role and --no-presence belong to keys add\n" + usage)
+        }
+        switch subcommand {
+        case "add":
+            guard let file = a.next() else { throw ChauffeurError.usage(usage) }
+            try a.done()
+            func required(_ name: String) throws -> String {
+                guard let value = a.option(name) else { throw ChauffeurError.usage("\(name) is required\n" + usage) }
+                return value
+            }
+            let issuer = try required("--issuer")
+            let keyID = try required("--key-id")
+            guard let role = ConnectRole(flag: try required("--role")) else {
+                throw ChauffeurError.usage("--role must be developer or app-manager\n" + usage)
+            }
+            return try add(
+                file: file, issuer: issuer, keyID: keyID, role: role, presence: !a.flag("--no-presence"), cwd: cwd,
+                env: env)
+        case "list":
+            try a.done()
+            return try list(cwd: cwd, env: env)
+        case "check":
+            let keyID = a.next()
+            try a.done()
+            return try check(keyID: keyID, cwd: cwd, env: env)
+        case "remove":
+            guard let keyID = a.next() else { throw ChauffeurError.usage(usage) }
+            try a.done()
+            return try remove(keyID: keyID, env: env)
+        case "use":
+            guard let keyID = a.next() else { throw ChauffeurError.usage(usage) }
+            try a.done()
+            return try use(keyID: keyID, cwd: cwd, env: env)
+        default:
+            throw ChauffeurError.usage(usage)
+        }
+    }
+
     /// Reads and parses the key, refuses a stored id, probes, and stores the key only when the probes accept it.
     public static func add(
         file: String, issuer: String, keyID: String, role: ConnectRole, presence: Bool, cwd: URL, env: Environment
