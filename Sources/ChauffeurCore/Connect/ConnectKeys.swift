@@ -1,7 +1,7 @@
 import Foundation
 
-/// `keys add`, `keys check` and `keys remove`. A key is probed before it is stored, and only a key the probes
-/// accepted is stored. Nothing here renders the key, a token or the keychain comment.
+/// `keys add`, `keys check`, `keys use`, `keys list` and `keys remove`. A key is probed before it is stored, and
+/// only a key the probes accepted is stored. Nothing here renders the key, a token or the keychain comment.
 public enum ConnectKeys {
     /// What the commands touch outside themselves. Tests swap each one for a fake.
     public struct Environment: Sendable {
@@ -67,9 +67,10 @@ public enum ConnectKeys {
         return Output(text, data: data)
     }
 
-    /// Loads the resolved key (asking for presence when it was stored with it) and probes it again.
-    public static func check(keyID: String?, config: String?, env: Environment) throws -> Output {
-        let chosen = try resolve(flag: keyID, config: config, stored: env.store.list())
+    /// Loads the resolved key (the flag's, else the project pin's, else the only one), asking for presence when it
+    /// was stored with it, and probes it again.
+    public static func check(keyID: String?, cwd: URL, env: Environment) throws -> Output {
+        let chosen = try resolve(flag: keyID, config: Target.connectKey(from: cwd), stored: env.store.list())
         let (key, stored) = try KeyLoader.load(keyID: chosen.keyID, store: env.store, presence: env.presence)
         let client = ConnectClient(key: key, role: stored.role, transport: env.transport, now: env.now)
         let verdict = try Probe.run(client)
@@ -84,6 +85,39 @@ public enum ConnectKeys {
         case .unauthorized, .rateLimited:
             return Output(Probe.message(verdict), exit: 1)
         }
+    }
+
+    /// Pins a stored key for the project: `connectKey` in `cwd`'s `.chauffeur.json`, every other key kept.
+    public static func use(keyID: String, cwd: URL, env: Environment) throws -> Output {
+        let ids = try env.store.list().map(\.keyID)
+        guard ids.contains(keyID) else { throw ConnectError.unknownKey(keyID, known: ids) }
+        try Target.setConfig("connectKey", to: keyID, in: cwd)
+        return Output("using key \(keyID) for \(cwd.path)")
+    }
+
+    /// The stored keys from their records alone: no key data is read and no issuer is shown.
+    public static func list(cwd: URL, env: Environment) throws -> Output {
+        let keys = try env.store.list()
+        guard !keys.isEmpty else {
+            return Output(
+                "no keys stored (chauffeur keys add <AuthKey.p8> --issuer <uuid> --key-id <id> --role app-manager)",
+                data: ["keys": []])
+        }
+        let pinned = Target.connectKey(from: cwd)
+        let lines = keys.map { key in
+            let parts = [
+                key.keyID, key.role.title, "\(key.apps.count) apps", "added \(key.added.prefix(10))",
+                key.presence ? "presence" : "no presence",
+            ]
+            return (parts + (key.keyID == pinned ? ["pinned"] : [])).joined(separator: " · ")
+        }
+        let rows: [JSON] = keys.map { key in
+            .object([
+                "keyID": .string(key.keyID), "role": .string(key.role.rawValue), "apps": JSON(key.apps),
+                "added": .string(key.added), "presence": .bool(key.presence), "pinned": .bool(key.keyID == pinned),
+            ])
+        }
+        return Output(lines.joined(separator: "\n"), data: ["keys": .array(rows)])
     }
 
     /// Deletes the key from the keychain. It stays valid at Apple until someone revokes it there.

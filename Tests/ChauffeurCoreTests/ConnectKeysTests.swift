@@ -21,6 +21,12 @@ import Testing
         return (e, store, t)
     }
 
+    func tempDir() throws -> URL {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("cht-keys-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
     let add = { (e: ConnectKeys.Environment, cwd: URL) in
         try ConnectKeys.add(
             file: "AuthKey_7X2K9ABC1D.p8", issuer: TestKeys.issuer, keyID: TestKeys.keyID, role: .appManager,
@@ -110,7 +116,9 @@ import Testing
         let presence = ScriptedPresence(allow: true)
         var e2 = e
         e2.presence = presence
-        let out = try ConnectKeys.check(keyID: nil, config: nil, env: e2)
+        let root = try tempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let out = try ConnectKeys.check(keyID: nil, cwd: root, env: e2)
         #expect(
             out.exit == 0 && out.text.hasSuffix("\nkey 7X2K9ABC1D: ok (2 apps)") && presence.asked.count == 1
                 && t.requests.count == 6)
@@ -120,8 +128,34 @@ import Testing
         let (e, store, _) = try env()
         _ = try add(e, cwd)
         let (e2, _, _) = try env(users: "unauthorized-401", store: store)
-        let out = try ConnectKeys.check(keyID: "7X2K9ABC1D", config: nil, env: e2)
+        let root = try tempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let out = try ConnectKeys.check(keyID: "7X2K9ABC1D", cwd: root, env: e2)
         #expect(out.exit == 1 && out.text == ConnectError.unauthorized.description)
+    }
+
+    @Test func useWritesThePinAndListShowsIt() throws {
+        let root = try tempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let (e, store, _) = try env()
+        _ = try add(e, root)
+        #expect(throws: ConnectError.unknownKey("Z", known: ["7X2K9ABC1D"])) {
+            try ConnectKeys.use(keyID: "Z", cwd: root, env: e)
+        }
+        #expect(Target.connectKey(from: root) == nil)
+        #expect(
+            try ConnectKeys.use(keyID: "7X2K9ABC1D", cwd: root, env: e).text == "using key 7X2K9ABC1D for \(root.path)")
+        let list = try ConnectKeys.list(cwd: root, env: e)
+        #expect(
+            list.text == "7X2K9ABC1D · App Manager · 2 apps · added 2027-01-15 · presence · pinned"
+                && store.dataReads == 0)
+        #expect(
+            list.data?["keys"]?.array?.first?["pinned"] == true
+                && list.data?["keys"]?.array?.first?["issuer"] == nil)
+        let empty = try tempDir()
+        defer { try? FileManager.default.removeItem(at: empty) }
+        let (none, _, _) = try env(store: MemoryKeyStore())
+        #expect(try ConnectKeys.list(cwd: empty, env: none).text.hasPrefix("no keys stored (chauffeur keys add"))
     }
 
     @Test func removeSaysItDoesNotRevoke() throws {
