@@ -280,6 +280,15 @@ ID prompt is observed by hand once per macOS version and noted in Findings.
 - `chauffeur doctor` reports the key; the skill gains one sentence: an agent never adds or removes keys.
 - No release command exists yet (M5b), so the table has reads only, and the "never" test already guards it.
 
+7. **Live run of the revised design, 2026-10-27**, signed release build (`scripts/sign.sh`, flags `adhoc,runtime`):
+   `keys add` with the App Manager key printed the six-line sheet (`role check: not an Admin or Finance key`), stored
+   it, `keys list` and `doctor` showed it with no dialog, `keys use` pinned it, `keys check` re-probed and answered
+   `ok (2 apps)` after the presence step. The Admin key was refused with the finance-alarm text after two requests
+   (apps 200, finance 400); the revoked key was rejected with the 401 text after one. The debug build refused
+   `keys check` with the unhardened-build text before any prompt. A `DYLD_INSERT_LIBRARIES` library ran inside the
+   unsigned release binary and not inside the signed one. Whether the presence step showed the Touch ID sheet or the
+   password sheet on this Mac is recorded by the owner's observation (pending at the time of writing).
+
 ## Decision (2026-10-27)
 
 After Step 0 and a research pass (notes and report under `.superpowers/research/`, summarised in Findings 2 and 4):

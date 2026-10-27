@@ -67,8 +67,9 @@ before live tests: register `dev.chauffeur.fixture` on the team, create its app 
 - [x] Step 0: keychain findings (in the spec)
 - [x] Key, tokens, request table, errors, transport, client
 - [x] Probes, capability sheet, keychain store, keys commands, CLI and doctor
-- [ ] Step 0: probe and scoped-token recordings with the owner's keys (Findings 2 and 4)
-- [ ] Live run: keys add with each role; Touch ID observed
+- [x] Step 0: probe and scoped-token recordings with the owner's keys (Findings 2 and 4); the Decision
+- [x] Finance alarm, wider deny list, hardened binary (Tasks 15–16)
+- [x] Live run: App Manager accepted, Admin and revoked keys refused, debug build refuses; Touch ID noted in Findings 7
 - [ ] 0.3.0 with M5b and M5c
 
 ## Later
