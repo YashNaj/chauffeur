@@ -218,12 +218,14 @@ gains a row for `Connect` (App Store Connect: the key, tokens, the request table
   `chauffeur` is linker-signed ad hoc without the hardened runtime, so a library injected with
   `DYLD_INSERT_LIBRARIES` runs inside it under its keychain identity and skips the presence check; the debug build
   carries `get-task-allow`, so a debugger can attach. Release artifacts are therefore signed with
-  `codesign -o runtime` (ad hoc is enough: `scripts/sign.sh`, run by `build-mcpb.sh`, CI's release job and the
-  Homebrew formula), and every command that reads or writes a key first checks its own code signature: hardened
+  `codesign -o runtime` (ad hoc is enough: `scripts/sign.sh`, run by `build-mcpb.sh`, `check.sh` and the Homebrew
+  formula), and every command that reads or writes a key first checks its own code signature: hardened
   runtime present and no `get-task-allow`. A build that fails the check refuses with
   `this build can't hold an App Store Connect key: it isn't hardened. Build and sign a release: swift build -c
   release && scripts/sign.sh`. Developers run key commands from the signed release build; the live keychain test
-  calls `KeychainStore` directly and is unaffected.
+  calls `KeychainStore` directly and is unaffected. The in-process check reads the on-disk signature of the running
+  binary and is a guard rail for honest use; the security boundary is the hardened runtime itself, which the kernel
+  enforces at exec.
 
 ## 6. Tokens
 

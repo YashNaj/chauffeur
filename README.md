@@ -122,10 +122,12 @@ chauffeur keys remove <key-id>
 chauffeur keys use <key-id>
 ```
 
-`keys add` probes the key first and refuses one that can reach users or certificates. The key lives in the login
-keychain and is read only after Touch ID or your login password. Keys are for humans: an agent never adds or removes
-one. Key commands run from the signed release build (`swift build -c release && scripts/sign.sh`) and refuse to run
-from a debug build. Details: [the M5a spec](docs/specs/2026-10-26-m5a-connect-key-design.md).
+`keys add` probes the key first and refuses one that can read the team's finance reports, which only Admin, Account
+Holder and Finance keys can; the request table, not the probe, is what keeps chauffeur away from users, certificates,
+identifiers and profiles. The key lives in the login keychain and is read only after Touch ID or your login password.
+Keys are for humans: an agent never adds or removes one. Key commands run from the signed release build
+(`swift build -c release && scripts/sign.sh`) and refuse to run from a debug build.
+Details: [the M5a spec](docs/specs/2026-10-26-m5a-connect-key-design.md).
 
 ## How it works
 

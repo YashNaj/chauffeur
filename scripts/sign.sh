@@ -6,7 +6,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 path=${1:-$ROOT/.build/release/chauffeur}
 [ -f "$path" ] || { echo "sign: no binary at $path" >&2; exit 1; }
-codesign --force --sign - --options runtime "$path" 2>/dev/null || { echo "sign: codesign failed on $path" >&2; exit 1; }
+codesign --force --sign - --options runtime "$path" || { echo "sign: codesign failed on $path" >&2; exit 1; }
 # Read each answer whole: grep -q exits early, and under pipefail codesign's SIGPIPE would fail the check.
 details=$(codesign -d -vv "$path" 2>&1)
 grep -q 'flags=.*runtime' <<<"$details" || { echo "sign: $path is not signed with the hardened runtime" >&2; exit 1; }
