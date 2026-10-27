@@ -1,0 +1,23 @@
+{
+  "status": 200,
+  "headers": {"X-Rate-Limit": "user-hour-lim:3600;user-hour-rem:3598"},
+  "body": {
+    "data": [
+      {
+        "type": "certificates",
+        "id": "C1D2E3F4G5",
+        "attributes": {
+          "name": "Apple Distribution: Example Team",
+          "certificateType": "DISTRIBUTION",
+          "displayName": "Example Team",
+          "platform": "IOS",
+          "expirationDate": "2027-10-26T00:00:00.000+0000"
+        },
+        "links": {"self": "https://api.appstoreconnect.apple.com/v1/certificates/C1D2E3F4G5"}
+      }
+    ],
+    "links": {"self": "https://api.appstoreconnect.apple.com/v1/certificates?limit=1"},
+    "meta": {"paging": {"total": 1, "limit": 1}}
+  },
+  "source": "documented"
+}

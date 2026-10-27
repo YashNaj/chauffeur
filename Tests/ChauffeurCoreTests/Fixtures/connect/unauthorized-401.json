@@ -1,0 +1,16 @@
+{
+  "status": 401,
+  "headers": {},
+  "body": {
+    "errors": [
+      {
+        "id": "9d3a1b2c-4e5f-4a6b-8c7d-2e3f4a5b6c7d",
+        "status": "401",
+        "code": "NOT_AUTHORIZED",
+        "title": "Authentication credentials are missing or invalid.",
+        "detail": "Provide a properly configured and signed bearer token, and make sure that it has not expired. Learn more about Generating Tokens for API Requests https://developer.apple.com/go/?id=api-generating-tokens"
+      }
+    ]
+  },
+  "source": "documented"
+}

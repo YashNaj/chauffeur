@@ -1,0 +1,33 @@
+{
+  "status": 200,
+  "headers": {"X-Rate-Limit": "user-hour-lim:3600;user-hour-rem:3597"},
+  "body": {
+    "data": [
+      {
+        "type": "apps",
+        "id": "1500000002",
+        "attributes": {
+          "name": "Notes \"quoted\"",
+          "bundleId": "dev.x.notes",
+          "sku": "NOTES",
+          "primaryLocale": "en-US"
+        },
+        "links": {"self": "https://api.appstoreconnect.apple.com/v1/apps/1500000002"}
+      },
+      {
+        "type": "apps",
+        "id": "1500000001",
+        "attributes": {
+          "name": "Fixture",
+          "bundleId": "dev.chauffeur.fixture",
+          "sku": "FIXTURE",
+          "primaryLocale": "en-US"
+        },
+        "links": {"self": "https://api.appstoreconnect.apple.com/v1/apps/1500000001"}
+      }
+    ],
+    "links": {"self": "https://api.appstoreconnect.apple.com/v1/apps?limit=200"},
+    "meta": {"paging": {"total": 2, "limit": 200}}
+  },
+  "source": "documented"
+}

@@ -1,0 +1,16 @@
+{
+  "status": 403,
+  "headers": {},
+  "body": {
+    "errors": [
+      {
+        "id": "4f1c2d6e-8a3b-4c5d-9e7f-0a1b2c3d4e5f",
+        "status": "403",
+        "code": "FORBIDDEN_ERROR",
+        "title": "This request is forbidden for security reasons",
+        "detail": "The API key in use does not allow this request"
+      }
+    ]
+  },
+  "source": "documented"
+}
