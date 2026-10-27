@@ -274,8 +274,20 @@ programs are not in the repo; the plan's live tests repeat the checks that matte
    with the Certificates, Identifiers & Profiles box checked, and `keys add` refused it after the first request.
    Observed shapes: a 200 on `/v1/users` carries `data[].attributes.roles` (e.g. `["ADMIN",
    "CLOUD_MANAGED_DEVELOPER_ID"]`); `X-Rate-Limit` is `user-hour-lim:3600;user-hour-rem:N` and counts down by one
-   per request. Still to run: an App Manager key without the toggle, and a Developer key, to settle whether App
-   Manager also gets 200 on `/v1/users`.
+   per request. **Settled 2026-10-27**, later the same day: that third key had been generated as App Manager, and
+   the current Generate API Key dialog has no Certificates, Identifiers & Profiles checkbox at all (Access is a
+   role picker: Admin, App Manager, Developer, Finance, Sales and Reports, Customer Support, Marketing). A
+   differential run of 17 reads with the Admin key and the App Manager key answered identically on every one:
+   200 on `users`, `userInvitations`, `certificates`, `bundleIds`, `profiles`, `devices`, `merchantIds`,
+   `passTypeIds`, `ciProducts`, `apps`, `betaGroups`; 403 on `webhooks` and `appEvents` for both; the full
+   `users` list (two users, roles `ADMIN` and `ACCOUNT_HOLDER+ADMIN`) is the same for both; `GET /v1/apiKeys`
+   is `404 PATH_ERROR` for both. With the owner's approval, `DELETE` on ids that cannot exist
+   (`/v1/certificates/DOESNOTEXIST00`, `/v1/bundleIds/…`, `/v1/profiles/…`, `/v1/users/0000…`) answered
+   `404 NOT_FOUND` for both keys, so Apple checks existence before authorisation and a safe write can't tell the
+   roles apart either. **No read and no safe write distinguishes an Admin key from an App Manager key.** §3's
+   probes as written would refuse every App Manager key; the design has to change (see the Decision below
+   Findings). Whether an App Manager key can revoke a certificate was not tested (it would need a real id);
+   Apple's role chart says only Admin and the Account Holder can.
    The responses become fixtures under `Tests/ChauffeurCoreTests/Fixtures/connect/` when recorded; until then the
    decision table is tested on Apple's documented error shape.
 3. **Reading the role back.** No endpoint returns a team key's own role (Apple's API reference lists none; the key
