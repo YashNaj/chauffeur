@@ -89,13 +89,30 @@ public protocol ConnectTransport: Sendable {
     func perform(_ request: ConnectRequest) throws -> ConnectResponse
 }
 
+// The semaphore orders the completion handler's write before the waiting thread's read; nothing reads after a timeout.
 private final class ConnectOutcome: @unchecked Sendable {
     var result: Result<ConnectResponse, ConnectError> = .failure(.transport("no HTTP response"))
+}
+
+/// Hands a 3xx back as the response instead of following it.
+private final class NoRedirects: NSObject, URLSessionTaskDelegate, Sendable {
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void
+    ) {
+        completionHandler(nil)
+    }
 }
 
 /// The real transport. Synchronous, like `Shell.run`: the CLI process has nothing else to do while it waits.
 public struct URLSessionTransport: ConnectTransport {
     public let timeout: TimeInterval
+
+    /// Ephemeral: no cache and no cookies on disk. Redirects are refused: following a 3xx to its `Location` is the
+    /// one way a request, bearer token and all, could reach a host other than `ConnectRequest.host`, so a 3xx comes
+    /// back as an ordinary response and surfaces as `ConnectError.apple`. No test covers this: it needs a network.
+    private static let session = URLSession(
+        configuration: .ephemeral, delegate: NoRedirects(), delegateQueue: nil)
 
     public init(timeout: TimeInterval = 30) { self.timeout = timeout }
 
@@ -106,7 +123,7 @@ public struct URLSessionTransport: ConnectTransport {
         for (name, value) in request.headers { urlRequest.setValue(value, forHTTPHeaderField: name) }
         let done = DispatchSemaphore(value: 0)
         let outcome = ConnectOutcome()
-        let task = URLSession.shared.dataTask(with: urlRequest) { data, response, error in
+        let task = Self.session.dataTask(with: urlRequest) { data, response, error in
             defer { done.signal() }
             if let error {
                 outcome.result = .failure(
