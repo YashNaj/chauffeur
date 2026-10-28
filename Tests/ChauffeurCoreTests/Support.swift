@@ -109,20 +109,36 @@ final class ScriptedTouches: TouchEvidenceSource {
     }
 }
 
-/// A `ShellRunner` that records every call's args and answers from a table keyed by args. Calls arrive from whichever
-/// thread `Session` runs a command on, so `calls` is lock-guarded (`@unchecked Sendable`, as `Box` in `Shell.swift`).
+/// A `ShellRunner` that records every call and answers from a table keyed by args. A key holds its replies in order,
+/// for a repeated call (`pbpaste` before and after a tap); the last one holds. Calls arrive from whichever thread
+/// `Session` runs a command on, so the state is lock-guarded (`@unchecked Sendable`, as `Box` in `Shell.swift`).
 final class RecordingShell: ShellRunner, @unchecked Sendable {
     private let lock = NSLock()
-    private var recorded: [[String]] = []
-    private let replies: [[String]: ProcessResult]
+    private var log: [(args: [String], stdin: String?, timeout: Double)] = []
+    private var served: [[String]: Int] = [:]
+    private let replies: [[String]: [ProcessResult]]
 
-    init(replies: [[String]: ProcessResult] = [:]) { self.replies = replies }
+    init(replies: [[String]: [ProcessResult]] = [:]) { self.replies = replies }
 
-    var calls: [[String]] { lock.withLock { recorded } }
+    /// One reply per call of an args key; the shorthand for the common case.
+    convenience init(replies: [[String]: ProcessResult]) {
+        self.init(replies: replies.mapValues { [$0] })
+    }
+
+    var calls: [[String]] { lock.withLock { log.map(\.args) } }
+    /// Every call with the stdin and timeout it passed (Task 12 asserts pbcopy's stdin).
+    var recorded: [(args: [String], stdin: String?, timeout: Double)] { lock.withLock { log } }
 
     func simctl(_ args: [String], stdin: String?, timeout: Double) throws -> ProcessResult {
-        lock.withLock { recorded.append(args) }
-        let reply = replies[args] ?? ProcessResult(status: 0, out: "", timedOut: false)
+        let reply: ProcessResult = lock.withLock {
+            log.append((args: args, stdin: stdin, timeout: timeout))
+            let index = served[args, default: 0]
+            served[args] = index + 1
+            guard let ordered = replies[args], let last = ordered.indices.last else {
+                return ProcessResult(status: 0, out: "", timedOut: false)
+            }
+            return ordered[min(index, last)]
+        }
         if reply.timedOut {
             // As `SimCtl.run` does.
             throw ChauffeurError.simulatorServiceUnresponsive(
@@ -133,29 +149,45 @@ final class RecordingShell: ShellRunner, @unchecked Sendable {
 }
 
 extension SessionEnvironment {
-    /// Tests: scripts the device, accessibility, touch evidence, shell, clock, flows and processes. By default the
-    /// touch log is unattached, there are no flows or live processes, and the device is booted at 402×874. It does not
-    /// fake the real `LogTap`, `SimBoot` (reached through the `simulatorBooted`/`simulatorBootDate` closures),
-    /// `CrashFinder` (`findCrashReport`) or the `StatePaths` files under `$TMPDIR/chauffeur`; the session still uses
-    /// those.
+    /// Tests: scripts the device, accessibility, touch evidence, shell, clock, flows, processes, boot state and the
+    /// crash report. By default the touch log is unattached, there are no flows or live processes, the simulator is
+    /// booted (no boot date) and no crash report is found, and the device is booted at 402×874. It does not fake the
+    /// real `LogTap` or the `StatePaths` files under `$TMPDIR/chauffeur`; the session still uses those.
     static func scripted(
         ax: ScriptedAX, touches: ScriptedTouches = ScriptedTouches(evidence: [], attached: false),
-        shell: RecordingShell = RecordingShell(), clock: FakeClock = FakeClock()
+        shell: RecordingShell = RecordingShell(), clock: FakeClock = FakeClock(),
+        flows: (any FlowSource)? = nil, processes: FakeProcesses = FakeProcesses(alive: []),
+        simulatorBooted: @escaping () -> Bool? = { true }, simulatorBootDate: @escaping () -> Date? = { nil },
+        findCrashReport: @escaping (TrackedApp) -> CrashReport? = { _ in nil }
     ) -> SessionEnvironment {
-        SessionEnvironment(
+        nonisolated(unsafe) let flows = flows  // a test's own object, only ever read on the main actor
+        return SessionEnvironment(
             clock: clock,
             device: { FakeDevice(udid: $0, booted: true, size: Size(w: 402, h: 874)) },
             ax: { _ in ax },
             touchEvidence: touches,
             shell: shell,
-            flows: { nil },
-            processes: FakeProcesses(alive: []))
+            flows: { flows },
+            processes: processes,
+            simulatorBooted: simulatorBooted,
+            simulatorBootDate: simulatorBootDate,
+            findCrashReport: findCrashReport)
     }
 }
 
-/// A `ProcessTable` where exactly the given pids are alive and have no relatives.
-struct FakeProcesses: ProcessTable {
-    var alive: Set<Int32>
+/// A `ProcessTable` whose live pids a test changes between commands (a reference, so the session sees the change).
+/// Nobody has relatives.
+final class FakeProcesses: ProcessTable, @unchecked Sendable {
+    private let lock = NSLock()
+    private var pids: Set<Int32>
+
+    init(alive: Set<Int32>) { pids = alive }
+
+    var alive: Set<Int32> {
+        get { lock.withLock { pids } }
+        set { lock.withLock { pids = newValue } }
+    }
+
     func isAlive(_ pid: Int32) -> Bool { alive.contains(pid) }
     func parent(of pid: Int32) -> Int32? { nil }
     func children(of parent: Int32, named: String) -> [Int32] { [] }

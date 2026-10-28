@@ -21,4 +21,37 @@ import Testing
         let s = Session(udid: "ZZ000000-TEST", environment: env)
         #expect(s.run(["snapshot"]).text.contains("not booted"))
     }
+
+    private func trackedSession(
+        _ procs: FakeProcesses, booted: @escaping () -> Bool? = { true }
+    ) -> (Session, TrackedApp) {
+        let env = SessionEnvironment.scripted(
+            ax: ScriptedAX(frames: []), processes: procs, simulatorBooted: booted)
+        let s = Session(
+            udid: "ZZ" + String(format: "%06X", UInt32.random(in: 0...0xFFFFFF)) + "-TEST", environment: env)
+        let app = TrackedApp(
+            bundle: "dev.chauffeur.fixture", executable: "Fixture", displayName: "Fixture", pid: 4321,
+            launchedAt: Date())
+        s.app = app
+        s.crashReportWaitMs = 0
+        s.logTapAttemptMs = s.clock.nowMs()  // no real `log stream` for a fake simulator
+        return (s, app)
+    }
+
+    @Test func livenessComesFromTheEnvironmentsProcessTable() {
+        let procs = FakeProcesses(alive: [4321])
+        let (s, _) = trackedSession(procs)
+        defer { TrackedApp.clear(StatePaths.app(s.udid)) }
+        #expect(s.annotate(Output("snapshot"), since: 0, logs: false).exit == 0 && s.app != nil)
+        procs.alive = []
+        #expect(s.annotate(Output("snapshot"), since: 0, logs: false).exit == 5)
+    }
+
+    @Test func aShutDownSimulatorFromTheEnvironmentIsNotACrash() {
+        let procs = FakeProcesses(alive: [4321])
+        let (s, _) = trackedSession(procs, booted: { false })
+        defer { TrackedApp.clear(StatePaths.app(s.udid)) }
+        procs.alive = []
+        #expect(s.annotate(Output("snapshot"), since: 0, logs: false).exit == 0 && s.app == nil)
+    }
 }

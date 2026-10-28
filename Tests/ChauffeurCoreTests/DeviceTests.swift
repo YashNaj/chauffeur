@@ -5,7 +5,13 @@ import Testing
 
 /// Argument checks for the simulator-setting commands; all of them fail before touching a simulator.
 @Suite @MainActor struct DeviceTests {
-    let s = Session(udid: "ZZ000000-TEST")
+    let procs = FakeProcesses(alive: [])
+    let s: Session
+
+    init() {
+        s = Session(
+            udid: "ZZ000000-TEST", environment: .scripted(ax: ScriptedAX(frames: []), processes: procs))
+    }
 
     @Test func permissionArgumentsAreChecked() throws {
         #expect(throws: ChauffeurError.self) { try s.permissionCommand(["allow", "location", "dev.x"]) }
@@ -21,7 +27,7 @@ import Testing
         let fixture = TrackedApp(
             bundle: "dev.chauffeur.fixture", executable: "Fixture", displayName: "Fixture", pid: 4321,
             launchedAt: Date())
-        s.isAlive = { _ in false }
+        procs.alive = []
         let note = s.afterPermissionChange(fixture, waitMs: 0)
         #expect(
             note
@@ -32,7 +38,7 @@ import Testing
                 && s.annotate(Output("permission grant location dev.chauffeur.fixture → granted"), since: 0, logs: true)
                     .exit == 0
         )
-        s.isAlive = { _ in true }
+        procs.alive = [4321]
         #expect(s.afterPermissionChange(fixture, waitMs: 0) == nil && s.app == fixture)  // it survived: followed again
     }
 

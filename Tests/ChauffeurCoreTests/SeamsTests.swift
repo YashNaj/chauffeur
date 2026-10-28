@@ -76,6 +76,29 @@ import Testing
         #expect(table.children(of: 1, named: "x").isEmpty)
     }
 
+    @Test func recordingShellRecordsStdinAndTimeoutAndRepliesInOrder() throws {
+        let args = ["spawn", "U", "pbpaste"]
+        let shell = RecordingShell(replies: [
+            args: [
+                ProcessResult(status: 0, out: "before", timedOut: false),
+                ProcessResult(status: 0, out: "after", timedOut: false),
+            ]
+        ])
+        #expect(try shell.simctl(args, stdin: nil, timeout: 5).out == "before")
+        #expect(try shell.simctl(args, stdin: "x", timeout: 15).out == "after")
+        #expect(try shell.simctl(args, stdin: nil, timeout: 5).out == "after")  // the last reply holds
+        #expect(shell.calls == [args, args, args])
+        #expect(shell.recorded.map(\.stdin) == [nil, "x", nil] && shell.recorded.map(\.timeout) == [5, 15, 5])
+    }
+
+    @Test func fakeProcessesChangeBetweenCommands() {
+        let procs = FakeProcesses(alive: [1])
+        let table: any ProcessTable = procs
+        #expect(table.isAlive(1))
+        procs.alive = []
+        #expect(!table.isAlive(1))
+    }
+
     @Test func theProductionTypesConform() {
         let _: any ShellRunner = SimCtlRunner()
         let table: any ProcessTable = LiveProcessTable()

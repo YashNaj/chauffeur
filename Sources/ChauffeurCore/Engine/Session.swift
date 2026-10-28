@@ -32,12 +32,6 @@ public final class Session {
     nonisolated static let endedGraceMs = 10_000
     /// Test seam: runs inside a command, just before it executes (stands in for what it does to the launched app).
     var commandHook: ((String) -> Void)?
-    /// Seams for unit tests: is the simulator booted (nil: could not tell), and when did its current boot start.
-    var simulatorBooted: () -> Bool? = { nil }
-    var simulatorBootDate: () -> Date? = { nil }
-    /// Seams for unit tests: process liveness and the crash-report lookup.
-    var isAlive: (Int32) -> Bool
-    var findCrashReport: (TrackedApp) -> CrashReport?
     var refs = RefTable()
     var rev = 0
     var last: Snapshot?
@@ -83,15 +77,9 @@ public final class Session {
         self.udid = udid
         self.environment = environment
         logTap = LogTap(udid: udid)
-        simulatorBooted = { SimBoot.booted(udid: udid) }
-        simulatorBootDate = { SimBoot.date(udid: udid) }
-        let processes = environment.processes
-        isAlive = { processes.isAlive($0) }
-        findCrashReport = { app in CrashFinder.find(bundle: app.bundle, pid: app.pid, udid: udid, since: app.launchedAt)
-        }
         // A restarted daemon (upgrade, idle exit) keeps following an app that is still running.
         if let saved = TrackedApp.load(StatePaths.app(udid)) {
-            if processes.isAlive(saved.pid) { app = saved } else { TrackedApp.clear(StatePaths.app(udid)) }
+            if environment.processes.isAlive(saved.pid) { app = saved } else { TrackedApp.clear(StatePaths.app(udid)) }
         }
     }
 

@@ -103,7 +103,7 @@ extension Session {
         var lines: [String]
         var exit = ExitCode.ok
         if !Self.showsLaunchedApp(front.snapshot.kind, stale: stale) {
-            let alive = isAlive(pid)
+            let alive = processes.isAlive(pid)
             lines = [
                 alive
                     ? "launch \(bundle) → UNVERIFIED: pid \(pid) is running, but after \(after) the accessibility tree still shows \(Self.describe(front.snapshot.kind))"

@@ -12,9 +12,11 @@ extension Session {
     /// Notices that the launched app is gone without chauffeur ending it. Reported once: the app stops being
     /// followed, and the crash is kept for `logs`, which keeps looking for the report.
     func detectCrash() -> CrashInfo? {
-        guard let gone = app, !isAlive(gone.pid) else { return nil }
+        guard let gone = app, !processes.isAlive(gone.pid) else { return nil }
         // A simulator that was shut down, or rebooted since the app launched, explains the missing process.
-        if simulatorBooted() == false || simulatorBootDate().map({ $0 > gone.launchedAt }) == true {
+        if environment.simulatorBooted() == false
+            || environment.simulatorBootDate().map({ $0 > gone.launchedAt }) == true
+        {
             simulatorWentDown()
             return nil
         }
@@ -26,7 +28,7 @@ extension Session {
         var info = CrashInfo(app: gone, detectedAt: Date(), report: nil)
         let deadline = clock.nowMs() + crashReportWaitMs
         while true {
-            info.report = findCrashReport(gone)
+            info.report = environment.findCrashReport(gone)
             if info.report != nil || clock.nowMs() >= deadline { break }
             clock.sleep(ms: 250)
         }
@@ -102,7 +104,7 @@ extension Session {
         }
 
         _ = detectCrash()
-        if var c = crash, c.report == nil, let report = findCrashReport(c.app) {
+        if var c = crash, c.report == nil, let report = environment.findCrashReport(c.app) {
             c.report = report
             crash = c
         }
