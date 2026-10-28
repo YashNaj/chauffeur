@@ -120,11 +120,6 @@ final class RecordingShell: ShellRunner, @unchecked Sendable {
 
     init(replies: [[String]: [ProcessResult]] = [:]) { self.replies = replies }
 
-    /// One reply per call of an args key; the shorthand for the common case.
-    convenience init(replies: [[String]: ProcessResult]) {
-        self.init(replies: replies.mapValues { [$0] })
-    }
-
     var calls: [[String]] { lock.withLock { log.map(\.args) } }
     /// Every call with the stdin and timeout it passed (Task 12 asserts pbcopy's stdin).
     var recorded: [(args: [String], stdin: String?, timeout: Double)] { lock.withLock { log } }
@@ -149,16 +144,19 @@ final class RecordingShell: ShellRunner, @unchecked Sendable {
 }
 
 extension SessionEnvironment {
-    /// Tests: scripts the device, accessibility, touch evidence, shell, clock, flows, processes, boot state and the
-    /// crash report. By default the touch log is unattached, there are no flows or live processes, the simulator is
-    /// booted (no boot date) and no crash report is found, and the device is booted at 402×874. It does not fake the
-    /// real `LogTap` or the `StatePaths` files under `$TMPDIR/chauffeur`; the session still uses those.
+    /// Tests: scripts the device, accessibility, touch evidence, shell, clock, flows, processes, boot state, the
+    /// crash report and the input device. By default the touch log is unattached, there are no flows or live
+    /// processes, the simulator is booted (no boot date), no crash report is found, the input device's two transports
+    /// and keyboard send, and the device is booted at 402×874. It does not fake the real `LogTap` or the `StatePaths`
+    /// files under `$TMPDIR/chauffeur`; the session still uses those.
+    @MainActor
     static func scripted(
         ax: ScriptedAX, touches: ScriptedTouches = ScriptedTouches(evidence: [], attached: false),
         shell: RecordingShell = RecordingShell(), clock: FakeClock = FakeClock(),
         flows: (any FlowSource)? = nil, processes: FakeProcesses = FakeProcesses(alive: []),
         simulatorBooted: @escaping () -> Bool? = { true }, simulatorBootDate: @escaping () -> Date? = { nil },
-        findCrashReport: @escaping (TrackedApp) -> CrashReport? = { _ in nil }
+        findCrashReport: @escaping (TrackedApp) -> CrashReport? = { _ in nil },
+        inputs: FakeInputs = FakeInputs()
     ) -> SessionEnvironment {
         nonisolated(unsafe) let flows = flows  // a test's own object, only ever read on the main actor
         return SessionEnvironment(
@@ -171,7 +169,8 @@ extension SessionEnvironment {
             processes: processes,
             simulatorBooted: simulatorBooted,
             simulatorBootDate: simulatorBootDate,
-            findCrashReport: findCrashReport)
+            findCrashReport: findCrashReport,
+            inputs: { _ in inputs })
     }
 }
 
@@ -191,4 +190,82 @@ final class FakeProcesses: ProcessTable, @unchecked Sendable {
     func isAlive(_ pid: Int32) -> Bool { alive.contains(pid) }
     func parent(of pid: Int32) -> Int32? { nil }
     func children(of parent: Int32, named: String) -> [Int32] { [] }
+}
+
+/// A `TouchTransport` that records every touch and answers `sends`.
+@MainActor
+final class FakeTransport: TouchTransport {
+    let name: String
+    let supportsMove: Bool
+    private let sends: Bool
+    private(set) var touches: [(Point, TouchPhase)] = []
+
+    init(name: String, supportsMove: Bool, sends: Bool = true) {
+        self.name = name
+        self.supportsMove = supportsMove
+        self.sends = sends
+    }
+
+    func touch(_ normalised: Point, _ phase: TouchPhase) -> Bool {
+        touches.append((normalised, phase))
+        return sends
+    }
+}
+
+/// A `TextInput` that records what it typed and pressed. `press` answers the next of `presses` and holds the last.
+final class FakeTextInput: TextInput {
+    private let types: Bool
+    private let presses: [Bool]
+    private(set) var typed: [String] = []
+    private(set) var pressed: [(usage: UInt32, modifiers: [UInt32])] = []
+
+    init(types: Bool = true, presses: [Bool] = [true]) {
+        self.types = types
+        self.presses = presses
+    }
+
+    func type(_ text: String) -> Bool {
+        typed.append(text)
+        return types
+    }
+
+    func press(_ usage: UInt32, modifiers: [UInt32]) -> Bool {
+        let index = pressed.count
+        pressed.append((usage: usage, modifiers: modifiers))
+        guard let last = presses.indices.last else { return true }
+        return presses[min(index, last)]
+    }
+}
+
+/// An `InputDevice` over fakes: the same transports until the end (it counts resets rather than rebuilding), a
+/// scripted keyboard, and buttons that record their press and hold it on the clock as `HID` does.
+@MainActor
+final class FakeInputs: InputDevice {
+    let fakes: [FakeTransport]
+    let keyboard: FakeTextInput
+    private let pressAnswer: Bool
+    private(set) var resetCount = 0
+    private(set) var pressed: [HardwareButton] = []
+
+    init(
+        transports: [FakeTransport] = [
+            FakeTransport(name: "digitizer", supportsMove: true), FakeTransport(name: "mouse", supportsMove: false),
+        ],
+        keyboard: FakeTextInput = FakeTextInput(), press: Bool = true
+    ) {
+        fakes = transports
+        self.keyboard = keyboard
+        pressAnswer = press
+    }
+
+    func transports() throws -> [any TouchTransport] { fakes }
+    func keyboard(clock: any SettleClock) throws -> any TextInput { keyboard }
+
+    func press(_ button: HardwareButton, clock: any SettleClock) throws -> Bool {
+        pressed.append(button)
+        clock.sleep(ms: button.holdMs)
+        return pressAnswer
+    }
+
+    func reset() { resetCount += 1 }
 }

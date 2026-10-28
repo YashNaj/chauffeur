@@ -1,4 +1,3 @@
-import ChauffeurBridge
 import Foundation
 
 extension Session {
@@ -15,19 +14,20 @@ extension Session {
         return (result.snapshot, result.settle.settled)
     }
 
-    /// HID client and transports, built on first use; touch log started if it can be (else outcomes are UNVERIFIED).
-    func transportsReady() throws -> [TouchTransport] {
+    /// The input device, built on first use from the connected simulator.
+    func inputDeviceReady() throws -> any InputDevice {
+        if let inputDevice { return inputDevice }
         let (device, _) = try connect()
-        if transports.isEmpty, let sim = (device as? Device)?.sim {  // until Task 10 (HID) owns the client
-            do {
-                let client = try CHHIDClient(simulator: sim)
-                hid = client
-                transports = [DigitizerTransport(hid: client), MouseTransport(hid: client)]
-                preferred = 0
-            } catch {
-                throw ChauffeurError.bridge(error.localizedDescription)
-            }
-        }
+        let made = try environment.inputs(device)
+        inputDevice = made
+        preferred = 0
+        return made
+    }
+
+    /// The input device's transports; touch log started if it can be (else outcomes are UNVERIFIED).
+    func transportsReady() throws -> [any TouchTransport] {
+        _ = try connect()
+        let transports = try inputDeviceReady().transports()
         if !touchLog.isAttached, touchLogAttemptMs.map({ clock.nowMs() - $0 >= 30_000 }) ?? true {
             touchLogAttemptMs = clock.nowMs()
             try? touchLog.start()
@@ -38,7 +38,7 @@ extension Session {
     /// Sends a gesture and reports what really happened (spec §6.2).
     func act(
         _ label: String, target: Node?, before: Snapshot, baselineSettled: Bool = true, capMs: Int = 1500,
-        needsMove: Bool = false, network: NetStart? = nil, gesture: (TouchTransport) -> Bool
+        needsMove: Bool = false, network: NetStart? = nil, gesture: (any TouchTransport) -> Bool
     ) throws -> ActionReport {
         let all = try transportsReady()
         let order = (all[preferred...] + all[..<preferred]).filter { !needsMove || $0.supportsMove }
@@ -68,11 +68,12 @@ extension Session {
                 }
                 outcome = .notDelivered
             }
-            if !sent {
-                hid = nil
-                transports = []
-            }  // rebuild the HID client next time
             if outcome != .notDelivered, let i = all.firstIndex(where: { $0 === transport }) { preferred = i }
+            if !sent {
+                // The device rebuilds its client on the next action, which starts again on the first transport.
+                inputDevice?.reset()
+                preferred = 0
+            }
             var report = ActionReport(
                 action: label, outcome: outcome, evidence: evidence, settledMs: settle.elapsedMs,
                 settled: settle.settled,
@@ -138,7 +139,7 @@ extension Session {
         var report = try act(
             "tap \(aimed.label)", target: aimed.node, before: before, baselineSettled: settled, network: network
         ) {
-            Gestures.tap($0, at: aimed.point, screen: device.size, holdMs: holdMs)
+            Gestures.tap($0, at: aimed.point, screen: device.size, holdMs: holdMs, clock: clock)
         }
         // Right after typing, a switch can ignore the first touch that reaches the app (F1, M2 dogfood; reproduced in
         // M3a Task 7, no keyboard or overlay on screen). Its value is in the tree and did not change, so one more touch
@@ -157,7 +158,7 @@ extension Session {
                 "tap \(aimed.label)", target: aimed.node, before: again, baselineSettled: settledAgain,
                 network: netStart()
             ) {
-                Gestures.tap($0, at: aimed.point, screen: device.size, holdMs: holdMs)
+                Gestures.tap($0, at: aimed.point, screen: device.size, holdMs: holdMs, clock: clock)
             }
             if second.outcome == .changed {
                 second.hints.append(
@@ -188,7 +189,7 @@ extension Session {
         for transport in all {
             let cursor = touchLog.cursor
             let start = clock.nowMs()
-            let sent = Gestures.tap(transport, at: point, screen: device.size)
+            let sent = Gestures.tap(transport, at: point, screen: device.size, clock: clock)
             let evidence = touchLog.evidence(since: cursor, waitMs: 500)
             let ms = clock.nowMs() - start
             switch evidence {
@@ -242,7 +243,7 @@ extension Session {
             var report = try act(
                 "scroll \(direction)", target: nil, before: snap, baselineSettled: settled, needsMove: true
             ) {
-                Gestures.drag($0, from: drag.from, to: drag.to, screen: device.size)
+                Gestures.drag($0, from: drag.from, to: drag.to, screen: device.size, clock: clock)
             }
             if report.outcome == .noEffect { report.hints = ["nothing moved: already at the end in that direction"] }
             guard let until else { return Output(report.render(), exit: report.exitCode, data: report.json) }

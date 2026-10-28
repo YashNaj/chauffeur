@@ -1,4 +1,3 @@
-import ChauffeurBridge
 import Foundation
 
 extension Session {
@@ -29,7 +28,7 @@ extension Session {
         let label =
             "swipe (\(Geometry.fmt(from.x)),\(Geometry.fmt(from.y)))→(\(Geometry.fmt(to.x)),\(Geometry.fmt(to.y)))"
         var report = try act(label, target: nil, before: before, baselineSettled: settled, needsMove: true) {
-            Gestures.drag($0, from: from, to: to, screen: device.size)
+            Gestures.drag($0, from: from, to: to, screen: device.size, clock: clock)
         }
         if report.outcome == .noEffect {
             report.hints = ["nothing moved: start the swipe on scrollable or draggable content, or use scroll"]
@@ -44,22 +43,12 @@ extension Session {
         }
         try a.done()
         _ = try transportsReady()
-        guard let hid else { throw ChauffeurError.bridge("no HID client") }
+        let input = try inputDeviceReady()
         return try actWithoutTouch(
             "button \(name)", capMs: 4000, note: "a button press leaves no touch evidence",
             hints: ["the press may have nothing visible to change here (volume, already home); run snapshot"]
         ) {
-            press(button, hid: hid) ? nil : "the HID send failed; run chauffeur doctor --live"
+            try input.press(button, clock: clock) ? nil : "the HID send failed; run chauffeur doctor --live"
         }
-    }
-
-    func press(_ button: HardwareButton, hid: CHHIDClient) -> Bool {
-        func send(_ down: Bool) -> Bool {
-            if let source = button.source { return hid.button(source: source, down: down) }
-            return hid.usage(page: 0x0C, usage: button.consumerUsage ?? 0, down: down)
-        }
-        let down = send(true)
-        clock.sleep(ms: button.holdMs)
-        return send(false) && down
     }
 }

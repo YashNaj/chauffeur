@@ -1,4 +1,3 @@
-import ChauffeurBridge
 import Foundation
 
 /// Warm per-simulator state: bridge objects, refs, the latest snapshot, the touch log.
@@ -7,8 +6,9 @@ public final class Session {
     public let udid: String
     var device: (any SimDevice)?
     var ax: (any AXSource)?
-    var hid: CHHIDClient?
-    var transports: [TouchTransport] = []
+    /// Touches, keys and buttons, built on first use (`inputDeviceReady()`); `drop()` forgets it.
+    var inputDevice: (any InputDevice)?
+    /// The transport that last delivered, as an index into the input device's transports.
     var preferred = 0
     /// The launched app's unified log (spec §6.8).
     let logTap: LogTap
@@ -133,8 +133,7 @@ public final class Session {
         touchLog.stop()
         device = nil
         ax = nil
-        hid = nil
-        transports = []
+        inputDevice = nil
     }
 
     /// Polls the raw tree until it settles, completes it (bar sweep) and publishes a snapshot.

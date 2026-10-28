@@ -30,6 +30,9 @@ grep_sources() {
 
 report bridge "private API belongs in Sources/ChauffeurBridge" \
   < <(grep_sources Sources 'dlopen|dlsym|NSClassFromString|objc_msgSend|@_silgen_name|PrivateFrameworks' Sources/ChauffeurBridge)
+# The private HID client has one owner, so a failed send has one place to drop and rebuild it.
+report hid-owner "the HID client belongs to HID (Sources/ChauffeurCore/Device/HID.swift); go through InputDevice" \
+  < <(grep_sources Sources 'CHHIDClient' Sources/ChauffeurBridge | grep -v "^$ROOT/Sources/ChauffeurCore/Device/HID.swift:")
 report try-bang "a crash here takes the agent's session down; handle the error" \
   < <(grep_sources Sources 'try!')
 report print "output goes through the CLI target; print corrupts the MCP stream" \

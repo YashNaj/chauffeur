@@ -159,7 +159,7 @@ public enum Doctor {
                                 + "device session leaves it; chauffeur turns it back on, and apps opened since then need a relaunch"
                         ))
             }
-            _ = try CHHIDClient(simulator: device.sim)
+            try HID(device: device).open()
             checks.append(Check(status: .ok, text: "HID client ready"))
         } catch {
             checks.append(Check(status: .fail, text: "\(error)"))

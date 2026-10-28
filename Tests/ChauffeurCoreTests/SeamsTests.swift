@@ -40,7 +40,7 @@ import Testing
 
     @Test func aRecordingShellRecordsCallsAndRepliesFromItsTable() throws {
         let read = ["spawn", "U-1", "defaults", "read", "k"]
-        let shell = RecordingShell(replies: [read: ProcessResult(status: 1, out: "boom", timedOut: false)])
+        let shell = RecordingShell(replies: [read: [ProcessResult(status: 1, out: "boom", timedOut: false)]])
         let hit = try shell.simctl(read, stdin: nil, timeout: 5)
         #expect(hit.status == 1 && hit.out == "boom")
         let miss = try shell.simctl(["list"])
@@ -50,7 +50,7 @@ import Testing
 
     @Test func aRecordingShellThrowsOnATimedOutReplyAfterRecordingTheCall() {
         let args = ["spawn", "U-1", "log", "show"]
-        let shell = RecordingShell(replies: [args: ProcessResult(status: 0, out: "", timedOut: true)])
+        let shell = RecordingShell(replies: [args: [ProcessResult(status: 0, out: "", timedOut: true)]])
         #expect(throws: ChauffeurError.simulatorServiceUnresponsive(command: "simctl spawn U-1")) {
             try shell.simctl(args, stdin: nil, timeout: 5)
         }
