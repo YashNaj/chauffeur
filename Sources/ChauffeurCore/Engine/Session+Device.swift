@@ -33,7 +33,7 @@ extension Session {
         // "Some permission changes will terminate the application" (simctl help privacy): if that is the launched app,
         // its exit is expected, not a crash.
         let tracked = (bundle ?? app?.bundle).flatMap { release($0) }
-        let r = try SimCtl.run(["privacy", udid, action, service] + (bundle.map { [$0] } ?? []), timeout: 30)
+        let r = try shell.simctl(["privacy", udid, action, service] + (bundle.map { [$0] } ?? []), timeout: 30)
         let note = tracked.flatMap { afterPermissionChange($0, waitMs: 1000) }
         guard r.status == 0 else {
             return Output("permission \(action) \(service) → FAILED: \(SimCtl.message(r))", exit: .error)
@@ -79,7 +79,7 @@ extension Session {
             shown = "set to \(lat),\(lon)"
         }
         _ = try connect()
-        let r = try SimCtl.run(["location", udid] + args, timeout: 30)
+        let r = try shell.simctl(["location", udid] + args, timeout: 30)
         guard r.status == 0 else { return Output("location → FAILED: \(SimCtl.message(r))", exit: .error) }
         return Output("location → \(shown)")
     }
@@ -94,7 +94,7 @@ extension Session {
         }
         if let problem = Self.pushProblem(data) { return Output("push: \(problem)", exit: .error) }
         _ = try connect()
-        let r = try SimCtl.run(["push", udid, bundle, file.path], timeout: 30)
+        let r = try shell.simctl(["push", udid, bundle, file.path], timeout: 30)
         guard r.status == 0 else { return Output("push \(bundle) → FAILED: \(SimCtl.message(r))", exit: .error) }
         return Output("push \(bundle) → sent (\(data.count)-byte payload)")
     }
@@ -116,11 +116,11 @@ extension Session {
         guard let mode = a.next(), mode == "light" || mode == "dark" else { throw ChauffeurError.usage(a.usage) }
         try a.done()
         _ = try connect()
-        let before = try SimCtl.run(["ui", udid, "appearance"], timeout: 30).out.trimmingCharacters(
+        let before = try shell.simctl(["ui", udid, "appearance"], timeout: 30).out.trimmingCharacters(
             in: .whitespacesAndNewlines)
-        let r = try SimCtl.run(["ui", udid, "appearance", mode], timeout: 30)
+        let r = try shell.simctl(["ui", udid, "appearance", mode], timeout: 30)
         guard r.status == 0 else { return Output("appearance \(mode) → FAILED: \(SimCtl.message(r))", exit: .error) }
-        let after = try SimCtl.run(["ui", udid, "appearance"], timeout: 30).out.trimmingCharacters(
+        let after = try shell.simctl(["ui", udid, "appearance"], timeout: 30).out.trimmingCharacters(
             in: .whitespacesAndNewlines)
         guard after == mode else {
             return Output(

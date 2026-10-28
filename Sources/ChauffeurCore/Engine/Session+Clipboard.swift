@@ -41,8 +41,8 @@ final class Background<T: Sendable>: @unchecked Sendable {
 }
 
 extension Session {
-    nonisolated static func readClipboard(udid: String) -> ClipboardMark? {
-        guard let r = try? SimCtl.run(["pbpaste", udid], timeout: 5), r.status == 0 else { return nil }
+    nonisolated static func readClipboard(udid: String, shell: any ShellRunner) -> ClipboardMark? {
+        guard let r = try? shell.simctl(["pbpaste", udid], timeout: 5), r.status == 0 else { return nil }
         return ClipboardMark(r.out)
     }
 }

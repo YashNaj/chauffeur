@@ -19,11 +19,11 @@ public enum AXSettings {
     }
 
     /// Turns on the flags that are off and returns them (empty when all were on).
-    public static func ensure(udid: String) throws -> [String] {
-        let read = try SimCtl.run(["spawn", udid, "defaults", "read", domain])
+    public static func ensure(udid: String, shell: any ShellRunner = SimCtlRunner()) throws -> [String] {
+        let read = try shell.simctl(["spawn", udid, "defaults", "read", domain])
         let missing = off(read.out)
         for key in missing {
-            try SimCtl.run(["spawn", udid, "defaults", "write", domain, key, "-bool", "true"])
+            try shell.simctl(["spawn", udid, "defaults", "write", domain, key, "-bool", "true"])
         }
         return missing
     }

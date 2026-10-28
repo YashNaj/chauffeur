@@ -28,14 +28,15 @@ extension Session {
     /// networking process, its sibling under the device's launchd_sim, for web views (Findings §2).
     func watchedPids() -> [Int32] {
         guard let pid = app?.pid ?? ax?.frontmostPID() else { return [] }
-        let webKit = Proc.parent(pid).map { Proc.children(of: $0, named: "com.apple.WebKit.Networking") } ?? []
+        let webKit =
+            processes.parent(of: pid).map { processes.children(of: $0, named: "com.apple.WebKit.Networking") } ?? []
         return [pid] + webKit
     }
 
     func flows(_ pids: [Int32]) -> [Flow] {
         if flowSource == nil, !flowSourceTried {
             flowSourceTried = true
-            flowSource = try? NetStatsSource()
+            flowSource = environment.flows()
         }
         guard let flowSource, !pids.isEmpty else { return [] }
         return flowSource.flows(pids: pids)

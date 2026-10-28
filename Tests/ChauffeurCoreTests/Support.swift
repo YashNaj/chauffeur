@@ -125,9 +125,28 @@ final class RecordingShell: ShellRunner, @unchecked Sendable {
         let reply = replies[args] ?? ProcessResult(status: 0, out: "", timedOut: false)
         if reply.timedOut {
             // As `SimCtl.run` does.
-            throw ChauffeurError.simulatorServiceUnresponsive(command: "simctl " + args.prefix(2).joined(separator: " "))
+            throw ChauffeurError.simulatorServiceUnresponsive(
+                command: "simctl " + args.prefix(2).joined(separator: " "))
         }
         return reply
+    }
+}
+
+extension SessionEnvironment {
+    /// Tests: scripted everything, an unattached touch log unless given, no flows, no live processes, and a booted
+    /// 402×874 device.
+    static func scripted(
+        ax: ScriptedAX, touches: ScriptedTouches = ScriptedTouches(evidence: [], attached: false),
+        shell: RecordingShell = RecordingShell(), clock: FakeClock = FakeClock()
+    ) -> SessionEnvironment {
+        SessionEnvironment(
+            clock: clock,
+            device: { FakeDevice(udid: $0, booted: true, size: Size(w: 402, h: 874)) },
+            ax: { _ in ax },
+            touchEvidence: touches,
+            shell: shell,
+            flows: { nil },
+            processes: FakeProcesses(alive: []))
     }
 }
 
