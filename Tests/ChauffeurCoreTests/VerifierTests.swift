@@ -37,7 +37,7 @@ import Testing
                 tap e4 "Submit" → NO EFFECT · the accessibility tree did not change in 1.5s (touch reached dev.chauffeur.fixture)
                 hint: e4 is disabled; fill in or select whatever it depends on first, then retry
                 """)
-        #expect(r.exitCode == 3)
+        #expect(r.exitCode == .noEffect)
     }
 
     @Test func noEffectSaysWhatWasCompared() {
@@ -70,7 +70,7 @@ import Testing
             settled: true, revBefore: 7, revAfter: 8, diff: ["+ text \"Fixture alert\""],
             transport: "digitizer", retriedFrom: nil, hints: [], capMs: 1500)
         #expect(r.render() == "tap e1 \"Show alert\" → changed · settled 340ms · rev 7→8\n+ text \"Fixture alert\"")
-        #expect(r.exitCode == 0)
+        #expect(r.exitCode == .ok)
     }
 
     @Test func retriedAndUndelivered() {
@@ -99,7 +99,7 @@ import Testing
             revBefore: 1, revAfter: 1, diff: [], transport: "digitizer", retriedFrom: nil,
             hints: Verifier.hints(outcome: .unverified, target: nil), capMs: 1500)
         #expect(r.render().hasPrefix("tap e1 → UNVERIFIED: no visible change"))
-        #expect(r.exitCode == 3)
+        #expect(r.exitCode == .noEffect)
     }
 
     @Test func unverifiedSaysWhyAndReportsAreData() {
@@ -112,7 +112,7 @@ import Testing
             r.render()
                 == "open \"fixture://x\" → UNVERIFIED: no visible change (the URL was delivered; nothing visible changed in 3s)\nhint: run snapshot"
         )
-        #expect(r.exitCode == 3)
+        #expect(r.exitCode == .noEffect)
         #expect(
             r.json["outcome"] == "unverified" && r.json["rev"] == [4, 4]
                 && r.json["note"]?.string?.hasPrefix("the URL") == true)
@@ -156,7 +156,7 @@ import Testing
     @Test func typeReports() {
         let ok = TypeReport(action: "type e1 \"Ab@1\"", method: "keys", verdict: .ok, value: "Ab@1", settledMs: 210)
         #expect(ok.render() == "type e1 \"Ab@1\" → typed via keys · value=\"Ab@1\" · settled 210ms")
-        #expect(ok.exitCode == 0)
+        #expect(ok.exitCode == .ok)
         let bad = TypeReport(
             action: "type e1 \"café\"", method: "paste", verdict: .mismatch("caf"), value: "caf", settledMs: 300)
         #expect(
@@ -164,7 +164,7 @@ import Testing
                 type e1 "café" → TEXT MISMATCH via paste · field shows "caf"
                 hint: the field may limit or reformat input; run snapshot to see it
                 """)
-        #expect(bad.exitCode == 3)
+        #expect(bad.exitCode == .noEffect)
         let gone = TypeReport(action: "type e1 \"x\"", method: "keys", verdict: .fieldGone, value: nil, settledMs: 300)
         #expect(gone.render() == "type e1 \"x\" → FIELD GONE after typing · run snapshot")
     }

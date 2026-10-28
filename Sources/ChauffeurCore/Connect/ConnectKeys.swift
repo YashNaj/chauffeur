@@ -101,7 +101,7 @@ public enum ConnectKeys {
         let client = ConnectClient(key: key, role: role, transport: env.transport, now: env.now)
         let verdict = try Probe.run(client, now: env.now())
         guard case .accepted(let apps, let roleCheck) = verdict else {
-            return Output(Probe.message(verdict), exit: 1)
+            return Output(Probe.message(verdict), exit: .error)
         }
         let stored = StoredKey(
             keyID: keyID, issuer: issuer, role: role, apps: apps, added: timestamp(env.now()), presence: presence)
@@ -142,9 +142,9 @@ public enum ConnectKeys {
             return Output(sheet + "\nkey \(stored.keyID): ok (\(apps.count) apps)", data: data)
         case .refusedFinance:
             return Output(
-                Probe.message(verdict) + "\nit is still stored: chauffeur keys remove \(stored.keyID)", exit: 1)
+                Probe.message(verdict) + "\nit is still stored: chauffeur keys remove \(stored.keyID)", exit: .error)
         case .unauthorized, .rateLimited:
-            return Output(Probe.message(verdict), exit: 1)
+            return Output(Probe.message(verdict), exit: .error)
         }
     }
 

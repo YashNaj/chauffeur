@@ -123,11 +123,11 @@ public struct ActionReport: Sendable {
         self.capMs = capMs
     }
 
-    public var exitCode: Int32 {
+    public var exitCode: ExitCode {
         switch outcome {
-        case .changed: return 0
-        case .pending: return 6
-        default: return 3
+        case .changed: return .ok
+        case .pending: return .pending
+        default: return .noEffect
         }
     }
 
@@ -279,7 +279,7 @@ public struct TypeReport: Sendable {
         self.settledMs = settledMs
     }
 
-    public var exitCode: Int32 { verdict == .ok ? 0 : 3 }
+    public var exitCode: ExitCode { verdict == .ok ? .ok : .noEffect }
 
     public var json: JSON {
         var o: [String: JSON] = [

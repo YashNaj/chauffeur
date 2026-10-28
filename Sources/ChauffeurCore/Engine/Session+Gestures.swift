@@ -22,7 +22,7 @@ extension Session {
         // --edge lifts the guard only: the digitizer still sends interior touches, so system edge gestures may not fire.
         for p in [from, to] {
             if let refusal = Geometry.refusal(for: p, screen: device.size, allowEdge: a.flag("--edge")) {
-                return Output("swipe refused: \(refusal)", exit: 1)
+                return Output("swipe refused: \(refusal)", exit: .error)
             }
         }
         let (before, settled) = try baseline()

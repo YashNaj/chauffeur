@@ -77,7 +77,7 @@ public enum CLI {
     @MainActor static func handleText(_ argv: [String], _ e: Environment) -> Output {
         do {
             let (udidFlag, _, rest) = try globals(argv)
-            guard let command = rest.first else { return Output(Usage.text, exit: 64) }
+            guard let command = rest.first else { return Output(Usage.text, exit: .usage) }
             let tail = Array(rest.dropFirst())
             switch command {
             case "help", "--help", "-h":
@@ -121,16 +121,10 @@ public enum CLI {
                     configUDID: Target.readConfig(from: e.cwd), devices: e.devices())
                 return try e.send(udid, [command] + tail)
             default:
-                return Output("unknown command \"\(command)\"\n\n" + Usage.text, exit: 64)
+                return Output("unknown command \"\(command)\"\n\n" + Usage.text, exit: .usage)
             }
-        } catch ChauffeurError.usage(let text) {
-            return Output(text, exit: 64)
-        } catch let error as ChauffeurError {
-            return Output(error.description, exit: 1)
-        } catch let error as ConnectError {
-            return Output(error.description, exit: 1)
         } catch {
-            return Output("\(error)", exit: 1)
+            return Output.failure(error)
         }
     }
 }

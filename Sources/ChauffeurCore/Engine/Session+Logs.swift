@@ -108,7 +108,7 @@ extension Session {
         guard let followed = app ?? crash?.app else {
             return Output(
                 "no app launched through chauffeur yet: logs follow the app started with chauffeur launch <bundle>",
-                exit: 1)
+                exit: .error)
         }
         let pool = sinceLast ? logTap.since(lastActionLogCursor) : logTap.all
         let filtered = level == "error" ? pool.filter(\.isError) : pool

@@ -65,7 +65,7 @@ import Testing
             revBefore: 1, revAfter: 2, diff: [], transport: "digitizer", retriedFrom: nil,
             hints: Verifier.hints(outcome: .unattributed, target: nil), capMs: 1500)
         #expect(r.render().hasPrefix("tap e1 → UNVERIFIED: the screen was already changing"))
-        #expect(r.exitCode == 3)
+        #expect(r.exitCode == .noEffect)
     }
 
     func field(_ value: String) -> Node {

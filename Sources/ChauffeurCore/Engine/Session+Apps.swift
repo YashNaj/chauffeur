@@ -44,17 +44,17 @@ extension Session {
         else {
             return Output(
                 "install: \(url.path) is not an .app directory. Build for the simulator, then install "
-                    + "Build/Products/Debug-iphonesimulator/<App>.app", exit: 1)
+                    + "Build/Products/Debug-iphonesimulator/<App>.app", exit: .error)
         }
         guard let bundle = SimApps.bundle(at: url) else {
-            return Output("install: \(url.lastPathComponent) has no Info.plist with a bundle id", exit: 1)
+            return Output("install: \(url.lastPathComponent) has no Info.plist with a bundle id", exit: .error)
         }
         _ = try connect()
         release(bundle.identifier)  // installing replaces, and so ends, a running copy
         let start = clock.nowMs()
         let r = try SimCtl.run(["install", udid, url.path], timeout: 300)
         guard r.status == 0 else {
-            return Output("install \(url.lastPathComponent) → FAILED: \(SimCtl.message(r))", exit: 1)
+            return Output("install \(url.lastPathComponent) → FAILED: \(SimCtl.message(r))", exit: .error)
         }
         let seconds = String(format: "%.1f", Double(clock.nowMs() - start) / 1000)
         return Output(
@@ -74,7 +74,8 @@ extension Session {
         let info = try SimCtl.run(["appinfo", udid, bundle], timeout: 30)
         guard info.status == 0, let appInfo = SimApps.appInfo(info.out) else {
             return Output(
-                "\(bundle) is not installed on this simulator. Install it first: chauffeur install <path.app>", exit: 1)
+                "\(bundle) is not installed on this simulator. Install it first: chauffeur install <path.app>",
+                exit: .error)
         }
         // What was in front before: until it is replaced, the launch has not shown anything yet.
         let previous = try? observe(minMs: 0, capMs: 500).snapshot.kind
@@ -87,7 +88,7 @@ extension Session {
         appLogCursor = logTap.cursor  // crash evidence comes from this launch's lines only
         let r = try SimCtl.run(["launch", udid, bundle] + a.rest, timeout: 60)
         guard r.status == 0, let pid = SimApps.launchedPID(r.out) else {
-            return Output("launch \(bundle) → FAILED: \(SimCtl.message(r))", exit: 1)
+            return Output("launch \(bundle) → FAILED: \(SimCtl.message(r))", exit: .error)
         }
         var tracked = TrackedApp(
             bundle: bundle, executable: appInfo.executable, displayName: appInfo.displayName,
@@ -212,7 +213,7 @@ extension Session {
         perform: () throws -> String?
     ) throws -> Output {
         let (before, settled) = try baseline()
-        if let failure = try perform() { return Output("\(label) → FAILED: \(failure)", exit: 1) }
+        if let failure = try perform() { return Output("\(label) → FAILED: \(failure)", exit: .error) }
         // The accessibility tree can lag the screen (SpringBoard after `button home` took over a second to show up), so
         // a tree that is merely stable is not "no change": keep looking until it differs or `capMs` has passed.
         let started = clock.nowMs()
@@ -243,7 +244,7 @@ extension Session {
         guard r.status == 0 else {
             if r.err.contains("found nothing to terminate") { return Output("terminate \(bundle) → was not running") }
             if let tracked { track(tracked) }
-            return Output("terminate \(bundle) → FAILED: \(SimCtl.message(r))", exit: 1)
+            return Output("terminate \(bundle) → FAILED: \(SimCtl.message(r))", exit: .error)
         }
         let snap = try observe(minMs: 150, capMs: 1500).snapshot
         return Output("terminate \(bundle) → stopped" + (tracked.map { " (pid \($0.pid))" } ?? "") + "\n" + snap.header)

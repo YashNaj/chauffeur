@@ -137,10 +137,8 @@ public final class MCPServer {
                 payloads.append(url)
                 return url.path
             }
-        } catch let error as MCPToolError {
-            return ["content": [["type": "text", "text": .string(error.message)]], "isError": true]
         } catch {
-            return ["content": [["type": "text", "text": .string("\(error)")]], "isError": true]
+            return ["content": [["type": "text", "text": .string(Output.failure(error).text)]], "isError": true]
         }
         let out = run(argv)
         var content: [JSON] = [["type": "text", "text": .string(out.text)]]

@@ -43,6 +43,13 @@ expect_pass "print in the CLI target passes" "$d"
 d=$(tree comment); printf '    // print() would buffer; try! here would crash\n' > "$d/Sources/ChauffeurCore/B.swift"
 expect_pass "comment line passes" "$d"
 
+d=$(tree exit); echo 'return Output("x", exit: 1)' > "$d/Sources/ChauffeurCore/B.swift"
+expect_fail "bare exit-code literal fails" exit-literal "$d"
+d=$(tree exit-cli); echo 'let o = Output("x", exit: 64)' > "$d/Sources/chauffeur/main.swift"
+expect_fail "bare exit-code literal in the CLI target fails" exit-literal "$d"
+d=$(tree exit-case); printf 'return Output("x", exit: .error)\nreturn Output("x", exit: report.exitCode)\ncase ok = 0\n' > "$d/Sources/ChauffeurCore/B.swift"
+expect_pass "ExitCode cases and raw values pass" "$d"
+
 d=$(tree long); lines 401 > "$d/Sources/ChauffeurCore/B.swift"
 expect_fail "401-line source file fails" file-length "$d"
 d=$(tree long-test); lines 401 > "$d/Tests/X/BTests.swift"

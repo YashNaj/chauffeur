@@ -91,7 +91,7 @@ final class ScriptedFlows: FlowSource {
         var r = report(.noEffect)
         let net = TapNet(pids: [4321], earlier: [], atTouch: [], logCursor: s.logTap.cursor, touchMs: s.clock.nowMs())
         s.applyNetwork(&r, net: net, target: nil)
-        #expect(r.outcome == .pending && r.exitCode == 6)
+        #expect(r.outcome == .pending && r.exitCode == .pending)
         #expect(r.render().hasPrefix("tap e4 \"Login\" → PENDING · 127.0.0.1:8765 · sent 58 B, no reply after 2."))
     }
 

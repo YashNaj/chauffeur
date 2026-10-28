@@ -21,7 +21,7 @@ public enum Doctor {
         (["chauffeur \(Chauffeur.version)"] + checks.map { "\($0.status.rawValue) \($0.text)" }).joined(separator: "\n")
     }
 
-    public static func exitCode(_ checks: [Check]) -> Int32 { checks.contains { $0.status == .fail } ? 1 : 0 }
+    public static func exitCode(_ checks: [Check]) -> ExitCode { checks.contains { $0.status == .fail } ? .error : .ok }
 
     /// The report as text, exit code and `--json` data.
     public static func output(_ checks: [Check]) -> Output {

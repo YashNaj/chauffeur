@@ -34,6 +34,8 @@ report try-bang "a crash here takes the agent's session down; handle the error" 
   < <(grep_sources Sources 'try!')
 report print "output goes through the CLI target; print corrupts the MCP stream" \
   < <(grep_sources Sources/ChauffeurCore '(^|[^[:alnum:]_.])print\(')
+report exit-literal "exit codes are ExitCode cases; no bare literals" \
+  < <(grep_sources Sources 'exit: [0-9]')
 
 length_limit() {
   local dir=$1 max=$2 f n
