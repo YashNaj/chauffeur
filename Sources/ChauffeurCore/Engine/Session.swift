@@ -6,7 +6,7 @@ import Foundation
 public final class Session {
     public let udid: String
     var device: Device?
-    var ax: AXProvider?
+    var ax: (any AXSource)?
     var hid: CHHIDClient?
     var transports: [TouchTransport] = []
     var preferred = 0
@@ -95,7 +95,7 @@ public final class Session {
     }
 
     /// Connects lazily; after the device stops being booted, drops everything (spec §6.9).
-    func connect() throws -> (Device, AXProvider) {
+    func connect() throws -> (Device, any AXSource) {
         if let device, let ax {
             if device.booted {
                 _ = try? ensureAccessibility(force: false)  // an Xcode session may have switched them off since
@@ -177,7 +177,7 @@ public final class Session {
     }
 
     /// Diagnoses a missing tree and applies the cure: flags back on, and a poisoned bridge restarted (at most once a minute).
-    func heal(noTreeForMs: Int, ax: AXProvider, screen: Size) -> AXHealth.Plan {
+    func heal(noTreeForMs: Int, ax: any AXSource, screen: Size) -> AXHealth.Plan {
         guard noTreeForMs >= AXHealth.patienceMs else {
             return AXHealth.Plan(enableFlags: [], restartBridge: false, relaunchApp: false)
         }
@@ -194,14 +194,14 @@ public final class Session {
     }
 
     /// Restarts the simulator's accessibility bridge (launchd brings it back at once); returns the provider to read with.
-    func restartBridge() -> AXProvider? {
+    func restartBridge() -> (any AXSource)? {
         _ = try? SimCtl.run(["spawn", udid, "launchctl", "stop", "com.apple.CoreSimulator.bridge"])
         bridgeRestartedMs = clock.nowMs()
         clock.sleep(ms: 1500)  // give it a moment to come up
         return ax
     }
 
-    private func poll(_ ax: AXProvider, minMs: Int, capMs: Int) -> Settled<AXElement> {
+    private func poll(_ ax: any AXSource, minMs: Int, capMs: Int) -> Settled<AXElement> {
         Settle.wait(minMs: minMs, capMs: capMs, clock: clock) { () -> (value: AXElement, hash: Int)? in
             guard let root = ax.read(), !root.frame.isEmpty else { return nil }  // 0×0 root = not settled (decision 3)
             return (root, root.hashValue)

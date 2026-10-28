@@ -43,3 +43,24 @@ func element(_ root: AXElement, _ text: String) -> AXElement? {
         [e.label, e.identifier, e.value].contains { $0?.localizedCaseInsensitiveContains(text) == true }
     }
 }
+
+/// An `AXSource` that replays recorded trees: each `read()` returns the next frame and holds the last.
+@MainActor
+final class ScriptedAX: AXSource {
+    private let frames: [AXElement?]
+    private var next = 0
+    var scriptedPID: Int32? = 4321
+
+    init(frames: [AXElement?]) { self.frames = frames }
+
+    func read() -> AXElement? {
+        guard !frames.isEmpty else { return nil }
+        defer { next = min(next + 1, frames.count - 1) }
+        return frames[next]
+    }
+    func read(pid: Int32) -> AXElement? { nil }
+    func frontmostPID() -> Int32? { scriptedPID }
+    func element(at point: Point) -> AXElement? { nil }
+    func probe(center: Point) -> (frontmostIsEmptyApp: Bool, screenAnswers: Bool) { (false, true) }
+    func complete(_ root: AXElement) -> AXElement { root }
+}
