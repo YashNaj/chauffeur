@@ -66,6 +66,26 @@ import Testing
         #expect(inputs.fakes[0].touches.count == 4)
     }
 
+    @Test func typingAfterAFocusTapThatLostTheInputDeviceIsABridgeError() throws {
+        let form = try Fixtures.ax("fixture-form")
+        var refs = RefTable()
+        let snap = Perception.build(root: form, size: screen, previous: nil, refs: &refs, rev: 0)
+        let ref = try #require(snap.find("email").first { Perception.textEntry.contains($0.role) }?.ref)
+        let inputs = FakeInputs(transports: [
+            FakeTransport(name: "digitizer", supportsMove: true, sends: false),
+            FakeTransport(name: "mouse", supportsMove: false, sends: false),
+        ])
+        let s = Session(
+            udid: "ZZ000000-TEST",
+            environment: .scripted(
+                ax: ScriptedAX(frames: [form]), touches: ScriptedTouches(evidence: [], attached: false),
+                inputs: inputs))
+        let out = s.run(["type", ref, "hello"])
+        #expect(out.text.contains("HID client lost after focusing"), "\(out.text)")
+        #expect(out.exit == ExitCode.error.rawValue)
+        #expect(inputs.keyboard.typed.isEmpty)
+    }
+
     /// Compile-only: no simulator in unit tests.
     func hidIsAnInputDevice(_ device: Device) -> any InputDevice { HID(device: device) }
 }

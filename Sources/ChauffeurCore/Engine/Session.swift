@@ -8,6 +8,8 @@ public final class Session {
     var ax: (any AXSource)?
     /// Touches, keys and buttons, built on first use (`inputDeviceReady()`); `drop()` forgets it.
     var inputDevice: (any InputDevice)?
+    /// Set when the input device is reset (a failed send) or dropped; `type` clears it before focusing the field.
+    var inputDeviceLost = false
     /// The transport that last delivered, as an index into the input device's transports.
     var preferred = 0
     /// The launched app's unified log (spec §6.8).
@@ -134,6 +136,7 @@ public final class Session {
         device = nil
         ax = nil
         inputDevice = nil
+        inputDeviceLost = true
     }
 
     /// Polls the raw tree until it settles, completes it (bar sweep) and publishes a snapshot.

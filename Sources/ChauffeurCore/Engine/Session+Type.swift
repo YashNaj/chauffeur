@@ -20,6 +20,7 @@ extension Session {
         traceArgs = secure ? Self.redactedType(ref: ref, characters: text.count, submit: submit) : nil
 
         let aimed = try aim(ref, in: before)
+        inputDeviceLost = false
         let focus = try act("tap \(aimed.label)", target: field, before: before, baselineSettled: settled) {
             Gestures.tap($0, at: aimed.point, screen: device.size, clock: clock)
         }
@@ -32,6 +33,8 @@ extension Session {
             break
         }
         let focused = last ?? before
+        // The focus tap reset (a failed send) or dropped the input device: the field is not known to be focused.
+        guard !inputDeviceLost else { throw ChauffeurError.bridge("HID client lost after focusing") }
         let keyboard = try inputDeviceReady().keyboard(clock: clock)
         let method: String
         let sent: Bool

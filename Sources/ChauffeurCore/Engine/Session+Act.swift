@@ -72,6 +72,7 @@ extension Session {
             if !sent {
                 // The device rebuilds its client on the next action, which starts again on the first transport.
                 inputDevice?.reset()
+                inputDeviceLost = true
                 preferred = 0
             }
             var report = ActionReport(
