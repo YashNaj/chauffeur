@@ -12,7 +12,9 @@ PROMPT=$(awk -F'\t' -v id="$TASK" '$1==id{print $3}' "$REPO/dogfood/tasks.tsv")
 lsof -nP -iTCP:8765 -sTCP:LISTEN >/dev/null 2>&1 || { nohup python3 -I "$REPO/Tests/FixtureApp/netserver.py" >/dev/null 2>&1 & sleep 1; }
 reset() { printf 'demo' | xcrun simctl pbcopy "$UDID" 2>/dev/null || true
           "$BIN" --udid "$UDID" terminate dev.chauffeur.fixture >/dev/null 2>&1 || true
-          "$BIN" --udid "$UDID" launch dev.chauffeur.fixture >/dev/null; sleep 2; }
+          # A cold launch can outlast the launch window (UNVERIFIED, non-zero): the wait decides, as in dogfood/run.sh.
+          "$BIN" --udid "$UDID" launch dev.chauffeur.fixture >/dev/null 2>&1 || true
+          "$BIN" --udid "$UDID" wait "Show alert" --timeout 30 >/dev/null; sleep 1; }
 # The panel's title carries the notice: Homebrew's ffmpeg has no drawtext filter to burn one in.
 TC="chauffeur 0.2.0 · run 1 of 2 · sped up ${SPEED}× for this recording"
 TX="Xcode 27.1 MCP · run 2 · same start · sped up ${SPEED}× for this recording"

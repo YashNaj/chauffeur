@@ -72,6 +72,11 @@ The failing request, both ways. The recording is sped up 3×; in real time chauf
 
 ![Tap Failing API and report the HTTP status: chauffeur (top, 4 turns, $0.022) reads the 500 off the tap's result line; Xcode 27.1's MCP (bottom, 17 turns, $0.199) can't tell](docs/media/network-N2.gif)
 
+The slow request, both ways, also at 3×: in real time chauffeur took 26 s and Xcode 40 s. The tap comes back
+`PENDING`, one `wait` finishes it, and the diff shows the result row change.
+
+![Tap Slow API and report the result: chauffeur (top, 6 turns, $0.025) gets PENDING, waits once, and reads the diff; Xcode 27.1's MCP (bottom, 14 turns, $0.172) screenshots until the row changes](docs/media/network-N1.gif)
+
 ## Quick start
 
 Requirements: Apple silicon and Xcode 26 or 27. Boot a simulator, then run:
