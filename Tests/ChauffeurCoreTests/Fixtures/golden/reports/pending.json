@@ -1,0 +1,1 @@
+{"action":"tap e4 \"Login\"","diff":[],"evidence":"app:dev.chauffeur.fixture","hints":["run `chauffeur wait` for the result"],"outcome":"pending","requests":[{"host":"api.example.com","path":"/login","port":443,"streaming":false,"telemetry":false,"waiting":true}],"rev":[7,7],"settled":true,"settledMs":420,"transport":"digitizer"}

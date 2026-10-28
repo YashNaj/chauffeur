@@ -1,0 +1,5 @@
+tap e4 "Login" → NO EFFECT · localhost:8765/fail → 500 Internal Server Error in 481 ms (server 1 ms)
+request: sent 206 B, got 113 B · http/1.1
+telemetry: 1 request (app-measurement.com)
+hint: nothing at that point reacted; run snapshot and act on a ref
+hint: the server failed (500) and the app shows nothing for it; check the server or the app's error handling

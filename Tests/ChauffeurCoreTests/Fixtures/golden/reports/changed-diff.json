@@ -1,0 +1,1 @@
+{"action":"tap e4 \"Login\"","diff":["+ text \"Welcome\"","- button \"Login\"","~ e2 value \"\" → \"alice\""],"evidence":"app:dev.chauffeur.fixture","hints":[],"outcome":"changed","rev":[7,8],"settled":true,"settledMs":420,"transport":"digitizer"}

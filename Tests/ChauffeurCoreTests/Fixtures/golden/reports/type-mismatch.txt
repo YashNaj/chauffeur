@@ -1,0 +1,2 @@
+type e9 "alice@example.com" → TEXT MISMATCH via paste · field shows "alice@example.co"
+hint: the field may limit or reformat input; run snapshot to see it

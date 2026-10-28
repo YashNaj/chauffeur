@@ -14,11 +14,9 @@ import Testing
         r.requestElapsedMs = 2200
         return r
     }
-    let fail = RequestItem(
-        host: "localhost", port: 8765, path: "/fail", status: 500, ms: 481, serverMs: 1, sent: 206, received: 113,
-        proto: "http/1.1", bodyBytes: 0)
-    let ping = RequestItem(host: "app-measurement.com", port: 443, path: "/a", status: 204, telemetry: true)
-    let open = RequestItem(host: "api.example.com", port: 443, path: "/login", waiting: true)
+    let fail = ReportFixtures.fail
+    let ping = ReportFixtures.ping
+    let open = ReportFixtures.open
 
     @Test func pending() {
         let r = report(.pending, requests: [open], hints: Verifier.hints(outcome: .pending, target: nil))

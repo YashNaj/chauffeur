@@ -1,0 +1,2 @@
+tap e4 "Login" → PENDING · api.example.com/login still running after 2.2 s
+hint: run `chauffeur wait` for the result

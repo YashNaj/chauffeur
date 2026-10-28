@@ -1,0 +1,2 @@
+tap e4 "Login" → NOT DELIVERED · still no touch
+hint: input transport unhealthy — run `chauffeur doctor --live`

@@ -1,0 +1,1 @@
+{"action":"tap e4 \"Login\"","diff":[],"evidence":"unavailable","hints":["touch log unavailable, so delivery is unknown; run `chauffeur doctor`"],"note":"the app was not running","outcome":"unverified","rev":[7,7],"settled":true,"settledMs":420,"transport":"digitizer"}

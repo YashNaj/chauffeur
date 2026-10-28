@@ -1,0 +1,1 @@
+tap e4 "Login" → changed · still changing at 1.5s · rev 7→8 · via mouse after digitizer showed no touch

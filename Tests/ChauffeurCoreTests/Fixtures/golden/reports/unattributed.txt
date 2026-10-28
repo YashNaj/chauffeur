@@ -1,0 +1,2 @@
+tap e4 "Login" → UNVERIFIED: the screen was already changing before the action, so the change can't be credited to it
+hint: wait for the screen to settle (chauffeur wait …), run snapshot, and check whether the action is still needed

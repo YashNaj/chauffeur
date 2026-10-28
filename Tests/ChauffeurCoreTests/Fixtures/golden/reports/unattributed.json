@@ -1,0 +1,1 @@
+{"action":"tap e4 \"Login\"","diff":[],"evidence":"app:dev.chauffeur.fixture","hints":["wait for the screen to settle (chauffeur wait …), run snapshot, and check whether the action is still needed"],"outcome":"unattributed","rev":[7,7],"settled":true,"settledMs":420,"transport":"digitizer"}

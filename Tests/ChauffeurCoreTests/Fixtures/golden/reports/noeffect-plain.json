@@ -1,0 +1,1 @@
+{"action":"tap e4 \"Login\"","diff":[],"evidence":"app:dev.chauffeur.fixture","hints":["nothing at that point reacted; run snapshot and act on a ref"],"outcome":"noEffect","rev":[7,7],"screenshot":"$TMPDIR/shot.jpg","settled":true,"settledMs":420,"transport":"digitizer"}

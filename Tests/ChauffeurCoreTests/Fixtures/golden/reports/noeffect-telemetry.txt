@@ -1,0 +1,3 @@
+tap e4 "Login" → NO EFFECT · the accessibility tree did not change in 1.5s (touch reached dev.chauffeur.fixture)
+telemetry: 1 request (app-measurement.com)
+hint: nothing at that point reacted; run snapshot and act on a ref

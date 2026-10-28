@@ -1,0 +1,1 @@
+{"action":"tap e4 \"Login\"","diff":[],"evidence":"app:dev.chauffeur.fixture","hints":["nothing at that point reacted; run snapshot and act on a ref"],"outcome":"noEffect","requests":[{"host":"app-measurement.com","path":"/a","port":443,"status":204,"streaming":false,"telemetry":true,"waiting":false}],"rev":[7,7],"settled":true,"settledMs":420,"transport":"digitizer"}
