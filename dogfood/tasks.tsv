@@ -14,3 +14,8 @@ S3	settings	In Settings, find the Accessibility setting that makes text bigger a
 C1	calendar	In the Calendar app, find which calendars are listed and tell me their names. Don't create or change anything.	claim:us holidays.*birthdays|birthdays.*us holidays
 K1	contacts	In Contacts, open Kate Bell and tell me which company she works for. Don't change anything.	claim:creative consulting
 R1	reminders	Open the Reminders app and tell me which lists are under My Lists and how many reminders each one has. Don't create or change anything.	claim:\breminders\b.*\b(0|no|zero|none|empty)\b
+N1	network	In the Fixture app's Network tab, tap Slow API and tell me what the Result row says once the request has finished.	claim:slow 200
+N2	network	In the Fixture app's Network tab, tap Failing API and tell me whether its request succeeded; if it did not, tell me the HTTP status it got.	claim:\b500\b
+N3	network	In the Fixture app's Network tab, tap Dead network button and tell me whether tapping it did anything.	claim:\b(nothing|no effect|no change|did not|didn't|does nothing|not do anything|no visible)\b
+N4	network	In the Fixture app's Network tab, tap Copy code and tell me how many characters it put on the clipboard.	claim:\b17\b
+N5	network	In the Fixture app's Network tab, tap Medium API and tell me what the Result row says.	claim:medium 200
