@@ -1,0 +1,2 @@
+tap e4 "Login" → INTERCEPTED by com.apple.springboard · nothing changed
+hint: something else is on top of the app; run snapshot to see what

@@ -1,0 +1,4 @@
+tap e4 "Login" → NO EFFECT · the accessibility tree did not change in 1.5s (touch reached dev.chauffeur.fixture)
+screen: $TMPDIR/shot.jpg (look before retrying: some changes, like checkmarks, never reach the tree)
+hint: nothing at that point reacted; run snapshot and act on a ref
+note: network not watched (no app process to watch)

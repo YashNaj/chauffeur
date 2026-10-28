@@ -16,7 +16,8 @@ extension Session {
         if service == "notifications" {
             return Output(
                 "permission \(action) notifications → not possible: simctl cannot change notification permission. "
-                    + "Let the app ask, then tap Allow on the prompt (snapshot shows it as a system alert)", exit: 1)
+                    + "Let the app ask, then tap Allow on the prompt (snapshot shows it as a system alert)",
+                exit: .error)
         }
         guard Self.privacyServices.contains(service) else {
             throw ChauffeurError.usage(
@@ -35,7 +36,7 @@ extension Session {
         let r = try SimCtl.run(["privacy", udid, action, service] + (bundle.map { [$0] } ?? []), timeout: 30)
         let note = tracked.flatMap { afterPermissionChange($0, waitMs: 1000) }
         guard r.status == 0 else {
-            return Output("permission \(action) \(service) → FAILED: \(SimCtl.message(r))", exit: 1)
+            return Output("permission \(action) \(service) → FAILED: \(SimCtl.message(r))", exit: .error)
         }
         let done = ["grant": "granted", "revoke": "revoked", "reset": "reset"][action] ?? action
         let head = "permission \(action) \(service)" + (bundle.map { " \($0)" } ?? "") + " → \(done)"
@@ -79,7 +80,7 @@ extension Session {
         }
         _ = try connect()
         let r = try SimCtl.run(["location", udid] + args, timeout: 30)
-        guard r.status == 0 else { return Output("location → FAILED: \(SimCtl.message(r))", exit: 1) }
+        guard r.status == 0 else { return Output("location → FAILED: \(SimCtl.message(r))", exit: .error) }
         return Output("location → \(shown)")
     }
 
@@ -88,11 +89,13 @@ extension Session {
         let bundle = try bundleArgument(&a)
         guard let raw = a.text() else { throw ChauffeurError.usage(a.usage) }
         let file = resolvePath(raw)
-        guard let data = try? Data(contentsOf: file) else { return Output("push: cannot read \(file.path)", exit: 1) }
-        if let problem = Self.pushProblem(data) { return Output("push: \(problem)", exit: 1) }
+        guard let data = try? Data(contentsOf: file) else {
+            return Output("push: cannot read \(file.path)", exit: .error)
+        }
+        if let problem = Self.pushProblem(data) { return Output("push: \(problem)", exit: .error) }
         _ = try connect()
         let r = try SimCtl.run(["push", udid, bundle, file.path], timeout: 30)
-        guard r.status == 0 else { return Output("push \(bundle) → FAILED: \(SimCtl.message(r))", exit: 1) }
+        guard r.status == 0 else { return Output("push \(bundle) → FAILED: \(SimCtl.message(r))", exit: .error) }
         return Output("push \(bundle) → sent (\(data.count)-byte payload)")
     }
 
@@ -116,12 +119,13 @@ extension Session {
         let before = try SimCtl.run(["ui", udid, "appearance"], timeout: 30).out.trimmingCharacters(
             in: .whitespacesAndNewlines)
         let r = try SimCtl.run(["ui", udid, "appearance", mode], timeout: 30)
-        guard r.status == 0 else { return Output("appearance \(mode) → FAILED: \(SimCtl.message(r))", exit: 1) }
+        guard r.status == 0 else { return Output("appearance \(mode) → FAILED: \(SimCtl.message(r))", exit: .error) }
         let after = try SimCtl.run(["ui", udid, "appearance"], timeout: 30).out.trimmingCharacters(
             in: .whitespacesAndNewlines)
         guard after == mode else {
             return Output(
-                "appearance \(mode) → UNVERIFIED: the simulator now reports \(Perception.quote(after))", exit: 3)
+                "appearance \(mode) → UNVERIFIED: the simulator now reports \(Perception.quote(after))", exit: .noEffect
+            )
         }
         return Output(
             "appearance → \(mode)" + (before == mode ? " (it already was)" : " (was \(Perception.escape(before)))"))

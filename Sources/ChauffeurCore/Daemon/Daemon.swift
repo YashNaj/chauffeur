@@ -59,7 +59,7 @@ public enum Daemon {
             return (
                 Output(
                     "this daemon serves \(serving), not \(wanted): both simulators share the socket "
-                        + "\(StatePaths.socket(serving).lastPathComponent). Shut one of them down", exit: 1), false
+                        + "\(StatePaths.socket(serving).lastPathComponent). Shut one of them down", exit: .error), false
             )
         }
         guard request.version == current else {
@@ -155,7 +155,7 @@ public enum Daemon {
                 lastActivity = Date()
                 defer { lastActivity = Date() }
                 let answer = respond(to: request, serving: udid) { args in
-                    session?.run(args, cwd: request.cwd) ?? Output("daemon not ready", exit: 1)
+                    session?.run(args, cwd: request.cwd) ?? Output("daemon not ready", exit: .error)
                 }
                 return (answer.0, answer.exitAfter)
             }

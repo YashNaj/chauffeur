@@ -6,8 +6,8 @@ import Testing
     @Test func rendersAndScores() {
         let checks = [Check(status: .ok, text: "Xcode 27.0"), Check(status: .warn, text: "level debug")]
         #expect(Doctor.render(checks) == "chauffeur \(Chauffeur.version)\n✓ Xcode 27.0\n! level debug")
-        #expect(Doctor.exitCode(checks) == 0)
-        #expect(Doctor.exitCode(checks + [Check(status: .fail, text: "x")]) == 1)
+        #expect(Doctor.exitCode(checks) == .ok)
+        #expect(Doctor.exitCode(checks + [Check(status: .fail, text: "x")]) == .error)
     }
 
     @Test func raisedLevelWithoutADaemonIsFlagged() {

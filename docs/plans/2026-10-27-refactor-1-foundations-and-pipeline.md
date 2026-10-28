@@ -731,3 +731,51 @@ Branch `refactor-2-pipeline`. PR title: "Refactor 2: evidence passes, one credit
 - Task 14: the three `settledMs` conventions, written down before `credit` is introduced.
 - Task 16: any pass whose offline test needed a seam this plan didn't foresee.
 - The drift the ledger shows at each stage, resolved by §9's default ruling (the handler wins) and listed here.
+
+### Stage 0 (branch `refactor-0-goldens`)
+
+**Task 3: the exit-code literals.** 47 `exit: <digit>` literals in `Sources`, each now an `ExitCode` case:
+33 × `1` → `.error`, 4 × `3` → `.noEffect`, 4 × `4` → `.notFound`, 6 × `64` → `.usage`. Eight of them were the arms of
+two catch sites, four in `Session.guarded` and four in `CLI.handleText`; both are now one `Output.failure(error)` call,
+and so is `MCPServer.call`'s catch, which had no literal. The `exit: [0-9]` pattern missed 13 more, found in review and
+converted in a second commit: the ternaries `exit: anyDelivered ? 0 : 3` (selftest) and `exit: changed ? 0 : 3`
+(type's submit); `out.exit = 5` (crash annotation → `.crashed`); in batch, `var exit: Int32 = 0`, `exit = 1`,
+`!= 0` and `out.exit == 6`; in `launchCommand`, `var exit: Int32 = 0` and `exit = alive ? 3 : 1`; and the `== 0` /
+`!= 0` checks in recover, the MCP server (two) and Doctor (→ `ExitCode.ok.rawValue`). The `exit-literal` lint now also
+catches ternary branches and `exit`/`.exit` followed by `=`, `==` or `!=` and a digit.
+
+Left as they are, by ruling: process exit statuses (`exit(64)` and `exit(output.exit)` in
+`Sources/chauffeur/main.swift`, `exit(0)`/`exit(1)` in the daemon), and the daemon's version-mismatch code
+`versionMismatchExit = 75`. That one *is* carried by an `Output`: `Daemon.respond` returns it, the client retries once,
+and on a second mismatch `Daemon.send` returns it, so the CLI can exit 75. It stays out of `ExitCode` because a seventh
+case would change `Usage.text`'s exit-code line, which §9 doesn't list. **Plan 2's glossary must decide on 75.**
+`Output.exit` stays `Int32` (it is the daemon's wire format); `Output.init(_:exit: ExitCode, data:)` is an overload,
+and `ActionReport.exitCode`, `TypeReport.exitCode` and `Doctor.exitCode` return `ExitCode`.
+
+**Task 4: `Date()` and sleeps.** Both engine sleeps now go through the session's clock: selftest's 300 ms pause and
+`press`'s hold. Every `Date()` left in `Engine` is a wall-clock time, not a duration, and stays, with a comment:
+`launchedAt` (saved with the tracked app, compared with the simulator's boot date and crash report times);
+`CrashInfo.detectedAt` (a `Date` field, stored only); the trace line's timestamp; the screenshot file name. Durations
+were already measured with `clock.nowMs()`. `Settle.wait` and `NetJudge.judge` take `any SettleClock` instead of
+`some` so the session's existential clock can be passed. `SessionNetworkTests` went from 2.65 s to 0.06 s. Raw
+`usleep`/`Date()` outside `Engine` (TouchLog, Input, Daemon, LogStream, Doctor) are Stage 1a's.
+
+**Where each §1 report shape is pinned.** Task 2's 15 goldens cover every shape §1 lists except two. *Crash* is pinned
+byte for byte by `AnnotateTests.aVanishedAppIsACrashReportedOnce`. *Type with submit* is pinned nowhere yet: the
+"submit → …" lines and "→ not typed: focusing the field failed" in `Session+Act.swift`'s `typeCommand` need an offline
+`type`, which needs Stage 1b's seams. **Task 12 therefore adds an offline `type --submit` test whose rendered output
+ends in `Golden.check` (submit changed, submit NO EFFECT, submit NOT DELIVERED), recorded before Stage 2 touches
+`typeCommand`.**
+
+**The live expectations ledger.** The header line names the commit it was generated at and changes on every run;
+"no diff" means no change from line 3 on. The final review found the script missed `hasSuffix("…")`; it now collects
+contains, hasPrefix, hasSuffix and `== "…"`, and the regeneration added only the three `hasSuffix` lines (Batch, Bridge,
+Screenshot).
+
+**Live run at the end of Stage 0** (c2e9bfb, iPhone 17 on iOS 27, load 3 at start, 877 s): 455 tests, every live suite
+passed, `NetworkLiveTests` included, except `AXLiveTests.anAppStartedWithTheFlagsOffIsToldToRelaunch` (2 issues).
+With the accessibility flags turned off, the fixture's tree is still readable, so chauffeur never says "relaunch it";
+after the relaunch a system alert covers the app. The same test fails identically on `main` (76cfdf3), so it predates
+this refactor: the simulator now exposes the tree with the flags off. It needs its own investigation, outside this
+plan. During the run an orphaned `Tests/FixtureApp/netserver.py` from an earlier session held port 8765, so the
+network suites ran against it (same script); they passed.

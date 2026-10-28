@@ -22,6 +22,7 @@ extension Session {
         TrackedApp.clear(StatePaths.app(udid))
         // chauffeur ended it (a permission change can take more than the 1 s grace window to kill the app).
         if let endedAt = endedByChauffeur[gone.pid], clock.nowMs() - endedAt < Self.endedGraceMs { return nil }
+        // wall clock: `detectedAt` is a Date, not a duration (nothing reads it yet)
         var info = CrashInfo(app: gone, detectedAt: Date(), report: nil)
         let deadline = clock.nowMs() + crashReportWaitMs
         while true {
@@ -76,7 +77,7 @@ extension Session {
             extra.append(
                 "hint: after fixing it, rebuild, chauffeur install <path.app>, then chauffeur launch \(crashed.app.bundle)"
             )
-            out.exit = 5
+            out.exit = ExitCode.crashed.rawValue
         }
         if let note = healNote {
             extra.append("note: " + note)
@@ -108,7 +109,7 @@ extension Session {
         guard let followed = app ?? crash?.app else {
             return Output(
                 "no app launched through chauffeur yet: logs follow the app started with chauffeur launch <bundle>",
-                exit: 1)
+                exit: .error)
         }
         let pool = sinceLast ? logTap.since(lastActionLogCursor) : logTap.all
         let filtered = level == "error" ? pool.filter(\.isError) : pool

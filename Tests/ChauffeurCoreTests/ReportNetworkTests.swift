@@ -14,11 +14,9 @@ import Testing
         r.requestElapsedMs = 2200
         return r
     }
-    let fail = RequestItem(
-        host: "localhost", port: 8765, path: "/fail", status: 500, ms: 481, serverMs: 1, sent: 206, received: 113,
-        proto: "http/1.1", bodyBytes: 0)
-    let ping = RequestItem(host: "app-measurement.com", port: 443, path: "/a", status: 204, telemetry: true)
-    let open = RequestItem(host: "api.example.com", port: 443, path: "/login", waiting: true)
+    let fail = ReportFixtures.fail
+    let ping = ReportFixtures.ping
+    let open = ReportFixtures.open
 
     @Test func pending() {
         let r = report(.pending, requests: [open], hints: Verifier.hints(outcome: .pending, target: nil))
@@ -27,7 +25,7 @@ import Testing
                 tap e4 "Login" → PENDING · api.example.com/login still running after 2.2 s
                 hint: run `chauffeur wait` for the result
                 """)
-        #expect(r.exitCode == 6)
+        #expect(r.exitCode == .pending)
         #expect(r.json["outcome"]?.string == "pending")
         #expect(r.json["requests"]?.array?.first?["waiting"]?.bool == true)
     }
@@ -41,7 +39,7 @@ import Testing
                 telemetry: 1 request (app-measurement.com)
                 hint: the server failed (500) and the app shows nothing for it; check the server or the app's error handling
                 """)
-        #expect(r.exitCode == 3)
+        #expect(r.exitCode == .noEffect)
     }
 
     @Test func aSuccessThatChangedNothing() {
@@ -69,7 +67,7 @@ import Testing
         var r = report(.changed, requests: [])
         r.copiedCharacters = 24
         #expect(r.render() == "tap e4 \"Login\" → changed · copied to clipboard (24 characters)")
-        #expect(r.json["copied"]?.int == 24 && r.exitCode == 0)
+        #expect(r.json["copied"]?.int == 24 && r.exitCode == .ok)
     }
 
     @Test func anUnwatchedNetworkIsSaid() {

@@ -50,7 +50,7 @@ extension Session {
                 return Output(
                     (gone ? "still present" : "not found") + " after \(Geometry.fmt(timeout))s: "
                         + Perception.quote(query) + "\nscreen: " + lastHeader
-                        + (stillWaiting().map { "\nstill waiting: " + $0 } ?? ""), exit: 4,
+                        + (stillWaiting().map { "\nstill waiting: " + $0 } ?? ""), exit: .notFound,
                     data: [gone ? "gone" : "found": false, "screen": .string(lastHeader)])
             }
             clock.sleep(ms: 100)
@@ -62,7 +62,7 @@ extension Session {
         guard let pending = pendingTap else {
             return Output(
                 "nothing to wait for: no tap came back PENDING since the last action. To wait for something on the "
-                    + "screen: chauffeur wait \"<text>\"", exit: 1)
+                    + "screen: chauffeur wait \"<text>\"", exit: .error)
         }
         let start = clock.nowMs()
         var previous: [FlowActivity] = []

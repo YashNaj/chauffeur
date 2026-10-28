@@ -71,10 +71,12 @@ public final class Session {
     var telemetryOverride: [String]?
     /// Where the launched app's log lines start in `logTap` (crash evidence is this launch's lines only).
     var appLogCursor: Int?
-    let clock = SystemClock()
+    /// Every sleep and every duration the engine measures goes through this; tests inject a fake.
+    let clock: any SettleClock
 
-    public init(udid: String) {
+    public init(udid: String, clock: any SettleClock = SystemClock()) {
         self.udid = udid
+        self.clock = clock
         touchLog = TouchLog(udid: udid, levelFile: StatePaths.level(udid))
         logTap = LogTap(udid: udid)
         simulatorBooted = { SimBoot.booted(udid: udid) }
@@ -234,7 +236,7 @@ public final class Session {
 
     /// One command, then what the launched app logged and whether it crashed (spec §6.8), then the trace.
     func runOne(_ argv: [String]) -> Output {
-        guard let command = argv.first else { return Output(Usage.text, exit: 64) }
+        guard let command = argv.first else { return Output(Usage.text, exit: .usage) }
         let started = clock.nowMs()
         traceTarget = nil
         traceArgs = command == "type" ? Self.provisionalType(argv) : nil
@@ -265,6 +267,7 @@ public final class Session {
     /// Appends the command to the trace when this session keeps one.
     func record(_ args: [String], _ output: Output, ms: Int) {
         guard let traceFile else { return }
+        // wall clock: the trace is a log file people read
         let entry = TraceEntry(
             time: Trace.timestamp(Date()), udid: udid, args: args, exit: output.exit, ms: ms,
             result: String(output.text.prefix { $0 != "\n" }), target: traceTarget.map(TraceTarget.init),
@@ -294,7 +297,7 @@ public final class Session {
         case "appearance": return try appearanceCommand(argv)
         case "do": return try batchCommand(argv)
         case "selftest": return try selftestCommand()
-        default: return Output("unknown command \"\(command)\"\n\n" + Usage.text, exit: 64)
+        default: return Output("unknown command \"\(command)\"\n\n" + Usage.text, exit: .usage)
         }
     }
 
@@ -309,14 +312,8 @@ public final class Session {
     func guarded(_ body: () throws -> Output) -> Output {
         do {
             return try body()
-        } catch ChauffeurError.usage(let text) {
-            return Output(text, exit: 64)
-        } catch let error as ChauffeurError {
-            return Output(error.description, exit: 1)
-        } catch let error as RefError {
-            return Output(error.description, exit: 1)
         } catch {
-            return Output("\(error)", exit: 1)
+            return Output.failure(error)
         }
     }
 
@@ -340,7 +337,8 @@ public final class Session {
         let hits = snap.find(query)
         guard !hits.isEmpty else {
             return Output(
-                "no match for \(Perception.quote(query)) on: \(snap.header)\nrun snapshot to see the screen", exit: 4,
+                "no match for \(Perception.quote(query)) on: \(snap.header)\nrun snapshot to see the screen",
+                exit: .notFound,
                 data: ["matches": [], "screen": .string(snap.header)])
         }
         return Output(

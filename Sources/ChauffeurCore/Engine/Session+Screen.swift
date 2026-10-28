@@ -76,6 +76,7 @@ extension Session {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "HHmmss-SSS"
+        // wall clock: the filename is the time of day the shot was taken
         let url = dir.appendingPathComponent("shot-\(formatter.string(from: Date()))\(zoom == nil ? "" : "-zoom").jpg")
         guard let rendered = Screenshot.render(image, plan), let bytes = Screenshot.writeJPEG(rendered, to: url) else {
             throw ChauffeurError.failed("could not encode the screenshot")

@@ -1,0 +1,1 @@
+{"action":"type e9 \"alice@example.com\"","method":"paste","requests":[{"body":0,"host":"localhost","ms":481,"path":"/fail","port":8765,"protocol":"http/1.1","received":113,"sent":206,"serverMs":1,"status":500,"streaming":false,"telemetry":false,"waiting":false}],"settledMs":420,"value":"alice@example.com","verdict":"ok"}

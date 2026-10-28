@@ -11,7 +11,7 @@ extension Session {
             guard !inBatch, !relaunchedForAccessibility.contains(bundle) else { throw ChauffeurError.blind(why) }
             relaunchedForAccessibility.insert(bundle)
             let launched = relaunch?(bundle) ?? guarded { try launchCommand([bundle]) }
-            guard launched.exit == 0 else { throw ChauffeurError.blind(why) }
+            guard launched.exit == ExitCode.ok.rawValue else { throw ChauffeurError.blind(why) }
             // A retry that fails still says the app was reset: the agent's next steps depend on it.
             var out = guarded(body)
             out.text +=

@@ -1,0 +1,4 @@
+tap e4 "Login" → changed · settled 420ms · rev 7→8
++ text "Welcome"
+- button "Login"
+~ e2 value "" → "alice"

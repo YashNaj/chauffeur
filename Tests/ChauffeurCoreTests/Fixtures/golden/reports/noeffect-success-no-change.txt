@@ -1,0 +1,3 @@
+tap e4 "Login" → NO EFFECT · localhost:8765/fail → 200 OK in 481 ms (server 1 ms), but nothing changed on screen
+request: sent 206 B, got 113 B · http/1.1
+hint: nothing at that point reacted; run snapshot and act on a ref

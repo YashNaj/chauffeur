@@ -1,0 +1,2 @@
+tap e4 "Login" → UNVERIFIED: no visible change (the app was not running)
+hint: touch log unavailable, so delivery is unknown; run `chauffeur doctor`

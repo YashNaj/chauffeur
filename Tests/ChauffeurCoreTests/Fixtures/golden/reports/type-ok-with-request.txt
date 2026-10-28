@@ -1,0 +1,2 @@
+type e9 "alice@example.com" → typed via paste · value="alice@example.com" · settled 420ms
+request: localhost:8765/fail → 500 Internal Server Error in 481 ms (server 1 ms) · sent 206 B, got 113 B · http/1.1

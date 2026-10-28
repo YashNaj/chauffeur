@@ -4,6 +4,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 fail=0
+n=0
 ok() { echo "ok - $1"; }
 bad() { echo "FAIL - $1"; fail=1; }
 
@@ -42,6 +43,32 @@ d=$(tree print-cli); echo 'print("x")' > "$d/Sources/chauffeur/main.swift"
 expect_pass "print in the CLI target passes" "$d"
 d=$(tree comment); printf '    // print() would buffer; try! here would crash\n' > "$d/Sources/ChauffeurCore/B.swift"
 expect_pass "comment line passes" "$d"
+
+d=$(tree exit); echo 'return Output("x", exit: 1)' > "$d/Sources/ChauffeurCore/B.swift"
+expect_fail "bare exit-code literal fails" exit-literal "$d"
+d=$(tree exit-cli); echo 'let o = Output("x", exit: 64)' > "$d/Sources/chauffeur/main.swift"
+expect_fail "bare exit-code literal in the CLI target fails" exit-literal "$d"
+d=$(tree exit-case); printf 'return Output("x", exit: .error)\nreturn Output("x", exit: report.exitCode)\ncase ok = 0\n' > "$d/Sources/ChauffeurCore/B.swift"
+expect_pass "ExitCode cases and raw values pass" "$d"
+
+for shape in 'exit: anyDelivered ? 0 : 3)' 'exit: changed ? .ok : 3,' 'out.exit = 5' 'guard out.exit == 6 else { return out }' \
+  'exit = alive ? 3 : 1' 'if result.exit != 0 {'; do
+  n=$((n + 1)); d=$(tree "exit-shape-$n"); printf '%s\n' "$shape" > "$d/Sources/ChauffeurCore/B.swift"
+  expect_fail "bare exit code fails: $shape" exit-literal "$d"
+done
+for shape in 'public init(_ text: String, exit: Int32 = 0, data: JSON? = nil) {' 'var exit: Int32 = 1' 'let exit: Int32 = 2'; do
+  n=$((n + 1)); d=$(tree "exit-decl-$n"); printf '%s\n' "$shape" > "$d/Sources/ChauffeurCore/B.swift"
+  expect_fail "bare exit-code default or initial value fails: $shape" exit-literal "$d"
+done
+d=$(tree exit-decl-ok); printf '%s\n' 'public init(_ text: String, exit: Int32 = ExitCode.ok.rawValue, data: JSON? = nil) {' \
+  'var exit: Int32 = ExitCode.error.rawValue' > "$d/Sources/ChauffeurCore/B.swift"
+expect_pass "exit: Int32 = ExitCode.ok.rawValue passes" "$d"
+d=$(tree exit-report); echo 'return Output(report.render(), exit: report.exitCode, data: report.json)' > "$d/Sources/ChauffeurCore/B.swift"
+expect_pass "exit: report.exitCode passes" "$d"
+d=$(tree exit-ok); printf '%s\n' 'exit: alive ? .noEffect : .error)' 'out.exit = ExitCode.crashed.rawValue' \
+  'guard out.exit == ExitCode.pending.rawValue else { return out }' 'self.exit = exit' 'exit(64)' \
+  'return Output("simctl pbcopy exit: 3 (stderr: x)")' > "$d/Sources/ChauffeurCore/B.swift"
+expect_pass "ExitCode ternaries, rawValue comparisons, process exits and prose pass" "$d"
 
 d=$(tree long); lines 401 > "$d/Sources/ChauffeurCore/B.swift"
 expect_fail "401-line source file fails" file-length "$d"

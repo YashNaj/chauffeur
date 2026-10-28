@@ -132,7 +132,7 @@ extension Session {
         let (before, settled) = try baseline()
         let aimed = try aim(target, in: before)
         if let refusal = Geometry.refusal(for: aimed.point, screen: device.size, allowEdge: allowEdge) {
-            return Output("tap \(aimed.label) refused: \(refusal)", exit: 1)
+            return Output("tap \(aimed.label) refused: \(refusal)", exit: .error)
         }
         let clipboardBefore = clipboard.result(waitingAtMost: 2000) ?? nil
         var report = try act(
@@ -181,7 +181,7 @@ extension Session {
     func selftestCommand() throws -> Output {
         let (device, _) = try connect()
         let all = try transportsReady()
-        guard touchLog.isAttached else { return Output("touch log unavailable: cannot verify delivery", exit: 1) }
+        guard touchLog.isAttached else { return Output("touch log unavailable: cannot verify delivery", exit: .error) }
         let point = Point(x: device.size.w / 2, y: 20)
         var lines: [String] = []
         var anyDelivered = false
@@ -203,9 +203,9 @@ extension Session {
                     "✗ \(transport.name): " + (sent ? "sent, but no touch reached the simulator" : "send failed"))
             case .unavailable: lines.append("? \(transport.name): touch log stopped")
             }
-            usleep(300_000)
+            clock.sleep(ms: 300)
         }
-        return Output(lines.joined(separator: "\n"), exit: anyDelivered ? 0 : 3)
+        return Output(lines.joined(separator: "\n"), exit: anyDelivered ? .ok : .noEffect)
     }
 
     func typeCommand(_ argv: [String]) throws -> Output {
@@ -219,7 +219,7 @@ extension Session {
         guard Perception.textEntry.contains(field.role) else {
             return Output(
                 "\(ref) is a \(field.role), not a text field; type needs a textfield, securefield or searchfield ref",
-                exit: 1)
+                exit: .error)
         }
         let secure = field.role == "securefield"
         let label = "type \(ref)" + (secure ? " (\(text.count) characters)" : " " + Perception.quote(text))
@@ -233,7 +233,7 @@ extension Session {
         switch focus.outcome {
         case .notDelivered, .intercepted:
             return Output(
-                "\(label) → not typed: focusing the field failed\n" + focus.render(), exit: 3,
+                "\(label) → not typed: focusing the field failed\n" + focus.render(), exit: .noEffect,
                 data: ["focus": focus.json])
         default:
             break
@@ -251,7 +251,7 @@ extension Session {
             method = "paste"
             let copied = try SimCtl.run(["pbcopy", udid], stdin: text, timeout: 15)
             guard copied.status == 0 else {
-                return Output("\(label) → not typed: simctl pbcopy exited \(copied.status)", exit: 1)
+                return Output("\(label) → not typed: simctl pbcopy exited \(copied.status)", exit: .error)
             }
             sent = keyboard.press(Keys.v, modifiers: [Keys.command])
         }
@@ -262,7 +262,7 @@ extension Session {
         guard sent else {
             return Output(
                 "\(label) → NOT DELIVERED: key events failed to send\nhint: input transport unhealthy — run `chauffeur doctor --live`",
-                exit: 3)
+                exit: .noEffect)
         }
 
         // Verify the text before Return, so a submit that navigates away can't hide a failed entry (I2).
@@ -284,7 +284,7 @@ extension Session {
 
         guard keyboard.press(Keys.returnKey) else {
             return Output(
-                report.render() + "\nsubmit → NOT DELIVERED: Return failed to send", exit: 3,
+                report.render() + "\nsubmit → NOT DELIVERED: Return failed to send", exit: .noEffect,
                 data: report.json.merging(["submit": "notDelivered"]))
         }
         let after = try observe(minMs: 150, capMs: 1500).snapshot
@@ -295,7 +295,7 @@ extension Session {
                 + Diff.lines(from: typed, to: after).joined(separator: "\n")
             : "submit → NO EFFECT · nothing changed after Return"
         return Output(
-            report.render() + "\n" + submitted, exit: changed ? 0 : 3,
+            report.render() + "\n" + submitted, exit: changed ? .ok : .noEffect,
             data: report.json.merging(["submit": changed ? "changed" : "noEffect"]))
     }
 
@@ -353,7 +353,8 @@ extension Session {
         for p in [drag.from, drag.to] {
             if let refusal = Geometry.refusal(for: p, screen: device.size, allowEdge: false) {
                 return Output(
-                    "scroll \(direction) refused: \(refusal); the visible part of the region is too small", exit: 1)
+                    "scroll \(direction) refused: \(refusal); the visible part of the region is too small", exit: .error
+                )
             }
         }
 
@@ -379,11 +380,12 @@ extension Session {
             if report.outcome != .changed {
                 return Output(
                     "reached the end after \(n - 1) scrolls \(direction); no match for \(Perception.quote(until))\n"
-                        + report.render(), exit: 4, data: report.json.merging(["found": .null, "scrolls": JSON(n - 1)]))
+                        + report.render(), exit: .notFound,
+                    data: report.json.merging(["found": .null, "scrolls": JSON(n - 1)]))
             }
             snap = after
             settled = true  // the previous scroll's observe settled before we got here
         }
-        return Output("no match for \(Perception.quote(until ?? "")) after 15 scrolls \(direction)", exit: 4)
+        return Output("no match for \(Perception.quote(until ?? "")) after 15 scrolls \(direction)", exit: .notFound)
     }
 }
