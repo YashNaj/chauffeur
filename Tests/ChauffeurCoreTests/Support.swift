@@ -133,8 +133,11 @@ final class RecordingShell: ShellRunner, @unchecked Sendable {
 }
 
 extension SessionEnvironment {
-    /// Tests: scripted everything, an unattached touch log unless given, no flows, no live processes, and a booted
-    /// 402×874 device.
+    /// Tests: scripts the device, accessibility, touch evidence, shell, clock, flows and processes. By default the
+    /// touch log is unattached, there are no flows or live processes, and the device is booted at 402×874. It does not
+    /// fake the real `LogTap`, `SimBoot` (reached through the `simulatorBooted`/`simulatorBootDate` closures),
+    /// `CrashFinder` (`findCrashReport`) or the `StatePaths` files under `$TMPDIR/chauffeur`; the session still uses
+    /// those.
     static func scripted(
         ax: ScriptedAX, touches: ScriptedTouches = ScriptedTouches(evidence: [], attached: false),
         shell: RecordingShell = RecordingShell(), clock: FakeClock = FakeClock()
