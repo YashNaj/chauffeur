@@ -38,6 +38,12 @@ launch_fixture() {
   done
   echo "reset: Fixture never showed its Home screen, see $RUN.reset" >&2; exit 5
 }
+# The Network tab's peer (Tests/FixtureApp/netserver.py): started once, kept across runs, logged next to the results.
+ensure_netserver() {
+  lsof -nP -iTCP:8765 -sTCP:LISTEN >/dev/null 2>&1 && return 0
+  nohup python3 -I "$REPO/Tests/FixtureApp/netserver.py" >> "$OUT/netserver.log" 2>&1 &
+  sleep 1
+}
 : > "$OUT/$RUN.reset"
 case "$RESET" in
   none) ;;
@@ -47,6 +53,8 @@ case "$RESET" in
             q "$BIN" --udid $UDID button home ;;
   perm) q xcrun simctl privacy $UDID reset location dev.chauffeur.fixture
         q "$BIN" --udid $UDID terminate dev.chauffeur.fixture; launch_fixture ;;
+  network) ensure_netserver; printf 'benchmark' | q xcrun simctl pbcopy $UDID  # N4 copies: start from a clean pasteboard
+           q "$BIN" --udid $UDID terminate dev.chauffeur.fixture; launch_fixture ;;
   calendar) q "$BIN" --udid $UDID terminate com.apple.mobilecal; q "$BIN" --udid $UDID button home ;;
   contacts) q "$BIN" --udid $UDID terminate com.apple.MobileAddressBook; q "$BIN" --udid $UDID button home ;;
   reminders) q "$BIN" --udid $UDID terminate com.apple.reminders; q "$BIN" --udid $UDID button home ;;

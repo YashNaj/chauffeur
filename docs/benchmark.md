@@ -138,6 +138,92 @@ Each cell shows successes out of 3, the median cost and the median number of tur
 The published runs cost $30.10 at API prices: chauffeur $4.09 and Xcode $26.01. Including the discarded first Xcode
 round ($25.27), the benchmark cost about $55.50 in all.
 
+## Network round: chauffeur 0.2.0 against Xcode 27.1's MCP (2026-10-27)
+
+The launch benchmark never started a network request, so it could not show what M4b added. This round adds five
+tasks on the fixture's Network tab, each 3 times with Opus and with Sonnet on both arms: 60 runs, the same machine,
+an iPhone 17 simulator on iOS 27.0, chauffeur 0.2.0 (the release binary) against Xcode 27.1 (27A9275).
+
+**Opus**
+
+| | chauffeur 0.2.0 | Xcode 27.1 MCP |
+|---|---|---|
+| Tasks verified | 14/15 | 12/15 |
+| Median cost per task | $0.046 | $0.405 |
+| Median turns | 5.0 | 14.0 |
+| Median wall time | 15 s | 51 s |
+
+**Sonnet**
+
+| | chauffeur 0.2.0 | Xcode 27.1 MCP |
+|---|---|---|
+| Tasks verified | 15/15 | 12/15 |
+| Median cost per task | $0.022 | $0.193 |
+| Median turns | 4.0 | 16.0 |
+| Median wall time | 13 s | 37 s |
+
+### The tasks
+
+The Network tab talks to a local server (`Tests/FixtureApp/netserver.py`, started by the reset). A pass is a final
+answer that matches the `check` column of `dogfood/tasks.tsv`, then a hand review.
+
+| Task | Prompt | What decides it |
+|---|---|---|
+| N1 | In the Fixture app's Network tab, tap Slow API and tell me what the Result row says once the request has finished. | the reply takes 2.5 s; the row then reads `slow 200` |
+| N2 | …tap Failing API and tell me whether its request succeeded; if it did not, tell me the HTTP status it got. | the server answers 500 and the app shows nothing |
+| N3 | …tap Dead network button and tell me whether tapping it did anything. | a control: nothing happens |
+| N4 | …tap Copy code and tell me how many characters it put on the clipboard. | 17; the app shows nothing |
+| N5 | …tap Medium API and tell me what the Result row says. | the reply takes 1.2 s; the row then reads `medium 200` |
+
+### Per-task results
+
+Pass count over 3 runs · median cost · median turns.
+
+| Task | Opus · chauffeur | Opus · Xcode | Sonnet · chauffeur | Sonnet · Xcode |
+|---|---|---|---|---|
+| N1 slow request | 3/3 · $0.046 · 5 | 3/3 · $0.381 · 11 | 3/3 · $0.023 · 5 | 3/3 · $0.192 · 14 |
+| N2 failing request | 3/3 · $0.048 · 5 | **0/3** · $0.423 · 17 | 3/3 · $0.022 · 4 | **0/3** · $0.206 · 17 |
+| N3 dead button | **2/3** · $0.095 · 7 | 3/3 · $0.387 · 14 | 3/3 · $0.029 · 6 | 3/3 · $0.190 · 14 |
+| N4 clipboard copy | 3/3 · $0.043 · 4 | 3/3 · $0.510 · 19 | 3/3 · $0.020 · 4 | 3/3 · $0.237 · 20 |
+| N5 medium request | 3/3 · $0.042 · 4 | 3/3 · $0.363 · 11 | 3/3 · $0.020 · 4 | 3/3 · $0.189 · 14 |
+
+### Where each tool failed
+
+- **Xcode, N2, all six runs.** The HTTP status never reaches the screen, and the simulator's console shows nothing
+  for a URLSession reply, so the agent has nothing to read. Every answer said so honestly ("I couldn't tell whether
+  the request succeeded, and I have no HTTP status for it"); every run also tapped the button twice, which is a
+  double submit. chauffeur's agent answered from the tap's result line, `NO EFFECT · 127.0.0.1:8765/fail → 500
+  Internal Server Error`, in 4 or 5 turns.
+- **Xcode, N4, all six passes by improvisation.** The clipboard count isn't on screen either. Every Xcode run that
+  passed long-pressed the Search field, pasted, and counted the characters. chauffeur's agent read `copied to
+  clipboard (17 characters)` on the tap's result line.
+- **chauffeur, N3, one Opus run (hand review).** The agent tapped the Network tab and the dead button within a
+  second, while the tab's web view was still loading its page. The activity layer saw the WebKit networking process
+  fetch the page after the touch and attributed it to the tap: `NO EFFECT · 127.0.0.1:8765 · sent 451 B, got
+  341 B, but nothing changed on screen`. The verdict was right; the evidence line was wrong, and the agent concluded
+  "the button works, but it gives no feedback". The automatic check passed the answer (it says "nothing you can
+  see"); the hand review overruled it to a failure. The fix is to name the web view as the source of such a line, so
+  an agent can discount it; it's tracked on the roadmap.
+- **N1 and N5, both tools.** The screen eventually shows the result, so both arms pass; the difference is the path.
+  chauffeur's agent went snapshot, tap, tap, `wait`, answer. Xcode's agent took 11 to 17 turns of tap, capture, read
+  and re-capture, and once admitted it "read this from the screenshot only".
+
+### Method
+
+- `dogfood/run.sh` gained a `network` reset: start the fixture's server if it isn't listening, clear the simulator's
+  pasteboard, terminate and relaunch the fixture.
+- **The pasteboard reset was added during the run.** The first two Sonnet reps of N4 ran with the previous run's
+  code already on the pasteboard, so the copy changed nothing and both arms improvised a paste; those four runs were
+  set aside and N4 was run again for those reps under the reset. The published N4 rows all start from a clean
+  pasteboard.
+- **Xcode's skill export hung once for 76 minutes** (`mcpbridge run-agent skills export`, Xcode 27.1) before the first
+  Xcode run; `dogfood/xcode-skill.sh` now caches the export per Xcode build and gives each attempt 60 s. Xcode 27.1's
+  server still exposes the same device-interaction tools the harness allows; no run was refused a tool.
+- **Hand review:** every chauffeur answer (30) and every automatic failure (6) was read; one chauffeur pass was
+  overruled, above. `dogfood/results-network/verdicts.tsv` has the automatic verdict, the final verdict and the
+  reason for every run; `summary.csv` has turns, cost, time and tool calls.
+- **Cost:** the 60 runs cost $10.76 at API prices: chauffeur $1.26, Xcode $9.50.
+
 ## Earlier rounds
 
 Both earlier rounds ran 14 tasks, once each, with Opus only. They used the narrower Xcode tool list.

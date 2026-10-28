@@ -18,7 +18,8 @@ Xcode 27 ships its own MCP server for driving the Simulator, so I put the two he
 each, with Claude Code on Sonnet and on Opus, giving the agent either chauffeur's tools or Xcode's (`xcrun mcpbridge`)
 and nothing else. That's 180 runs.
 
-The figures were measured with chauffeur 0.1.x, before M4b's network evidence.
+The figures were measured with chauffeur 0.1.x, before M4b's network evidence. A second round, five tasks on the
+fixture's Network tab with chauffeur 0.2.0 against Xcode 27.1, is under [Network round](#network-round) below.
 
 **Sonnet**
 
@@ -47,6 +48,29 @@ against chauffeur, and every run is written up in [`docs/benchmark.md`](docs/ben
 The same task, both ways, in real time. chauffeur is on top.
 
 ![The same task with chauffeur (top, 5 turns, $0.025) and Xcode 27's MCP (bottom, 14 turns, $0.206)](docs/media/race.gif)
+
+### Network round
+
+0.2.0 judges a tap on the app's network activity too. To show what that changes, five tasks on the fixture's Network
+tab ran 3 times each with Opus and Sonnet, chauffeur 0.2.0 against Xcode 27.1's MCP: a slow request, a failing one, a
+dead button, a clipboard copy, and a 1.2 s request. 60 runs.
+
+| | Opus · chauffeur | Opus · Xcode 27.1 | Sonnet · chauffeur | Sonnet · Xcode 27.1 |
+|---|---|---|---|---|
+| Tasks verified | 14/15 | 12/15 | 15/15 | 12/15 |
+| Median cost per task | $0.046 | $0.405 | $0.022 | $0.193 |
+| Median turns | 5.0 | 14.0 | 4.0 | 16.0 |
+| Median wall time | 15 s | 51 s | 13 s | 37 s |
+
+Xcode's six misses are all the failing request: the HTTP status never reaches the screen, so its agent could only say
+it didn't know, after tapping the button twice. chauffeur's agent read `→ 500 Internal Server Error` off the tap's
+result line. chauffeur's one miss is its own: a web view's page load got attributed to a dead button's tap, and the
+hand review scored it a failure. Details, the tasks and every verdict are in
+[`docs/benchmark.md`](docs/benchmark.md#network-round-chauffeur-020-against-xcode-271s-mcp-2026-10-27).
+
+The failing request, both ways. The recording is sped up 3×; in real time chauffeur took 13 s and Xcode 50 s.
+
+![Tap Failing API and report the HTTP status: chauffeur (top, 4 turns, $0.022) reads the 500 off the tap's result line; Xcode 27.1's MCP (bottom, 17 turns, $0.199) can't tell](docs/media/network-N2.gif)
 
 ## Quick start
 
