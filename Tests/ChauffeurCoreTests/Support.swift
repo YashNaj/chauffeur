@@ -86,6 +86,8 @@ final class ScriptedTouches: TouchEvidenceSource {
     private let script: [Evidence]
     private var next = 0
     private(set) var cursor = 0
+    /// Every `evidence(since:waitMs:)` call's arguments, so a test can prove which cursor a caller passed.
+    private(set) var requests: [(since: Int, waitMs: Int)] = []
     let isAttached: Bool
 
     init(evidence: [Evidence], attached: Bool) {
@@ -97,6 +99,7 @@ final class ScriptedTouches: TouchEvidenceSource {
     func stop() {}
 
     func evidence(since cursor: Int, waitMs: Int) -> Evidence {
+        requests.append((since: cursor, waitMs: waitMs))
         guard isAttached else { return .unavailable }
         guard !script.isEmpty else { return .none }
         let evidence = script[next]
@@ -119,7 +122,12 @@ final class RecordingShell: ShellRunner, @unchecked Sendable {
 
     func simctl(_ args: [String], stdin: String?, timeout: Double) throws -> ProcessResult {
         lock.withLock { recorded.append(args) }
-        return replies[args] ?? ProcessResult(status: 0, out: "", timedOut: false)
+        let reply = replies[args] ?? ProcessResult(status: 0, out: "", timedOut: false)
+        if reply.timedOut {
+            // As `SimCtl.run` does.
+            throw ChauffeurError.simulatorServiceUnresponsive(command: "simctl " + args.prefix(2).joined(separator: " "))
+        }
+        return reply
     }
 }
 

@@ -48,6 +48,26 @@ import Testing
         #expect(shell.calls == [read, ["list"]])
     }
 
+    @Test func aRecordingShellThrowsOnATimedOutReplyAfterRecordingTheCall() {
+        let args = ["spawn", "U-1", "log", "show"]
+        let shell = RecordingShell(replies: [args: ProcessResult(status: 0, out: "", timedOut: true)])
+        #expect(throws: ChauffeurError.simulatorServiceUnresponsive(command: "simctl spawn U-1")) {
+            try shell.simctl(args, stdin: nil, timeout: 5)
+        }
+        #expect(shell.calls == [args])
+    }
+
+    @Test func scriptedTouchesRecordTheCursorAndWaitOfEveryRequest() {
+        let touches = ScriptedTouches(evidence: [.none], attached: true)
+        _ = touches.evidence(since: 3, waitMs: 250)
+        _ = touches.evidence(since: 4, waitMs: 0)
+        #expect(touches.requests.map(\.since) == [3, 4])
+        #expect(touches.requests.map(\.waitMs) == [250, 0])
+        let detached = ScriptedTouches(evidence: [], attached: false)
+        _ = detached.evidence(since: 7, waitMs: 1)
+        #expect(detached.requests.map(\.since) == [7])
+    }
+
     @Test func fakeProcessesAnswerLivenessFromTheirSet() {
         let table: any ProcessTable = FakeProcesses(alive: [10, 20])
         #expect(table.isAlive(10))
