@@ -109,7 +109,7 @@ public struct LogRing: Sendable {
 
 /// Follows the launched app's unified log (os_log, Logger, NSLog) at info level and above, by process name
 /// (spec §6.8). `print` output goes to the app's stdout and is not part of the unified log.
-public final class LogTap: @unchecked Sendable {
+public final class LogTap: LogSource, @unchecked Sendable {
     public let udid: String
     private let lock = NSLock()
     private var ring = LogRing(capacity: 2000)
@@ -165,9 +165,9 @@ public final class LogTap: @unchecked Sendable {
     public func last(_ n: Int) -> [LogLine] { lock.withLock { ring.last(n) } }
     public var all: [LogLine] { lock.withLock { ring.lines } }
 
-    /// Every line is stored with its URLs shaped (M4b spec §6), so no reader ever sees a raw one. Internal so unit
-    /// tests can feed lines without a simulator.
-    func append(_ line: LogLine) {
+    /// Every line is stored with its URLs shaped (M4b spec §6), so no reader ever sees a raw one. Tests feed lines
+    /// through the `LogSource` seam without a simulator.
+    public func append(_ line: LogLine) {
         let shaped = LogRedact.line(line)
         lock.withLock { ring.append(shaped) }
     }

@@ -34,10 +34,10 @@ import Testing
 
     @Test func actionsGetTheirNewErrorLines() {
         let s = session(alive: true)
-        s.logTap.append(LogLine(time: "t", level: "error", message: "before the action"))
-        let cursor = s.logTap.cursor
-        s.logTap.append(LogLine(time: "t", level: "info", message: "fine"))
-        s.logTap.append(LogLine(time: "t", level: "error", message: "save failed"))
+        s.logs.append(LogLine(time: "t", level: "error", message: "before the action"))
+        let cursor = s.logs.cursor
+        s.logs.append(LogLine(time: "t", level: "info", message: "fine"))
+        s.logs.append(LogLine(time: "t", level: "error", message: "save failed"))
         let out = s.annotate(Output("tap e2 \"Save\" → changed · settled 200ms · rev 1→2"), since: cursor, logs: true)
         #expect(out.text == "tap e2 \"Save\" → changed · settled 200ms · rev 1→2\nlogs: [error] \"save failed\"")
         #expect(out.exit == 0 && out.data?["logs"]?.array?.count == 1)
@@ -47,8 +47,8 @@ import Testing
 
     @Test func aVanishedAppIsACrashReportedOnce() {
         let s = session(alive: false)
-        let cursor = s.logTap.cursor
-        s.logTap.append(LogLine(time: "t", level: "fault", message: "fixture: crashing"))
+        let cursor = s.logs.cursor
+        s.logs.append(LogLine(time: "t", level: "fault", message: "fixture: crashing"))
         let out = s.annotate(tapped, since: cursor, logs: true)
         #expect(out.exit == 5)
         #expect(
@@ -65,10 +65,10 @@ import Testing
 
     @Test func aCrashNoticedByALaterCommandStillShowsTheLastActionsErrors() {
         let s = session(alive: false)
-        s.logTap.append(LogLine(time: "t", level: "error", message: "long before"))
-        s.lastActionLogCursor = s.logTap.cursor  // the tap that triggered the crash started here
-        s.logTap.append(LogLine(time: "t", level: "fault", message: "fixture: crashing"))
-        let later = s.logTap.cursor  // a snapshot starts after the crash was logged
+        s.logs.append(LogLine(time: "t", level: "error", message: "long before"))
+        s.lastActionLogCursor = s.logs.cursor  // the tap that triggered the crash started here
+        s.logs.append(LogLine(time: "t", level: "fault", message: "fixture: crashing"))
+        let later = s.logs.cursor  // a snapshot starts after the crash was logged
         let out = s.annotate(Output("app \"SpringBoard\" · rev 9"), since: later, logs: false)
         #expect(out.exit == 5 && out.text.contains("\nlogs: [fault] \"fixture: crashing\"\n"))
         #expect(!out.text.contains("long before"))
@@ -173,7 +173,7 @@ import Testing
         ] {
             let s = session(alive: false)
             defer { try? FileManager.default.removeItem(at: StatePaths.artifacts(s.udid)) }
-            s.logTap.append(LogLine(time: "t", level: "fault", message: "fixture: crashing"))
+            s.logs.append(LogLine(time: "t", level: "fault", message: "fixture: crashing"))
             // These commands stop following the app (`release`) as soon as they run; that must not hide the crash.
             s.commandHook = { _ in s.release("dev.chauffeur.fixture") }
             let out = s.run(command)
@@ -196,7 +196,7 @@ import Testing
         var written = false
         let s = session(alive: false, findReport: { _ in written ? report : nil })
         defer { try? FileManager.default.removeItem(at: StatePaths.artifacts(s.udid)) }
-        s.logTap.append(LogLine(time: "22:31:04.120", level: "fault", message: "fixture: crashing"))
+        s.logs.append(LogLine(time: "22:31:04.120", level: "fault", message: "fixture: crashing"))
         #expect(
             s.annotate(tapped, since: 0, logs: true).text.contains(
                 "APP CRASHED: dev.chauffeur.fixture (pid 4321) · crash report not written yet"))
@@ -221,8 +221,8 @@ import Testing
     /// M2 transcripts: agents asked for `--since-last --last 40` and got a usage error.
     @Test func logsTakesSinceLastWithACount() throws {
         let s = session(alive: true)
-        s.lastActionLogCursor = s.logTap.cursor
-        for i in 1...3 { s.logTap.append(LogLine(time: "t", level: "error", message: "line \(i)")) }
+        s.lastActionLogCursor = s.logs.cursor
+        for i in 1...3 { s.logs.append(LogLine(time: "t", level: "error", message: "line \(i)")) }
         let out = try s.logsCommand(["--since-last", "--last", "2"])
         #expect(
             out.text.contains("2 of 3 lines (since the last action)") && !out.text.contains("line 1"), "\(out.text)")
@@ -231,12 +231,12 @@ import Testing
     @Test func onlyThisLaunchsOwnFatalLinesMakeACrash() {
         let s = session(alive: false)
         defer { try? FileManager.default.removeItem(at: StatePaths.artifacts(s.udid)) }
-        s.logTap.append(
+        s.logs.append(
             LogLine(
                 time: "t", level: "default", message: "Fixture/FixtureApp.swift:57: Fatal error: fixture crash",
                 sender: "libswiftCore"))
-        s.appLogCursor = s.logTap.cursor  // the relaunch
-        s.logTap.append(LogLine(time: "t", level: "fault", message: "UIKit fault", sender: "UIKitCore"))
+        s.appLogCursor = s.logs.cursor  // the relaunch
+        s.logs.append(LogLine(time: "t", level: "fault", message: "UIKit fault", sender: "UIKitCore"))
         #expect(s.annotate(Output("ok"), since: 0, logs: false).text.contains("APP EXITED"))
     }
 }

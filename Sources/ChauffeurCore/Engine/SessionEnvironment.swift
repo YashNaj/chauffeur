@@ -1,8 +1,8 @@
 import Foundation
 
 /// Everything `Session` reaches outside itself: the clock, the simulator, its accessibility tree, the touch log,
-/// `simctl`, the network flows, the host's processes, the boot state, the crash report and the input device. `.live` in
-/// the daemon; tests script each one.
+/// `simctl`, the network flows, the host's processes, the boot state, the crash report, the input device and the
+/// launched app's log. `.live` in the daemon; tests script each one.
 public struct SessionEnvironment {
     public var clock: any SettleClock
     public var device: @MainActor (String) throws -> any SimDevice
@@ -18,6 +18,8 @@ public struct SessionEnvironment {
     public var findCrashReport: (TrackedApp) -> CrashReport?
     /// Touches, keys and buttons for a connected device; the session keeps it until it drops the device.
     public var inputs: @MainActor (any SimDevice) throws -> any InputDevice
+    /// The launched app's unified log.
+    public var logs: any LogSource
 
     /// The real simulator: CoreSimulator, the accessibility bridge, the touch log, `simctl`, NetworkStatistics, `Proc`.
     public static func live(udid: String) -> SessionEnvironment {
@@ -46,6 +48,7 @@ public struct SessionEnvironment {
                     throw ChauffeurError.bridge("HID input needs a CoreSimulator device")
                 }
                 return HID(device: d)
-            })
+            },
+            logs: LogTap(udid: udid))
     }
 }

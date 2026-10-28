@@ -145,10 +145,10 @@ final class RecordingShell: ShellRunner, @unchecked Sendable {
 
 extension SessionEnvironment {
     /// Tests: scripts the device, accessibility, touch evidence, shell, clock, flows, processes, boot state, the
-    /// crash report and the input device. By default the touch log is unattached, there are no flows or live
+    /// crash report, the input device and the launched app's log. By default the touch log is unattached, there are no flows or live
     /// processes, the simulator is booted (no boot date), no crash report is found, the input device's two transports
-    /// and keyboard send, and the device is booted at 402×874. It does not fake the real `LogTap` or the `StatePaths`
-    /// files under `$TMPDIR/chauffeur`; the session still uses those.
+    /// and keyboard send, the log is empty and attaches, and the device is booted at 402×874. It does not fake the
+    /// `StatePaths` files under `$TMPDIR/chauffeur`; the session still uses those.
     @MainActor
     static func scripted(
         ax: ScriptedAX, touches: ScriptedTouches = ScriptedTouches(evidence: [], attached: false),
@@ -156,7 +156,7 @@ extension SessionEnvironment {
         flows: (any FlowSource)? = nil, processes: FakeProcesses = FakeProcesses(alive: []),
         simulatorBooted: @escaping () -> Bool? = { true }, simulatorBootDate: @escaping () -> Date? = { nil },
         findCrashReport: @escaping (TrackedApp) -> CrashReport? = { _ in nil },
-        inputs: FakeInputs = FakeInputs()
+        inputs: FakeInputs = FakeInputs(), logs: ScriptedLogs = ScriptedLogs()
     ) -> SessionEnvironment {
         nonisolated(unsafe) let flows = flows  // a test's own object, only ever read on the main actor
         return SessionEnvironment(
@@ -170,8 +170,37 @@ extension SessionEnvironment {
             simulatorBooted: simulatorBooted,
             simulatorBootDate: simulatorBootDate,
             findCrashReport: findCrashReport,
-            inputs: { _ in inputs })
+            inputs: { _ in inputs },
+            logs: logs)
     }
+}
+
+/// A `LogSource` over a `LogRing`: `start` records the executable and attaches, or not (`attaches: false`, a
+/// `log stream` that never came up); tests feed lines with `append`, unshaped.
+final class ScriptedLogs: LogSource {
+    private var ring = LogRing(capacity: 2000)
+    private let attaches: Bool
+    private(set) var isAttached = false
+    private(set) var executable: String?
+    /// Every executable `start` was asked to follow, in order.
+    private(set) var started: [String] = []
+
+    init(attaches: Bool = true) { self.attaches = attaches }
+
+    var cursor: Int { ring.end }
+    var all: [LogLine] { ring.lines }
+    func since(_ cursor: Int) -> [LogLine] { ring.since(cursor) }
+
+    @discardableResult
+    func start(executable: String) -> Bool {
+        started.append(executable)
+        self.executable = executable
+        isAttached = attaches
+        return attaches
+    }
+
+    func stop() { isAttached = false }
+    func append(_ line: LogLine) { ring.append(line) }
 }
 
 /// A `ProcessTable` whose live pids a test changes between commands (a reference, so the session sees the change).

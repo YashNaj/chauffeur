@@ -104,5 +104,6 @@ import Testing
         let table: any ProcessTable = LiveProcessTable()
         #expect(table.isAlive(getpid()))
         let _: any TouchEvidenceSource = TouchLog(udid: "U", levelFile: URL(fileURLWithPath: "/dev/null"))
+        let _: any LogSource = LogTap(udid: "U")
     }
 }

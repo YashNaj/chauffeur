@@ -14,11 +14,9 @@ final class ScriptedFlows: FlowSource {
 @Suite @MainActor struct SessionNetworkTests {
     func session(flows: [[Flow]] = [[]], clock: FakeClock = FakeClock()) -> Session {
         let udid = "ZZ" + String(format: "%06X", UInt32.random(in: 0...0xFFFFFF)) + "-TEST"
-        var environment = SessionEnvironment.live(udid: udid)
-        environment.clock = clock
+        let environment = SessionEnvironment.scripted(
+            ax: ScriptedAX(frames: []), clock: clock, flows: ScriptedFlows(flows))
         let s = Session(udid: udid, environment: environment)
-        s.flowSource = ScriptedFlows(flows)
-        s.flowSourceTried = true
         s.telemetryOverride = []
         return s
     }
@@ -32,13 +30,13 @@ final class ScriptedFlows: FlowSource {
 
     /// The touch, then `task`'s recorded lines arriving in the log.
     func tap(_ s: Session, task: String) throws -> TapNet {
-        let net = TapNet(pids: [4321], earlier: [], atTouch: [], logCursor: s.logTap.cursor, touchMs: s.clock.nowMs())
+        let net = TapNet(pids: [4321], earlier: [], atTouch: [], logCursor: s.logs.cursor, touchMs: s.clock.nowMs())
         let lines = try Fixtures.network("ios27-requests")
         let url = lines.first { $0.message.contains(task) && $0.message.contains("setting up Connection") }
         let connection = url.map { line in line.message.split(separator: " ").last.map { "[C\($0) " } ?? "" } ?? ""
         for line in lines
         where line.message.contains(task) || (!connection.isEmpty && line.message.hasPrefix(connection)) {
-            s.logTap.append(line)
+            s.logs.append(line)
         }
         return net
     }
@@ -72,7 +70,7 @@ final class ScriptedFlows: FlowSource {
     @Test func aDeadTapStaysPlain() {
         let s = session()
         var r = report(.noEffect)
-        let net = TapNet(pids: [4321], earlier: [], atTouch: [], logCursor: s.logTap.cursor, touchMs: s.clock.nowMs())
+        let net = TapNet(pids: [4321], earlier: [], atTouch: [], logCursor: s.logs.cursor, touchMs: s.clock.nowMs())
         let started = s.clock.nowMs()
         s.applyNetwork(&r, net: net, target: nil)
         #expect(r.outcome == .noEffect && r.requests.isEmpty)
@@ -92,7 +90,7 @@ final class ScriptedFlows: FlowSource {
             rx: 0, openedMs: 1, closedMs: nil)
         let s = session(flows: [[waiting]])
         var r = report(.noEffect)
-        let net = TapNet(pids: [4321], earlier: [], atTouch: [], logCursor: s.logTap.cursor, touchMs: s.clock.nowMs())
+        let net = TapNet(pids: [4321], earlier: [], atTouch: [], logCursor: s.logs.cursor, touchMs: s.clock.nowMs())
         s.applyNetwork(&r, net: net, target: nil)
         #expect(r.outcome == .pending && r.exitCode == .pending)
         #expect(r.render().hasPrefix("tap e4 \"Login\" → PENDING · 127.0.0.1:8765 · sent 58 B, no reply after 2."))
@@ -106,7 +104,7 @@ final class ScriptedFlows: FlowSource {
         let s = session(flows: [[waiting]], clock: clock)
         var r = report(.noEffect)
         let started = Date()
-        let net = TapNet(pids: [4321], earlier: [], atTouch: [], logCursor: s.logTap.cursor, touchMs: s.clock.nowMs())
+        let net = TapNet(pids: [4321], earlier: [], atTouch: [], logCursor: s.logs.cursor, touchMs: s.clock.nowMs())
         s.applyNetwork(&r, net: net, target: nil)
         #expect(r.outcome == .pending)
         #expect(clock.now >= NetJudge.requestWindowMs)
@@ -115,9 +113,9 @@ final class ScriptedFlows: FlowSource {
 
     @Test func requestLinesReplaceCFNetworkErrorLinesInLogs() throws {
         let s = session()
-        let cursor = s.logTap.cursor
-        s.logTap.append(LogLine(time: "t", level: "error", message: "login failed: invalid token"))
-        s.logTap.append(
+        let cursor = s.logs.cursor
+        s.logs.append(LogLine(time: "t", level: "error", message: "login failed: invalid token"))
+        s.logs.append(
             LogLine(
                 time: "t", level: "error",
                 message: "Task <AB>.<1> HTTP load failed, 0/0 bytes (error code: -1004 [1:61])",
