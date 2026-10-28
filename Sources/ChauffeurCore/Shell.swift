@@ -138,3 +138,11 @@ public enum SimCtl {
         return platform + " " + parts.dropFirst().joined(separator: ".")
     }
 }
+
+/// `ShellRunner` over `SimCtl.run`.
+public struct SimCtlRunner: ShellRunner {
+    public init() {}
+    public func simctl(_ args: [String], stdin: String?, timeout: Double) throws -> ProcessResult {
+        try SimCtl.run(args, stdin: stdin, timeout: timeout)
+    }
+}

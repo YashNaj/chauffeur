@@ -64,3 +64,69 @@ final class ScriptedAX: AXSource {
     func probe(center: Point) -> (frontmostIsEmptyApp: Bool, screenAnswers: Bool) { (false, true) }
     func complete(_ root: AXElement) -> AXElement { root }
 }
+
+/// A `SimDevice` with fixed answers.
+@MainActor
+final class FakeDevice: SimDevice {
+    let udid: String
+    var booted: Bool
+    var size: Size
+
+    init(udid: String, booted: Bool, size: Size) {
+        self.udid = udid
+        self.booted = booted
+        self.size = size
+    }
+}
+
+/// A `TouchEvidenceSource` that replays scripted evidence: each `evidence(since:waitMs:)` returns the next entry and
+/// holds the last (`.none` when the script is empty), or `.unavailable` while detached. `cursor` counts the recorded
+/// touches handed out so far (entries other than `.none`), as the real log's cursor counts records.
+final class ScriptedTouches: TouchEvidenceSource {
+    private let script: [Evidence]
+    private var next = 0
+    private(set) var cursor = 0
+    let isAttached: Bool
+
+    init(evidence: [Evidence], attached: Bool) {
+        script = evidence
+        isAttached = attached
+    }
+
+    func start() throws {}
+    func stop() {}
+
+    func evidence(since cursor: Int, waitMs: Int) -> Evidence {
+        guard isAttached else { return .unavailable }
+        guard !script.isEmpty else { return .none }
+        let evidence = script[next]
+        next = min(next + 1, script.count - 1)
+        if evidence != .none { self.cursor += 1 }
+        return evidence
+    }
+}
+
+/// A `ShellRunner` that records every call's args and answers from a table keyed by args. Calls arrive from whichever
+/// thread `Session` runs a command on, so `calls` is lock-guarded (`@unchecked Sendable`, as `Box` in `Shell.swift`).
+final class RecordingShell: ShellRunner, @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [[String]] = []
+    private let replies: [[String]: ProcessResult]
+
+    init(replies: [[String]: ProcessResult] = [:]) { self.replies = replies }
+
+    var calls: [[String]] { lock.withLock { recorded } }
+
+    func simctl(_ args: [String], stdin: String?, timeout: Double) throws -> ProcessResult {
+        lock.withLock { recorded.append(args) }
+        return replies[args] ?? ProcessResult(status: 0, out: "", timedOut: false)
+    }
+}
+
+/// A `ProcessTable` where exactly the given pids are alive and have no relatives.
+struct FakeProcesses: ProcessTable {
+    var alive: Set<Int32>
+    func isAlive(_ pid: Int32) -> Bool { alive.contains(pid) }
+    func parent(of pid: Int32) -> Int32? { nil }
+    func children(of parent: Int32, named: String) -> [Int32] { [] }
+}

@@ -3,11 +3,13 @@ import Foundation
 
 /// One simulator, resolved through CoreSimulator.
 @MainActor
-public final class Device {
+public final class Device: SimDevice {
+    public let udid: String
     public let sim: CHSimulator
     public let simulatorKitPath: String
 
     public init(udid: String) throws {
+        self.udid = udid
         let developerDir = Xcode.developerDir()
         do {
             simulatorKitPath = try CHSimulator.loadFrameworks(developerDir: developerDir)
