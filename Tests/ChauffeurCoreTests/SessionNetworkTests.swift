@@ -96,12 +96,17 @@ final class ScriptedFlows: FlowSource {
     }
 
     @Test func theWindowIsPaidOnTheFakeClockNotTheWall() {
+        let waiting = Flow(
+            id: 1, pid: 4321, process: "Fixture", proto: "tcp", remote: "127.0.0.1:8765", tx: 58,
+            rx: 0, openedMs: 1, closedMs: nil)
         let clock = FakeClock()
-        let s = session(clock: clock)
+        let s = session(flows: [[waiting]], clock: clock)
         var r = report(.noEffect)
         let started = Date()
-        let net = TapNet(pids: [4321], earlier: [], atTouch: [], logCursor: s.logTap.cursor, touchMs: clock.now)
+        let net = TapNet(pids: [4321], earlier: [], atTouch: [], logCursor: s.logTap.cursor, touchMs: s.clock.nowMs())
         s.applyNetwork(&r, net: net, target: nil)
+        #expect(r.outcome == .pending)
+        #expect(clock.now >= NetJudge.requestWindowMs)
         #expect(Date().timeIntervalSince(started) < 0.2)
     }
 
