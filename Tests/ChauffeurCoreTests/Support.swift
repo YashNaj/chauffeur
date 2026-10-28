@@ -226,7 +226,8 @@ final class FakeProcesses: ProcessTable, @unchecked Sendable {
 final class FakeTransport: TouchTransport {
     let name: String
     let supportsMove: Bool
-    private let sends: Bool
+    /// Whether `touch` sends; a test can flip it between actions.
+    var sends: Bool
     private(set) var touches: [(Point, TouchPhase)] = []
 
     init(name: String, supportsMove: Bool, sends: Bool = true) {

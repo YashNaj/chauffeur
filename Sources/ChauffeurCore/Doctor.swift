@@ -174,11 +174,11 @@ public enum Doctor {
         do {
             let device = try Device(udid: udid)
             guard device.booted else { throw ChauffeurError.notBooted(udid) }
-            let ax = try AXProvider(device: device)
-            let flagsOff = try? AXSettings.off(udid: udid, shell: SimCtlRunner())
             let start = Date()
+            let ax = try AXProvider(device: device)
             let root = ax.read()
             let ms = Int(Date().timeIntervalSince(start) * 1000)
+            let flagsOff = try? AXSettings.off(udid: udid, shell: SimCtlRunner())
             checks += accessibilityChecks(root: root, ms: ms, flagsOff: flagsOff, udid: udid) {
                 ax.probe(center: Point(x: device.size.w / 2, y: device.size.h / 2))
             }

@@ -14,6 +14,7 @@ import Testing
         let out = rig.s.run(["tap", showAlert])
         #expect(
             out.exit == 0 && out.text.hasPrefix("tap \(showAlert) \"Show alert\" → changed · settled"), "\(out.text)")
+        #expect(rig.inputs.resetCount == 0)
     }
 
     @Test func noTouchEvidenceRetriesOnTheNextTransportThenNotDelivered() throws {
@@ -32,8 +33,12 @@ import Testing
         let showAlert = try Act.ref(home, "Show alert")
         let rig = ActRig(frames: [home], touches: ScriptedTouches(evidence: [], attached: false))
         let out = rig.s.run(["tap", showAlert])
-        #expect(out.text.contains("UNVERIFIED") && !out.text.contains("changed"), "\(out.text)")
+        #expect(
+            ActRig.head(out)
+                == "tap \(showAlert) \"Show alert\" → UNVERIFIED: no visible change (touch log unavailable)",
+            "\(out.text)")
         #expect(out.exit == ExitCode.noEffect.rawValue)
+        #expect(rig.touches.requests.isEmpty)
     }
 
     @Test func aFailedSendDropsTheClientAndRebuildsIt() throws {
@@ -47,6 +52,37 @@ import Testing
         let out = rig.s.run(["tap", showAlert])
         #expect(out.text.contains("NOT DELIVERED"), "\(out.text)")
         #expect(inputs.resetCount == 1)
+    }
+
+    @Test func theTransportOrderStartsOverAfterAFailedSend() throws {
+        let home = try Act.home()
+        let showAlert = try Act.ref(home, "Show alert")
+        let inputs = FakeInputs()
+        let (digitizer, mouse) = (inputs.fakes[0], inputs.fakes[1])
+        // Tap 1: the digitizer's touch leaves no evidence and the mouse's reaches the app; later touches hold that.
+        let rig = ActRig(
+            frames: [home], touches: ScriptedTouches(evidence: [.none, .app(Act.fixtureBundle)], attached: true),
+            inputs: inputs)
+        let first = rig.s.run(["tap", showAlert])
+        #expect(first.text.contains("NO EFFECT"), "\(first.text)")
+        #expect(inputs.fakes.map(\.touches.count) == [2, 2])
+        #expect(rig.s.preferred == 1)
+        #expect(inputs.resetCount == 0)
+
+        // Tap 2: both sends fail, so the client is dropped.
+        digitizer.sends = false
+        mouse.sends = false
+        let second = rig.s.run(["tap", showAlert])
+        #expect(second.text.contains("NOT DELIVERED"), "\(second.text)")
+        #expect(inputs.resetCount == 1)
+
+        // Tap 3: the rebuilt device starts on its first transport, the digitizer, which delivers.
+        digitizer.sends = true
+        mouse.sends = true
+        let touched = (digitizer: digitizer.touches.count, mouse: mouse.touches.count)
+        let third = rig.s.run(["tap", showAlert])
+        #expect(digitizer.touches.count == touched.digitizer + 2, "\(third.text)")
+        #expect(mouse.touches.count == touched.mouse, "\(third.text)")
     }
 
     @Test func aTouchThatLandedInAnotherAppIsIntercepted() throws {

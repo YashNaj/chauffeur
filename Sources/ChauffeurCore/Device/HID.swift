@@ -11,9 +11,11 @@ public final class HID: InputDevice {
 
     public init(device: Device) { self.device = device }
 
-    /// The client, built if there is none. Throws the bridge's own error, which `doctor` shows as it is.
-    @discardableResult
-    func open() throws -> CHHIDClient {
+    /// Builds the client if there is none. Throws the bridge's own error, which `doctor` shows as it is.
+    func open() throws { _ = try opened() }
+
+    /// The client, built if there is none. Private: the client never leaves this file.
+    private func opened() throws -> CHHIDClient {
         if let client { return client }
         let made = try CHHIDClient(simulator: device.sim)
         client = made
@@ -21,10 +23,10 @@ public final class HID: InputDevice {
         return made
     }
 
-    /// `open()` for a command: a bridge failure tells the agent to run doctor.
+    /// `opened()` for a command: a bridge failure tells the agent to run doctor.
     private func connected() throws -> CHHIDClient {
         do {
-            return try open()
+            return try opened()
         } catch {
             throw ChauffeurError.bridge(error.localizedDescription)
         }
@@ -84,9 +86,14 @@ public final class MouseTransport: TouchTransport {
 
 @MainActor
 public struct Keyboard: TextInput {
-    // Built by `HID` only (the memberwise `init(hid:clock:)`): the two 15 ms waits go through `clock`.
-    let hid: CHHIDClient
+    // Built by `HID` only: the two 15 ms waits go through `clock`.
+    private let hid: CHHIDClient
     let clock: any SettleClock
+
+    fileprivate init(hid: CHHIDClient, clock: any SettleClock) {
+        self.hid = hid
+        self.clock = clock
+    }
 
     /// Types page-7 text (call only when `Keys.typeable`). ~35 ms per character (S4).
     public func type(_ text: String) -> Bool {
