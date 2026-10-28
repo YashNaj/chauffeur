@@ -1,4 +1,4 @@
-Literals the live tests expect (contains, hasPrefix, hasSuffix, == "…"), one `file: literal` per line, made by scripts/live-expectations.sh at 1903016.
+Literals the live tests expect (contains, hasPrefix, hasSuffix, == "…"), one `file: literal` per line, made by scripts/live-expectations.sh at 381f60b.
 
 AXLiveTests.swift: == "Fixture"
 AXLiveTests.swift: == "Form"

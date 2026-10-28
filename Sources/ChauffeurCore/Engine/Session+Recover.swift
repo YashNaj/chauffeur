@@ -22,8 +22,8 @@ extension Session {
     }
 
     /// The bundle id of the empty app in front, from the pid the bridge reports for it: its root has no label to go by.
-    func relaunchCandidate(_ ax: AXProvider) -> String? {
-        guard let pid = ax.frontmostPID(), let list = try? SimCtl.run(["spawn", udid, "launchctl", "list"]).out else {
+    func relaunchCandidate(_ ax: any AXSource) -> String? {
+        guard let pid = ax.frontmostPID(), let list = try? shell.simctl(["spawn", udid, "launchctl", "list"]).out else {
             return nil
         }
         return Self.relaunchBundle(frontPID: pid, launchctlList: list, launchedPID: app?.pid)

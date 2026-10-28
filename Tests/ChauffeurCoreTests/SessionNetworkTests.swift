@@ -13,7 +13,10 @@ final class ScriptedFlows: FlowSource {
 /// M4b spec §3 through the session's glue, with recorded log lines and scripted connections.
 @Suite @MainActor struct SessionNetworkTests {
     func session(flows: [[Flow]] = [[]], clock: FakeClock = FakeClock()) -> Session {
-        let s = Session(udid: "ZZ" + String(format: "%06X", UInt32.random(in: 0...0xFFFFFF)) + "-TEST", clock: clock)
+        let udid = "ZZ" + String(format: "%06X", UInt32.random(in: 0...0xFFFFFF)) + "-TEST"
+        var environment = SessionEnvironment.live(udid: udid)
+        environment.clock = clock
+        let s = Session(udid: udid, environment: environment)
         s.flowSource = ScriptedFlows(flows)
         s.flowSourceTried = true
         s.telemetryOverride = []

@@ -18,7 +18,7 @@ extension AXElement {
 
 /// Reads the frontmost tree and fills the bars the walk leaves empty (decision 1).
 @MainActor
-public final class AXProvider {
+public final class AXProvider: AXSource {
     private let reader: CHAXReader
     private var cache: (key: Int, result: AXElement)?
 
@@ -40,6 +40,11 @@ public final class AXProvider {
     /// One process's tree, whatever is in front. Used to tell a poisoned bridge from a silent simulator.
     public func read(pid: Int32) -> AXElement? {
         reader.tree(pid: pid).flatMap { AXElement(dictionary: $0) }
+    }
+
+    /// The element a hit-test at `point` lands on; nil when nothing answers.
+    public func element(at point: Point) -> AXElement? {
+        reader.element(at: CGPoint(x: point.x, y: point.y)).flatMap { AXElement(dictionary: $0) }
     }
 
     /// Why a walk found nothing: is the app in front an empty shell (no accessibility server), and does a hit-test at

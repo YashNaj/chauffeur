@@ -43,3 +43,120 @@ func element(_ root: AXElement, _ text: String) -> AXElement? {
         [e.label, e.identifier, e.value].contains { $0?.localizedCaseInsensitiveContains(text) == true }
     }
 }
+
+/// An `AXSource` that replays recorded trees: each `read()` returns the next frame and holds the last.
+@MainActor
+final class ScriptedAX: AXSource {
+    private let frames: [AXElement?]
+    private var next = 0
+    var scriptedPID: Int32? = 4321
+
+    init(frames: [AXElement?]) { self.frames = frames }
+
+    func read() -> AXElement? {
+        guard !frames.isEmpty else { return nil }
+        defer { next = min(next + 1, frames.count - 1) }
+        return frames[next]
+    }
+    func read(pid: Int32) -> AXElement? { nil }
+    func frontmostPID() -> Int32? { scriptedPID }
+    func element(at point: Point) -> AXElement? { nil }
+    func probe(center: Point) -> (frontmostIsEmptyApp: Bool, screenAnswers: Bool) { (false, true) }
+    func complete(_ root: AXElement) -> AXElement { root }
+}
+
+/// A `SimDevice` with fixed answers.
+@MainActor
+final class FakeDevice: SimDevice {
+    let udid: String
+    var booted: Bool
+    var size: Size
+
+    init(udid: String, booted: Bool, size: Size) {
+        self.udid = udid
+        self.booted = booted
+        self.size = size
+    }
+}
+
+/// A `TouchEvidenceSource` that replays scripted evidence: each `evidence(since:waitMs:)` returns the next entry and
+/// holds the last (`.none` when the script is empty), or `.unavailable` while detached. `cursor` counts the recorded
+/// touches handed out so far (entries other than `.none`), as the real log's cursor counts records.
+final class ScriptedTouches: TouchEvidenceSource {
+    private let script: [Evidence]
+    private var next = 0
+    private(set) var cursor = 0
+    /// Every `evidence(since:waitMs:)` call's arguments, so a test can prove which cursor a caller passed.
+    private(set) var requests: [(since: Int, waitMs: Int)] = []
+    let isAttached: Bool
+
+    init(evidence: [Evidence], attached: Bool) {
+        script = evidence
+        isAttached = attached
+    }
+
+    func start() throws {}
+    func stop() {}
+
+    func evidence(since cursor: Int, waitMs: Int) -> Evidence {
+        requests.append((since: cursor, waitMs: waitMs))
+        guard isAttached else { return .unavailable }
+        guard !script.isEmpty else { return .none }
+        let evidence = script[next]
+        next = min(next + 1, script.count - 1)
+        if evidence != .none { self.cursor += 1 }
+        return evidence
+    }
+}
+
+/// A `ShellRunner` that records every call's args and answers from a table keyed by args. Calls arrive from whichever
+/// thread `Session` runs a command on, so `calls` is lock-guarded (`@unchecked Sendable`, as `Box` in `Shell.swift`).
+final class RecordingShell: ShellRunner, @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [[String]] = []
+    private let replies: [[String]: ProcessResult]
+
+    init(replies: [[String]: ProcessResult] = [:]) { self.replies = replies }
+
+    var calls: [[String]] { lock.withLock { recorded } }
+
+    func simctl(_ args: [String], stdin: String?, timeout: Double) throws -> ProcessResult {
+        lock.withLock { recorded.append(args) }
+        let reply = replies[args] ?? ProcessResult(status: 0, out: "", timedOut: false)
+        if reply.timedOut {
+            // As `SimCtl.run` does.
+            throw ChauffeurError.simulatorServiceUnresponsive(
+                command: "simctl " + args.prefix(2).joined(separator: " "))
+        }
+        return reply
+    }
+}
+
+extension SessionEnvironment {
+    /// Tests: scripts the device, accessibility, touch evidence, shell, clock, flows and processes. By default the
+    /// touch log is unattached, there are no flows or live processes, and the device is booted at 402×874. It does not
+    /// fake the real `LogTap`, `SimBoot` (reached through the `simulatorBooted`/`simulatorBootDate` closures),
+    /// `CrashFinder` (`findCrashReport`) or the `StatePaths` files under `$TMPDIR/chauffeur`; the session still uses
+    /// those.
+    static func scripted(
+        ax: ScriptedAX, touches: ScriptedTouches = ScriptedTouches(evidence: [], attached: false),
+        shell: RecordingShell = RecordingShell(), clock: FakeClock = FakeClock()
+    ) -> SessionEnvironment {
+        SessionEnvironment(
+            clock: clock,
+            device: { FakeDevice(udid: $0, booted: true, size: Size(w: 402, h: 874)) },
+            ax: { _ in ax },
+            touchEvidence: touches,
+            shell: shell,
+            flows: { nil },
+            processes: FakeProcesses(alive: []))
+    }
+}
+
+/// A `ProcessTable` where exactly the given pids are alive and have no relatives.
+struct FakeProcesses: ProcessTable {
+    var alive: Set<Int32>
+    func isAlive(_ pid: Int32) -> Bool { alive.contains(pid) }
+    func parent(of pid: Int32) -> Int32? { nil }
+    func children(of parent: Int32, named: String) -> [Int32] { [] }
+}

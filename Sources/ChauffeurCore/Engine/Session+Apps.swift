@@ -52,7 +52,7 @@ extension Session {
         _ = try connect()
         release(bundle.identifier)  // installing replaces, and so ends, a running copy
         let start = clock.nowMs()
-        let r = try SimCtl.run(["install", udid, url.path], timeout: 300)
+        let r = try shell.simctl(["install", udid, url.path], timeout: 300)
         guard r.status == 0 else {
             return Output("install \(url.lastPathComponent) → FAILED: \(SimCtl.message(r))", exit: .error)
         }
@@ -71,7 +71,7 @@ extension Session {
         let bundle = try bundleArgument(&a)
         try a.done()
         _ = try connect()
-        let info = try SimCtl.run(["appinfo", udid, bundle], timeout: 30)
+        let info = try shell.simctl(["appinfo", udid, bundle], timeout: 30)
         guard info.status == 0, let appInfo = SimApps.appInfo(info.out) else {
             return Output(
                 "\(bundle) is not installed on this simulator. Install it first: chauffeur install <path.app>",
@@ -82,11 +82,11 @@ extension Session {
         let relaunching = app?.bundle == bundle ? app : nil
         // `simctl launch` on a running app just brings it forward with its old state (M1): end it first.
         release(bundle)
-        _ = try SimCtl.run(["terminate", udid, bundle], timeout: 30)
+        _ = try shell.simctl(["terminate", udid, bundle], timeout: 30)
         let reenabled = try ensureAccessibility()
         let following = logTap.start(executable: appInfo.executable)  // before launch, so launch-time lines are kept
         appLogCursor = logTap.cursor  // crash evidence comes from this launch's lines only
-        let r = try SimCtl.run(["launch", udid, bundle] + a.rest, timeout: 60)
+        let r = try shell.simctl(["launch", udid, bundle] + a.rest, timeout: 60)
         guard r.status == 0, let pid = SimApps.launchedPID(r.out) else {
             return Output("launch \(bundle) → FAILED: \(SimCtl.message(r))", exit: .error)
         }
@@ -136,14 +136,6 @@ extension Session {
                 "bundle": .string(bundle), "pid": JSON(Int(pid)), "waitedMs": JSON(front.waitedMs),
                 "screen": .string(front.snapshot.header),
             ])
-    }
-
-    /// Turns on the accessibility flags an app needs at launch to serve its tree; returns the ones that were off.
-    /// `force: false` checks at most every 60 s (the per-command path); launch always checks.
-    func ensureAccessibility(force: Bool = true) throws -> [String] {
-        if !force, let last = axCheckedMs, clock.nowMs() - last < 60_000 { return [] }
-        axCheckedMs = clock.nowMs()
-        return try AXSettings.ensure(udid: udid)
     }
 
     /// What was in front before a launch, unless it is the app being relaunched (under its Info.plist name or the name
@@ -198,7 +190,7 @@ extension Session {
             note: "the URL was delivered; nothing visible changed in 3s",
             hints: ["the app may handle this link without a visible change; run snapshot to check"]
         ) {
-            let r = try SimCtl.run(["openurl", udid, url], timeout: 30)
+            let r = try shell.simctl(["openurl", udid, url], timeout: 30)
             guard r.status != 0 else { return nil }
             // iOS 26.2 exits 194 with OSStatus -10814 (kLSApplicationNotFoundErr); earlier plans measured 115.
             return r.status == 115 || r.err.contains("-10814")
@@ -241,7 +233,7 @@ extension Session {
         try a.done()
         _ = try connect()
         let tracked = release(bundle)
-        let r = try SimCtl.run(["terminate", udid, bundle], timeout: 30)
+        let r = try shell.simctl(["terminate", udid, bundle], timeout: 30)
         guard r.status == 0 else {
             if r.err.contains("found nothing to terminate") { return Output("terminate \(bundle) → was not running") }
             if let tracked { track(tracked) }

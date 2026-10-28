@@ -18,9 +18,9 @@ extension Session {
     /// HID client and transports, built on first use; touch log started if it can be (else outcomes are UNVERIFIED).
     func transportsReady() throws -> [TouchTransport] {
         let (device, _) = try connect()
-        if transports.isEmpty {
+        if transports.isEmpty, let sim = (device as? Device)?.sim {  // until Task 10 (HID) owns the client
             do {
-                let client = try CHHIDClient(simulator: device.sim)
+                let client = try CHHIDClient(simulator: sim)
                 hid = client
                 transports = [DigitizerTransport(hid: client), MouseTransport(hid: client)]
                 preferred = 0
@@ -127,8 +127,8 @@ extension Session {
         try a.done()
         let (device, _) = try connect()
         let network = netStart()
-        let udid = self.udid
-        let clipboard = Background { Session.readClipboard(udid: udid) }
+        let peek: @Sendable () -> ClipboardMark? = { [udid, shell] in Self.readClipboard(udid: udid, shell: shell) }
+        let clipboard = Background(peek)
         let (before, settled) = try baseline()
         let aimed = try aim(target, in: before)
         if let refusal = Geometry.refusal(for: aimed.point, screen: device.size, allowEdge: allowEdge) {
@@ -167,7 +167,7 @@ extension Session {
         }
         // A copy changes nothing on screen; read the pasteboard again only then (spec §7: a read costs ~100 ms).
         if report.outcome == .noEffect,
-            let copied = ClipboardMark.copied(before: clipboardBefore, after: Session.readClipboard(udid: udid))
+            let copied = ClipboardMark.copied(before: clipboardBefore, after: peek())
         {
             report.outcome = .changed
             report.copiedCharacters = copied
@@ -249,7 +249,7 @@ extension Session {
             sent = keyboard.type(text)
         } else {
             method = "paste"
-            let copied = try SimCtl.run(["pbcopy", udid], stdin: text, timeout: 15)
+            let copied = try shell.simctl(["pbcopy", udid], stdin: text, timeout: 15)
             guard copied.status == 0 else {
                 return Output("\(label) → not typed: simctl pbcopy exited \(copied.status)", exit: .error)
             }
@@ -257,7 +257,7 @@ extension Session {
         }
         defer {
             // A pasted password must not stay on the simulator's pasteboard (M1 review minor); cleared once verified.
-            if secure && method == "paste" { _ = try? SimCtl.run(["pbcopy", udid], stdin: "", timeout: 15) }
+            if secure && method == "paste" { _ = try? shell.simctl(["pbcopy", udid], stdin: "", timeout: 15) }
         }
         guard sent else {
             return Output(

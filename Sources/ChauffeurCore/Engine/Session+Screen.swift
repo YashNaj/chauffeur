@@ -65,7 +65,7 @@ extension Session {
         try StatePaths.ensureDir(dir)
         let raw = dir.appendingPathComponent("capture.png")
         defer { try? FileManager.default.removeItem(at: raw) }
-        let r = try SimCtl.run(["io", udid, "screenshot", "--type=png", "--mask=ignored", raw.path], timeout: 30)
+        let r = try shell.simctl(["io", udid, "screenshot", "--type=png", "--mask=ignored", raw.path], timeout: 30)
         guard r.status == 0, let image = Screenshot.load(raw) else {
             throw ChauffeurError.failed("screenshot failed: " + SimCtl.message(r))
         }

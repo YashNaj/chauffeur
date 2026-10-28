@@ -5,12 +5,11 @@ import Foundation
 @MainActor
 public final class Session {
     public let udid: String
-    var device: Device?
-    var ax: AXProvider?
+    var device: (any SimDevice)?
+    var ax: (any AXSource)?
     var hid: CHHIDClient?
     var transports: [TouchTransport] = []
     var preferred = 0
-    let touchLog: TouchLog
     /// The launched app's unified log (spec §6.8).
     let logTap: LogTap
     /// The app `chauffeur launch` started; its exit without chauffeur ending it is a crash.
@@ -37,7 +36,7 @@ public final class Session {
     var simulatorBooted: () -> Bool? = { nil }
     var simulatorBootDate: () -> Date? = { nil }
     /// Seams for unit tests: process liveness and the crash-report lookup.
-    var isAlive: (Int32) -> Bool = Proc.isAlive
+    var isAlive: (Int32) -> Bool
     var findCrashReport: (TrackedApp) -> CrashReport?
     var refs = RefTable()
     var rev = 0
@@ -71,22 +70,34 @@ public final class Session {
     var telemetryOverride: [String]?
     /// Where the launched app's log lines start in `logTap` (crash evidence is this launch's lines only).
     var appLogCursor: Int?
+    /// What the session reaches outside itself: `.live` in the daemon, scripted in tests.
+    let environment: SessionEnvironment
     /// Every sleep and every duration the engine measures goes through this; tests inject a fake.
-    let clock: any SettleClock
+    var clock: any SettleClock { environment.clock }
+    /// What the simulator says about a touch (the touch log).
+    var touchLog: any TouchEvidenceSource { environment.touchEvidence }
+    var shell: any ShellRunner { environment.shell }
+    var processes: any ProcessTable { environment.processes }
 
-    public init(udid: String, clock: any SettleClock = SystemClock()) {
+    public init(udid: String, environment: SessionEnvironment) {
         self.udid = udid
-        self.clock = clock
-        touchLog = TouchLog(udid: udid, levelFile: StatePaths.level(udid))
+        self.environment = environment
         logTap = LogTap(udid: udid)
         simulatorBooted = { SimBoot.booted(udid: udid) }
         simulatorBootDate = { SimBoot.date(udid: udid) }
+        let processes = environment.processes
+        isAlive = { processes.isAlive($0) }
         findCrashReport = { app in CrashFinder.find(bundle: app.bundle, pid: app.pid, udid: udid, since: app.launchedAt)
         }
         // A restarted daemon (upgrade, idle exit) keeps following an app that is still running.
         if let saved = TrackedApp.load(StatePaths.app(udid)) {
-            if Proc.isAlive(saved.pid) { app = saved } else { TrackedApp.clear(StatePaths.app(udid)) }
+            if processes.isAlive(saved.pid) { app = saved } else { TrackedApp.clear(StatePaths.app(udid)) }
         }
+    }
+
+    /// The daemon's session: the real simulator.
+    public convenience init(udid: String) {
+        self.init(udid: udid, environment: .live(udid: udid))
     }
 
     public func shutdown() {
@@ -95,7 +106,7 @@ public final class Session {
     }
 
     /// Connects lazily; after the device stops being booted, drops everything (spec §6.9).
-    func connect() throws -> (Device, AXProvider) {
+    func connect() throws -> (any SimDevice, any AXSource) {
         if let device, let ax {
             if device.booted {
                 _ = try? ensureAccessibility(force: false)  // an Xcode session may have switched them off since
@@ -104,12 +115,12 @@ public final class Session {
             simulatorWentDown()
             throw ChauffeurError.notBooted(udid)
         }
-        let d = try Device(udid: udid)
+        let d = try environment.device(udid)
         guard d.booted else {
             simulatorWentDown()  // an app that was running there is gone, not crashed
             throw ChauffeurError.notBooted(udid)
         }
-        let a = try AXProvider(sim: d.sim)
+        let a = try environment.ax(d)
         device = d
         ax = a
         _ = try? ensureAccessibility(force: false)  // an Xcode session may have switched them off since
@@ -176,32 +187,7 @@ public final class Session {
         return (publish(ax.complete(root), size: device.size), result)
     }
 
-    /// Diagnoses a missing tree and applies the cure: flags back on, and a poisoned bridge restarted (at most once a minute).
-    func heal(noTreeForMs: Int, ax: AXProvider, screen: Size) -> AXHealth.Plan {
-        guard noTreeForMs >= AXHealth.patienceMs else {
-            return AXHealth.Plan(enableFlags: [], restartBridge: false, relaunchApp: false)
-        }
-        let flagsOff =
-            (try? SimCtl.run(["spawn", udid, "defaults", "read", AXSettings.domain]).out).map(AXSettings.off) ?? []
-        let probe = ax.probe(center: Point(x: screen.w / 2, y: screen.h / 2))
-        let plan = AXHealth.plan(
-            noTreeForMs: noTreeForMs, frontmostIsEmptyApp: probe.frontmostIsEmptyApp,
-            screenAnswers: probe.screenAnswers, flagsOff: flagsOff,
-            msSinceBridgeRestart: bridgeRestartedMs.map { clock.nowMs() - $0 })
-        if !plan.enableFlags.isEmpty { _ = try? ensureAccessibility() }
-        if plan.restartBridge { _ = restartBridge() }
-        return plan
-    }
-
-    /// Restarts the simulator's accessibility bridge (launchd brings it back at once); returns the provider to read with.
-    func restartBridge() -> AXProvider? {
-        _ = try? SimCtl.run(["spawn", udid, "launchctl", "stop", "com.apple.CoreSimulator.bridge"])
-        bridgeRestartedMs = clock.nowMs()
-        clock.sleep(ms: 1500)  // give it a moment to come up
-        return ax
-    }
-
-    private func poll(_ ax: AXProvider, minMs: Int, capMs: Int) -> Settled<AXElement> {
+    private func poll(_ ax: any AXSource, minMs: Int, capMs: Int) -> Settled<AXElement> {
         Settle.wait(minMs: minMs, capMs: capMs, clock: clock) { () -> (value: AXElement, hash: Int)? in
             guard let root = ax.read(), !root.frame.isEmpty else { return nil }  // 0×0 root = not settled (decision 3)
             return (root, root.hashValue)

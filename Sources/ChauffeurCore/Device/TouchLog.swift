@@ -88,3 +88,5 @@ public final class TouchLog: @unchecked Sendable {
         }
     }
 }
+
+extension TouchLog: TouchEvidenceSource {}
