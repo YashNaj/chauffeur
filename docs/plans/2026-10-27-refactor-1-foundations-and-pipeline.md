@@ -25,7 +25,7 @@ live tests on a booted iOS 27 simulator.
   and 600 in `Tests` (this plan aims for under 300 in `Sources`).
 - Fakes go behind seams (protocols, `SessionEnvironment`, recorded trees under `Tests/ChauffeurCoreTests/Fixtures`),
   never as flags in production code.
-- No verdict changes. No user-visible text changes except §9's Doctor ruling (Task 14). A golden test that fails is a
+- No verdict changes. No user-visible text changes except §9's Doctor ruling (Task 13). A golden test that fails is a
   bug in the task, never a reason to re-record the golden.
 - After every stage that touches `Engine`, `Device`, `Perception`, `Screen` or the bridge (all four here), run
   `CHAUFFEUR_LIVE_UDID=<udid> swift test --no-parallel` on a booted iOS 27 simulator with load under 10 and nothing
@@ -35,13 +35,13 @@ live tests on a booted iOS 27 simulator.
 
 ## Review Focus
 
-1. `wait --timeout 600` must still wait 300 s, not fail usage (Task 10 pins it offline: the clamp is `Session.waitTimeout`).
+1. `wait --timeout 600` must still wait 300 s, not fail usage (Task 9 pins it offline: the clamp is `Session.waitTimeout`).
 2. A session whose accessibility source returns no tree for longer than `AXHealth.patienceMs` must still heal
-   (flags, bridge restart) through the shell seam, not silently stop (Task 10 pins `heal` offline).
-3. A transport whose send fails must drop the HID client and rebuild it on the next action, as today (Task 13).
-4. A tap on a screen with an unattached touch log must come back UNVERIFIED, never `changed` (Task 13).
+   (flags, bridge restart) through the shell seam, not silently stop (Task 8 pins `heal` offline).
+3. A transport whose send fails must drop the HID client and rebuild it on the next action, as today (Task 12).
+4. A tap on a screen with an unattached touch log must come back UNVERIFIED, never `changed` (Task 12).
 5. After Stage 2, the evidence screenshot must exist exactly when the final verdict is NO EFFECT and never when a
-   pass upgraded it (Task 17).
+   pass upgraded it (Task 16).
 
 ---
 
@@ -516,6 +516,12 @@ Branch `refactor-1b-inputs`. PR title: "Refactor 1b: HID, the log seam, act runs
 
 - [ ] **Step 1: Write the failing tests** (`FakeInputs` behaviour; `HID` is an `InputDevice`; `grep -c CHHIDClient Sources/ChauffeurCore/Engine` is 0 — assert via a test that reads the files? No: add the rule to `scripts/check-code.sh`: `CHHIDClient` may appear only in `Device/HID.swift`.)
 - [ ] **Step 2: Run to verify it fails**
+- **Amendment (Stage 1a final review):** `Gestures.tap`/`Gestures.drag` (`Device/Input.swift`) and `Keyboard` call
+  `usleep` themselves (50 ms per tap, 192 ms per drag, 15 ms per key). Route them through the session's clock in this
+  task, so Task 12's offline gesture tests don't sleep for real (spec "Done when": no unit test sleeps).
+  `SessionEnvironment.scripted` also gains a `processes:` argument and neutral `simulatorBooted`,
+  `simulatorBootDate` and `findCrashReport` closures for the session it builds, and `RecordingShell` records stdin and
+  timeout, so Task 12 can launch offline and assert the cleared pasteboard after a secure paste.
 - [ ] **Step 3: Implement `HID`, `InputDevice`, `TextInput`; move `press`; route `transportsReady`, `typeCommand` and `buttonCommand` through `environment.inputs`; `drop()` calls `inputs.reset()` semantics (the session forgets its `InputDevice` and asks the environment again)**
 - [ ] **Step 4: Run** — `swift test`; `scripts/check-code.sh` (new rule passes)
 - [ ] **Step 5: Commit** — `git commit -m "HID: one owner of the HID client; InputDevice is the seam"`
@@ -758,7 +764,9 @@ and `ActionReport.exitCode`, `TypeReport.exitCode` and `Doctor.exitCode` return 
 `CrashInfo.detectedAt` (a `Date` field, stored only); the trace line's timestamp; the screenshot file name. Durations
 were already measured with `clock.nowMs()`. `Settle.wait` and `NetJudge.judge` take `any SettleClock` instead of
 `some` so the session's existential clock can be passed. `SessionNetworkTests` went from 2.65 s to 0.06 s. Raw
-`usleep`/`Date()` outside `Engine` (TouchLog, Input, Daemon, LogStream, Doctor) are Stage 1a's.
+`usleep`/`Date()` outside `Engine` (TouchLog, Input, Daemon, LogStream, Doctor) are not Stage 1a work after all: Input's sleeps
+move with the HID wrapper in Stage 1b, and TouchLog, LogStream, the daemon and Doctor stay on wall time unless a later seam
+needs them (corrected in Stage 1a).
 
 **Where each §1 report shape is pinned.** Task 2's 15 goldens cover every shape §1 lists except two. *Crash* is pinned
 byte for byte by `AnnotateTests.aVanishedAppIsACrashReportedOnce`. *Type with submit* is pinned nowhere yet: the
@@ -779,3 +787,40 @@ after the relaunch a system alert covers the app. The same test fails identicall
 this refactor: the simulator now exposes the tree with the flags off. It needs its own investigation, outside this
 plan. During the run an orphaned `Tests/FixtureApp/netserver.py` from an earlier session held port 8765, so the
 network suites ran against it (same script); they passed.
+
+### Stage 1a (branch `refactor-1a-environment`)
+
+**Every `simctl` call in the engine goes through `SessionEnvironment.shell`**, not only the five the plan listed: heal's
+`defaults read`, the bridge restart, the clipboard (`pbcopy`, `pbpaste`), install, appinfo, launch, terminate, openurl,
+privacy, location, push, appearance, the screenshot and recover's `launchctl list`, 19 calls in all, each with identical
+arguments, stdin and timeout. `AXSettings.ensure` takes the shell too, with no default, so no caller can bypass the seam; Doctor never called it
+and still runs its own `defaults read` through `SimCtl` until Task 13.
+`heal`, `restartBridge` and `ensureAccessibility` moved, unchanged, to `Engine/Session+Heal.swift`.
+
+**Two seams for one fact, until Plan 2.** The `isAlive` closure stays (the plan retires closures in Plan 2) but defaults
+to `environment.processes.isAlive`; the saved-app check and `watchedPids` use `processes` directly. A test that overrides
+only one of them gets mixed answers. Likewise `simulatorBooted` beside `device.booted`.
+
+**One cast outside `.live`, until Task 10.** `transportsReady` builds the HID client from `(device as? Device)?.sim`;
+with a fake device it builds none, and every gesture fails as a bridge error, never a success (`doctor --live`'s selftest
+prints nothing and exits 3).
+
+**Task 8's test as planned proved nothing.** `connect()` already runs `ensureAccessibility(force: false)` through the
+shell, so "a `defaults write` happened" passes without `heal`. The test asserts heal-only evidence instead: a second,
+forced `defaults write` and a `defaults read` after the first write (flags off), and `launchctl stop
+com.apple.CoreSimulator.bridge` (flags on, screen answers). Each no-tree `snapshot` spends 3000 fake ms, so heal's
+4000 ms patience is reached on the third.
+
+**Task 9's frame lists were off by one.** A stable screen settles in two reads (75 fake ms) per `snapshot`, so
+"rev 1, rev 1, rev 2" needs `[home ×4, form ×2]`. The form label is "Agree to terms" ("Email" isn't in the fixture).
+
+**Live run at the end of Stage 1a** (5c9589f, iPhone 17 on iOS 27, 1154 s): 473 tests. Two failed: the pre-existing
+`anAppStartedWithTheFlagsOffIsToldToRelaunch` (fails on `main` too), and `aDeadButtonIsPlainAndNotSlower`, while host
+load from outside the session rose to about 51: a request from the Network tab's web view to 127.0.0.1:8765 landed in
+the dead tap's window (the attribution Stage 5 fixes) and the taps took 1.1 to 2.0 s. `NetworkLiveTests` re-run alone
+at load 3: 12 of 12 passed, the dead button included. The ledger body is unchanged.
+
+**For Plan 2:** a task must retire the closure seams (`isAlive`, `simulatorBooted`, `simulatorBootDate`,
+`findCrashReport`, `relaunch`, `commandHook`, `telemetryOverride`, `crashReportWaitMs`) into `SessionEnvironment`;
+until then two seams answer "is this process alive" and "is the simulator booted". Stage 5's `Sweep` should also lift
+`complete` off `AXSource`, so the bar sweep runs on top of any source (spec §2) and can be tested offline.
