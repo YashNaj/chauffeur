@@ -1,0 +1,2 @@
+type e1 "alice@example.com" → typed via paste · value="alice@example.com" · settled 150ms
+submit → NOT DELIVERED: Return failed to send

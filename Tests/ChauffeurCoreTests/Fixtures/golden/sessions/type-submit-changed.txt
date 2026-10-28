@@ -1,0 +1,15 @@
+type e1 "alice@example.com" → typed via paste · value="alice@example.com" · settled 150ms
+submit → changed · rev 2→3
++ heading "Status"
++ text "Last action: none"
++ heading "Actions"
++ button "Show alert" [e5]
++ button "Request location" [e6]
++ button "Request notifications" [e7]
++ button "Long list" [e8]
++ button "Crash" [e9]
+- heading "Form"
+- textfield "email" [e1] value="alice@example.com"
+- securefield "password" [e2] value="Password"
+- switch "Agree to terms" [e3] value=off
+… 1 more changes — run snapshot

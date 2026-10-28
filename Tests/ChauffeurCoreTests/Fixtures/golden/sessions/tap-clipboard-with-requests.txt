@@ -1,0 +1,2 @@
+tap e1 "Show alert" → changed · copied to clipboard (16 characters)
+request: 127.0.0.1:8765 · sent 58 B, got 512 B · telemetry filter unavailable for 127.0.0.1

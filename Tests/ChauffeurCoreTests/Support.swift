@@ -176,7 +176,7 @@ extension SessionEnvironment {
 }
 
 /// A `LogSource` over a `LogRing`: `start` records the executable and attaches, or not (`attaches: false`, a
-/// `log stream` that never came up); tests feed lines with `append`, unshaped.
+/// `log stream` that never came up); tests feed lines with `append`, shaped as `LogTap` stores them.
 final class ScriptedLogs: LogSource {
     private var ring = LogRing(capacity: 2000)
     private let attaches: Bool
@@ -200,7 +200,7 @@ final class ScriptedLogs: LogSource {
     }
 
     func stop() { isAttached = false }
-    func append(_ line: LogLine) { ring.append(line) }
+    func append(_ line: LogLine) { ring.append(LogRedact.line(line)) }
 }
 
 /// A `ProcessTable` whose live pids a test changes between commands (a reference, so the session sees the change).

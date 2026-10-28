@@ -3,13 +3,6 @@ import Testing
 
 @testable import ChauffeurCore
 
-@MainActor
-final class ScriptedFlows: FlowSource {
-    var samples: [[Flow]]
-    init(_ samples: [[Flow]]) { self.samples = samples }
-    func flows(pids: [Int32]) -> [Flow] { samples.count > 1 ? samples.removeFirst() : samples.first ?? [] }
-}
-
 /// M4b spec §3 through the session's glue, with recorded log lines and scripted connections.
 @Suite @MainActor struct SessionNetworkTests {
     func session(flows: [[Flow]] = [[]], clock: FakeClock = FakeClock()) -> Session {
@@ -18,6 +11,8 @@ final class ScriptedFlows: FlowSource {
             ax: ScriptedAX(frames: []), clock: clock, flows: ScriptedFlows(flows))
         let s = Session(udid: udid, environment: environment)
         s.telemetryOverride = []
+        // Build the flow source as production's `netStart()` has by the time a tap is judged (no pids: no sample).
+        _ = s.flows([])
         return s
     }
 
