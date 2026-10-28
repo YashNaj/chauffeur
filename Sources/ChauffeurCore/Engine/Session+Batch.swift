@@ -29,13 +29,13 @@ extension Session {
         let start = clock.nowMs()
         var parts: [String] = []
         var results: [JSON] = []
-        var exit: Int32 = 0
+        var exit = ExitCode.ok.rawValue
         for (i, command) in commands.enumerated() {
             let tag = "[\(i + 1)/\(commands.count)]"
             let rest = commands[i...].map { Batch.render(Self.shown($0)) }.joined(separator: "; ")
             if clock.nowMs() - start >= Self.batchBudgetMs {
                 parts.append("stopped before \(tag): the batch has run \(Self.batchBudgetMs / 1000)s; not run: \(rest)")
-                exit = 1
+                exit = ExitCode.error.rawValue
                 break
             }
             let out = Self.throughPending(runOne(command)) { runOne(["wait"]) }
@@ -44,7 +44,7 @@ extension Session {
                 "argv": JSON(Self.shown(command)), "exit": JSON(Int(out.exit)), "text": .string(out.text),
                 "data": out.data ?? .null,
             ])
-            if out.exit != 0 {
+            if out.exit != ExitCode.ok.rawValue {
                 exit = out.exit
                 let notRun = commands[(i + 1)...].map { Batch.render(Self.shown($0)) }.joined(separator: "; ")
                 parts.append("stopped at \(tag) (exit \(out.exit))" + (notRun.isEmpty ? "" : "; not run: \(notRun)"))
@@ -59,7 +59,7 @@ extension Session {
     /// A step that came back PENDING is finished by a bare `wait` before the batch judges it, so "tap Login, then tap
     /// Profile" works (M4b spec §3, "Batches").
     nonisolated static func throughPending(_ out: Output, wait: () -> Output) -> Output {
-        guard out.exit == 6 else { return out }
+        guard out.exit == ExitCode.pending.rawValue else { return out }
         let waited = wait()
         return Output(out.text + "\n" + waited.text, exit: waited.exit, data: waited.data)
     }

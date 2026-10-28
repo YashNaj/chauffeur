@@ -176,7 +176,7 @@ public enum Doctor {
                             status: status,
                             text: "live tap · " + line.drop(while: { $0 != " " }).trimmingCharacters(in: .whitespaces)))
                 }
-                if result.exit != 0 {
+                if result.exit != ExitCode.ok.rawValue {
                     checks.append(
                         Check(status: .fail, text: "no transport delivered a touch; see `chauffeur doctor` above"))
                 }

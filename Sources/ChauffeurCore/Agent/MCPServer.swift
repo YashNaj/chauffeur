@@ -142,9 +142,11 @@ public final class MCPServer {
         }
         let out = run(argv)
         var content: [JSON] = [["type": "text", "text": .string(out.text)]]
-        if name == "screenshot", out.exit == 0, let path = out.data?["path"]?.string, let jpeg = readFile(path) {
+        if name == "screenshot", out.exit == ExitCode.ok.rawValue, let path = out.data?["path"]?.string,
+            let jpeg = readFile(path)
+        {
             content.append(["type": "image", "data": .string(jpeg.base64EncodedString()), "mimeType": "image/jpeg"])
         }
-        return ["content": .array(content), "isError": .bool(out.exit != 0)]
+        return ["content": .array(content), "isError": .bool(out.exit != ExitCode.ok.rawValue)]
     }
 }

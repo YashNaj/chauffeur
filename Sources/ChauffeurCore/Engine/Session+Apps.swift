@@ -100,7 +100,7 @@ extension Session {
         let front = try waitForApp(capMs: Self.launchWaitMs, notShowing: stale)
         let after = String(format: "%.1fs", Double(front.waitedMs) / 1000)
         var lines: [String]
-        var exit: Int32 = 0
+        var exit = ExitCode.ok
         if !Self.showsLaunchedApp(front.snapshot.kind, stale: stale) {
             let alive = isAlive(pid)
             lines = [
@@ -111,7 +111,7 @@ extension Session {
                     ? "hint: run: chauffeur wait \"<text on its first screen>\"; if it never appears, run: chauffeur doctor"
                     : "hint: run: chauffeur logs",
             ]
-            exit = alive ? 3 : 1
+            exit = alive ? .noEffect : .error
         } else {
             // A localized display name differs from Info.plist: follow what the screen calls it.
             if case .app(let name) = front.snapshot.kind, name != tracked.displayName {

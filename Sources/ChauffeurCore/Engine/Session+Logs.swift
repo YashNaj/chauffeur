@@ -76,7 +76,7 @@ extension Session {
             extra.append(
                 "hint: after fixing it, rebuild, chauffeur install <path.app>, then chauffeur launch \(crashed.app.bundle)"
             )
-            out.exit = 5
+            out.exit = ExitCode.crashed.rawValue
         }
         if let note = healNote {
             extra.append("note: " + note)

@@ -34,8 +34,11 @@ report try-bang "a crash here takes the agent's session down; handle the error" 
   < <(grep_sources Sources 'try!')
 report print "output goes through the CLI target; print corrupts the MCP stream" \
   < <(grep_sources Sources/ChauffeurCore '(^|[^[:alnum:]_.])print\(')
+# An exit code given as a bare number: the `exit:` argument (also either branch of a ternary there), or an assignment
+# to or comparison with an `exit` value. The label must follow `(`, `,` or start a line, so prose in a string isn't hit.
+EXIT_TERNARY='[^,()"]*\?([[:space:]]*[0-9]|[^,()":]*:[[:space:]]*[0-9])'
 report exit-literal "exit codes are ExitCode cases; no bare literals" \
-  < <(grep_sources Sources 'exit: [0-9]')
+  < <(grep_sources Sources "(^|[(,])[[:space:]]*exit:[[:space:]]*([0-9]|$EXIT_TERNARY)|(^|[^[:alnum:]_])exit[[:space:]]*(=|==|!=)[[:space:]]*([0-9]|$EXIT_TERNARY)")
 
 length_limit() {
   local dir=$1 max=$2 f n

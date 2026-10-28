@@ -205,7 +205,7 @@ extension Session {
             }
             usleep(300_000)
         }
-        return Output(lines.joined(separator: "\n"), exit: anyDelivered ? 0 : 3)
+        return Output(lines.joined(separator: "\n"), exit: anyDelivered ? .ok : .noEffect)
     }
 
     func typeCommand(_ argv: [String]) throws -> Output {
@@ -295,7 +295,7 @@ extension Session {
                 + Diff.lines(from: typed, to: after).joined(separator: "\n")
             : "submit → NO EFFECT · nothing changed after Return"
         return Output(
-            report.render() + "\n" + submitted, exit: changed ? 0 : 3,
+            report.render() + "\n" + submitted, exit: changed ? .ok : .noEffect,
             data: report.json.merging(["submit": changed ? "changed" : "noEffect"]))
     }
 
