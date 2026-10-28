@@ -203,7 +203,7 @@ extension Session {
                     "✗ \(transport.name): " + (sent ? "sent, but no touch reached the simulator" : "send failed"))
             case .unavailable: lines.append("? \(transport.name): touch log stopped")
             }
-            usleep(300_000)
+            clock.sleep(ms: 300)
         }
         return Output(lines.joined(separator: "\n"), exit: anyDelivered ? .ok : .noEffect)
     }

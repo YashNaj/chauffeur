@@ -90,6 +90,7 @@ extension Session {
         guard r.status == 0, let pid = SimApps.launchedPID(r.out) else {
             return Output("launch \(bundle) → FAILED: \(SimCtl.message(r))", exit: .error)
         }
+        // wall clock: `launchedAt` is saved to disk and compared with the boot date and crash-report times
         var tracked = TrackedApp(
             bundle: bundle, executable: appInfo.executable, displayName: appInfo.displayName,
             pid: pid, launchedAt: Date())

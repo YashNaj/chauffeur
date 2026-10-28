@@ -22,6 +22,7 @@ extension Session {
         TrackedApp.clear(StatePaths.app(udid))
         // chauffeur ended it (a permission change can take more than the 1 s grace window to kill the app).
         if let endedAt = endedByChauffeur[gone.pid], clock.nowMs() - endedAt < Self.endedGraceMs { return nil }
+        // wall clock: `detectedAt` is a Date, not a duration (nothing reads it yet)
         var info = CrashInfo(app: gone, detectedAt: Date(), report: nil)
         let deadline = clock.nowMs() + crashReportWaitMs
         while true {

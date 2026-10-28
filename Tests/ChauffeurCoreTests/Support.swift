@@ -3,6 +3,12 @@ import Testing
 
 @testable import ChauffeurCore
 
+final class FakeClock: SettleClock {
+    var now = 0
+    func nowMs() -> Int { now }
+    func sleep(ms: Int) { now += ms }
+}
+
 enum Fixtures {
     /// An accessibility tree recorded in M0 (`spikes/fixtures/ax`).
     static func ax(_ name: String) throws -> AXElement {

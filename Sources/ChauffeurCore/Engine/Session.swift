@@ -71,10 +71,12 @@ public final class Session {
     var telemetryOverride: [String]?
     /// Where the launched app's log lines start in `logTap` (crash evidence is this launch's lines only).
     var appLogCursor: Int?
-    let clock = SystemClock()
+    /// Every sleep and every duration the engine measures goes through this; tests inject a fake.
+    let clock: any SettleClock
 
-    public init(udid: String) {
+    public init(udid: String, clock: any SettleClock = SystemClock()) {
         self.udid = udid
+        self.clock = clock
         touchLog = TouchLog(udid: udid, levelFile: StatePaths.level(udid))
         logTap = LogTap(udid: udid)
         simulatorBooted = { SimBoot.booted(udid: udid) }
@@ -265,6 +267,7 @@ public final class Session {
     /// Appends the command to the trace when this session keeps one.
     func record(_ args: [String], _ output: Output, ms: Int) {
         guard let traceFile else { return }
+        // wall clock: the trace is a log file people read
         let entry = TraceEntry(
             time: Trace.timestamp(Date()), udid: udid, args: args, exit: output.exit, ms: ms,
             result: String(output.text.prefix { $0 != "\n" }), target: traceTarget.map(TraceTarget.init),

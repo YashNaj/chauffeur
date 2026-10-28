@@ -59,7 +59,7 @@ extension Session {
             return hid.usage(page: 0x0C, usage: button.consumerUsage ?? 0, down: down)
         }
         let down = send(true)
-        usleep(UInt32(button.holdMs) * 1000)
+        clock.sleep(ms: button.holdMs)
         return send(false) && down
     }
 }

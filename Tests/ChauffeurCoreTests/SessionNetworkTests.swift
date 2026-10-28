@@ -12,8 +12,8 @@ final class ScriptedFlows: FlowSource {
 
 /// M4b spec §3 through the session's glue, with recorded log lines and scripted connections.
 @Suite @MainActor struct SessionNetworkTests {
-    func session(flows: [[Flow]] = [[]]) -> Session {
-        let s = Session(udid: "ZZ" + String(format: "%06X", UInt32.random(in: 0...0xFFFFFF)) + "-TEST")
+    func session(flows: [[Flow]] = [[]], clock: FakeClock = FakeClock()) -> Session {
+        let s = Session(udid: "ZZ" + String(format: "%06X", UInt32.random(in: 0...0xFFFFFF)) + "-TEST", clock: clock)
         s.flowSource = ScriptedFlows(flows)
         s.flowSourceTried = true
         s.telemetryOverride = []
@@ -93,6 +93,16 @@ final class ScriptedFlows: FlowSource {
         s.applyNetwork(&r, net: net, target: nil)
         #expect(r.outcome == .pending && r.exitCode == .pending)
         #expect(r.render().hasPrefix("tap e4 \"Login\" → PENDING · 127.0.0.1:8765 · sent 58 B, no reply after 2."))
+    }
+
+    @Test func theWindowIsPaidOnTheFakeClockNotTheWall() {
+        let clock = FakeClock()
+        let s = session(clock: clock)
+        var r = report(.noEffect)
+        let started = Date()
+        let net = TapNet(pids: [4321], earlier: [], atTouch: [], logCursor: s.logTap.cursor, touchMs: clock.now)
+        s.applyNetwork(&r, net: net, target: nil)
+        #expect(Date().timeIntervalSince(started) < 0.2)
     }
 
     @Test func requestLinesReplaceCFNetworkErrorLinesInLogs() throws {

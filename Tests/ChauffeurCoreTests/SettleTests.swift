@@ -2,12 +2,6 @@ import Testing
 
 @testable import ChauffeurCore
 
-final class FakeClock: SettleClock {
-    var now = 0
-    func nowMs() -> Int { now }
-    func sleep(ms: Int) { now += ms }
-}
-
 @Suite struct SettleTests {
     func run(_ hashes: [Int?], minMs: Int = 150, capMs: Int = 1500) -> (Settled<Int>, FakeClock) {
         let clock = FakeClock()

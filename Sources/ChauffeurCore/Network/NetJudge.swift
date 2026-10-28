@@ -17,7 +17,7 @@ public enum NetJudge {
     /// window and no second look. The window counts from `touchMs`, the touch (spec §3: "still running after
     /// 2.2 s"), so a screen that is slow to settle doesn't push a slow reply inside it.
     public static func judge(
-        clock: some SettleClock, touchMs: Int, extraWindowMs: Int = 0, sample: () -> [RequestItem]
+        clock: any SettleClock, touchMs: Int, extraWindowMs: Int = 0, sample: () -> [RequestItem]
     ) -> NetVerdict {
         clock.sleep(ms: graceMs)
         var verdict = RequestEvidence.verdict(sample())
