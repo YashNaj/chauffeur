@@ -56,6 +56,13 @@ for shape in 'exit: anyDelivered ? 0 : 3)' 'exit: changed ? .ok : 3,' 'out.exit 
   n=$((n + 1)); d=$(tree "exit-shape-$n"); printf '%s\n' "$shape" > "$d/Sources/ChauffeurCore/B.swift"
   expect_fail "bare exit code fails: $shape" exit-literal "$d"
 done
+for shape in 'public init(_ text: String, exit: Int32 = 0, data: JSON? = nil) {' 'var exit: Int32 = 1' 'let exit: Int32 = 2'; do
+  n=$((n + 1)); d=$(tree "exit-decl-$n"); printf '%s\n' "$shape" > "$d/Sources/ChauffeurCore/B.swift"
+  expect_fail "bare exit-code default or initial value fails: $shape" exit-literal "$d"
+done
+d=$(tree exit-decl-ok); printf '%s\n' 'public init(_ text: String, exit: Int32 = ExitCode.ok.rawValue, data: JSON? = nil) {' \
+  'var exit: Int32 = ExitCode.error.rawValue' > "$d/Sources/ChauffeurCore/B.swift"
+expect_pass "exit: Int32 = ExitCode.ok.rawValue passes" "$d"
 d=$(tree exit-report); echo 'return Output(report.render(), exit: report.exitCode, data: report.json)' > "$d/Sources/ChauffeurCore/B.swift"
 expect_pass "exit: report.exitCode passes" "$d"
 d=$(tree exit-ok); printf '%s\n' 'exit: alive ? .noEffect : .error)' 'out.exit = ExitCode.crashed.rawValue' \

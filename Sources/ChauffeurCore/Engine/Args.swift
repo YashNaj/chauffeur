@@ -106,7 +106,7 @@ public struct Output: Codable, Equatable, Sendable {
     /// The same result as structured data, for `--json` and MCP; nil when a command has nothing beyond its text.
     public var data: JSON?
 
-    public init(_ text: String, exit: Int32 = 0, data: JSON? = nil) {
+    public init(_ text: String, exit: Int32 = ExitCode.ok.rawValue, data: JSON? = nil) {
         self.text = text
         self.exit = exit
         self.data = data

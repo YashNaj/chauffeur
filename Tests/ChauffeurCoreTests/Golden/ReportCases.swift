@@ -82,6 +82,8 @@ enum ReportCases {
         ("not-delivered", action(.notDelivered, evidence: .none)),
         // A custom reason, so the `note` key and its text are pinned rather than the default.
         ("unverified", action(.unverified, evidence: .unavailable) { $0.note = "the app was not running" }),
+        // No custom reason, so the default "(touch log unavailable)" headline is pinned too.
+        ("unverified-default", action(.unverified, evidence: .unavailable)),
         ("unattributed", action(.unattributed)),
         ("type-ok", typed(.ok, value: "alice@example.com")),
         ("type-mismatch", typed(.mismatch("alice@example.co"), value: "alice@example.co")),

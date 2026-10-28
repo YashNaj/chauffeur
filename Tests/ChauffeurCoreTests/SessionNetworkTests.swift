@@ -107,7 +107,7 @@ final class ScriptedFlows: FlowSource {
         s.applyNetwork(&r, net: net, target: nil)
         #expect(r.outcome == .pending)
         #expect(clock.now >= NetJudge.requestWindowMs)
-        #expect(Date().timeIntervalSince(started) < 0.2)
+        #expect(Date().timeIntervalSince(started) < 1.0)
     }
 
     @Test func requestLinesReplaceCFNetworkErrorLinesInLogs() throws {

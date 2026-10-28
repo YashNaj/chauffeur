@@ -1,4 +1,4 @@
-Literals the live tests expect (contains, hasPrefix, == "…"), one `file: literal` per line, made by scripts/live-expectations.sh at 85b5712.
+Literals the live tests expect (contains, hasPrefix, hasSuffix, == "…"), one `file: literal` per line, made by scripts/live-expectations.sh at c2e9bfb.
 
 AXLiveTests.swift: == "Fixture"
 AXLiveTests.swift: == "Form"
@@ -24,6 +24,8 @@ AppsLiveTests.swift: hasPrefix("launch dev.chauffeur.fixture → running (pid "
 AppsLiveTests.swift: hasPrefix("terminate dev.chauffeur.fixture → stopped (pid "
 BatchLiveTests.swift: contains("\n[3/3] tab \"Home\" ["
 BatchLiveTests.swift: hasPrefix("[1/3] tap \(form) \"Form\" → changed"
+BatchLiveTests.swift: hasSuffix("stopped at [1/2] (exit 4); not run: tap \(form)"
+BridgeLiveTests.swift: hasSuffix("SimulatorKit"
 ConnectLiveTests.swift: hasPrefix("-----BEGIN PRIVATE KEY-----"
 DeviceLiveTests.swift: == "location → set to 37.3349,-122.009"
 DeviceLiveTests.swift: contains("APP CRASHED"
@@ -83,6 +85,7 @@ RecoverLiveTests.swift: contains("note: relaunched dev.chauffeur.fixture"
 ScreenshotLiveTests.swift: contains(" px/pt: point = ("
 ScreenshotLiveTests.swift: contains("\nscreenshot → /"
 ScreenshotLiveTests.swift: hasPrefix("screenshot → /"
+ScreenshotLiveTests.swift: hasSuffix(" · 1 px = 1 pt"
 ScrollLiveTests.swift: hasPrefix("found text \"Row 40\" after "
 ScrollLiveTests.swift: hasPrefix("reached the end after "
 ScrollLiveTests.swift: hasPrefix("scroll up → changed"

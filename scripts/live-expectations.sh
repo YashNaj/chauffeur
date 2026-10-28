@@ -10,9 +10,9 @@ out="$root/docs/plans/2026-10-27-refactor-live-expectations.md"
 commit="$(git -C "$root" rev-parse --short HEAD)"
 cd "$root/Tests/ChauffeurCoreTests/Live"
 {
-  echo "Literals the live tests expect (contains, hasPrefix, == \"…\"), one \`file: literal\` per line, made by scripts/live-expectations.sh at $commit."
+  echo "Literals the live tests expect (contains, hasPrefix, hasSuffix, == \"…\"), one \`file: literal\` per line, made by scripts/live-expectations.sh at $commit."
   echo
   # A string literal is any run of non-quote, non-backslash characters or escaped characters between quotes.
-  grep -oE '(contains|hasPrefix)\("([^"\\]|\\.)*"|== "([^"\\]|\\.)*"' ./*.swift | sed -e 's|^\./||' -e 's/:/: /' \
+  grep -oE '(contains|hasPrefix|hasSuffix)\("([^"\\]|\\.)*"|== "([^"\\]|\\.)*"' ./*.swift | sed -e 's|^\./||' -e 's/:/: /' \
     | LC_ALL=C sort
 } >"$out"
