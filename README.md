@@ -68,6 +68,10 @@ result line. chauffeur's one miss is its own: a web view's page load got attribu
 hand review scored it a failure. Details, the tasks and every verdict are in
 [`docs/benchmark.md`](docs/benchmark.md#network-round-chauffeur-020-against-xcode-271s-mcp-2026-10-27).
 
+The failing request, both ways. The recording is sped up 3×; in real time chauffeur took 13 s and Xcode 50 s.
+
+![Tap Failing API and report the HTTP status: chauffeur (top, 4 turns, $0.022) reads the 500 off the tap's result line; Xcode 27.1's MCP (bottom, 17 turns, $0.199) can't tell](docs/media/network-N2.gif)
+
 ## Quick start
 
 Requirements: Apple silicon and Xcode 26 or 27. Boot a simulator, then run:
