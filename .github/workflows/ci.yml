@@ -7,12 +7,18 @@ on:
 jobs:
   build-test:
     name: build-test (Xcode ${{ matrix.xcode }})
-    runs-on: macos-26
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        xcode: ["26"]
+        include:
+          # The oldest Xcode chauffeur supports: the only place a change built on 27 is compiled with the older Swift.
+          - xcode: "26"
+            runner: macos-26
+          # The Xcode development and the live tests use. GitHub keys this image by Xcode major, not macOS version.
+          - xcode: "27"
+            runner: xcode-27
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,6 +27,9 @@ jobs:
         run: |
           ls -d /Applications/Xcode*.app
           X=$(ls -d /Applications/Xcode_${{ matrix.xcode }}*.app 2>/dev/null | sort -V | tail -1)
+          # An image built for one Xcode may ship it only as the default Xcode.app.
+          if [ -z "$X" ] && /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -version 2>/dev/null \
+            | grep -q "^Xcode ${{ matrix.xcode }}\."; then X=/Applications/Xcode.app; fi
           [ -n "$X" ] || { echo "::error::no Xcode ${{ matrix.xcode }} on this runner image"; exit 1; }
           sudo xcode-select -s "$X/Contents/Developer"; xcodebuild -version
       - name: Commits (no personal email, no AI co-author trailer)
