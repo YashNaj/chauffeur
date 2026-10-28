@@ -33,6 +33,10 @@ report bridge "private API belongs in Sources/ChauffeurBridge" \
 # The private HID client has one owner, so a failed send has one place to drop and rebuild it.
 report hid-owner "the HID client belongs to HID (Sources/ChauffeurCore/Device/HID.swift); go through InputDevice" \
   < <(grep_sources Sources 'CHHIDClient' Sources/ChauffeurBridge | grep -v "^$ROOT/Sources/ChauffeurCore/Device/HID.swift:")
+# Doctor runs the engine's probes through the same wrappers, so it never reaches the bridge itself.
+report hid-owner "Doctor goes through the Device wrappers (Device, AXProvider, HID, AXSettings), not ChauffeurBridge" \
+  < <(grep_sources Sources/ChauffeurCore '(^|[[:space:]])import[[:space:]]+ChauffeurBridge' \
+    | grep "^$ROOT/Sources/ChauffeurCore/Doctor.swift:")
 report try-bang "a crash here takes the agent's session down; handle the error" \
   < <(grep_sources Sources 'try!')
 report print "output goes through the CLI target; print corrupts the MCP stream" \

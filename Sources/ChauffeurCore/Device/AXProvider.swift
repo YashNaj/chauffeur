@@ -26,6 +26,8 @@ public final class AXProvider: AXSource {
         do { reader = try CHAXReader(simulator: sim) } catch { throw ChauffeurError.bridge(error.localizedDescription) }
     }
 
+    public convenience init(device: Device) throws { try self.init(sim: device.sim) }
+
     /// The raw walk: fast, used by settle polling. Nil when nothing answers.
     public func read() -> AXElement? {
         reader.frontmostTree().flatMap { AXElement(dictionary: $0) }

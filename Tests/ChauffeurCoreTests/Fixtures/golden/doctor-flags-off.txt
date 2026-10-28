@@ -1,0 +1,1 @@
+! app accessibility off (AutomationEnabled), as an Xcode device session leaves it; chauffeur turns it back on, and apps opened since then need a relaunch

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `doctor` describes accessibility problems in the same words as a result's note.
+
 ## 0.2.0
 
 - A crash now leads the action's result: `tap Pay → APP CRASHED: …` on the first line.

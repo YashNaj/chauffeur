@@ -28,8 +28,8 @@ build and install the small test app in `Tests/FixtureApp` themselves. Boot one 
 `xcrun simctl list devices booted` gives you its UDID. After any change to MCP mode, run `scripts/mcp-smoke.sh`: it
 checks that a real client (Claude Code) accepts the tool list.
 
-CI builds with Xcode 26 and Xcode 27. If you develop on Xcode 27, the Xcode 26 job is the only place your change is
-compiled with the older Swift, so wait for it.
+CI builds with Xcode 27 (`build-test`, the required check). It also runs Xcode 26 when runners are available; that
+job is not required, so check it when it runs: it is the only place your change is compiled with the older Swift.
 
 ## Making a change
 
