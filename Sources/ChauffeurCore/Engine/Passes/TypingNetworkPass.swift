@@ -5,9 +5,7 @@ import Foundation
 @MainActor
 struct TypingNetworkPass {
     func apply<C: EvidenceCarrier>(to carrier: inout C, net: TapNet, session: Session) {
-        session.clock.sleep(ms: NetJudge.graceMs)
-        var previous: [FlowActivity] = []
-        carrier.requests = session.netItems(net, previous: &previous)
+        carrier.requests = session.network.sampleOnce(net)
         carrier.requestElapsedMs = session.clock.nowMs() - net.touchMs
     }
 }

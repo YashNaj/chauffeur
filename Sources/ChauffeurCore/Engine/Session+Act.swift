@@ -52,7 +52,7 @@ extension Session {
         while true {
             let transport = gesture == nil ? nil : order[index]
             let cursor = touchLog.cursor
-            let net = network.map { tapNet($0) }
+            let net = network.map { self.network.atTouch($0) }
             let touchMs = net?.touchMs ?? clock.nowMs()
             let attempt =
                 if let gesture, let transport {
@@ -125,7 +125,7 @@ extension Session {
         guard let target = a.next() else { throw ChauffeurError.usage(a.usage) }
         try a.done()
         let (device, _) = try connect()
-        let network = netStart()
+        let network = self.network.start(appPid: app?.pid) { ax?.frontmostPID() }
         let clipboard = Background { [udid, shell] in Self.readClipboard(udid: udid, shell: shell) }
         let (before, settled) = try baseline()
         let aimed = try aim(target, in: before)

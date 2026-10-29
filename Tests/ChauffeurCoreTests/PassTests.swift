@@ -28,12 +28,12 @@ import Testing
     @Test func aRawSocketWaitingIsPending() throws {
         let rig = ActRig(frames: [try Act.home()], flows: [[], [], [Act.waiting]])
         let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
-        let net = rig.s.tapNet(rig.s.netStart())
+        let net = rig.s.network.atTouch(rig.s.network.start(appPid: rig.s.app?.pid) { rig.s.ax?.frontmostPID() })
         var r = Self.noEffect()
         try NetworkPass().apply(to: &r, context: rig.context(before: before, net: net), session: rig.s)
         #expect(r.outcome == .pending && r.exitCode == .pending)
         #expect(r.render().hasPrefix("tap e4 \"Login\" → PENDING · 127.0.0.1:8765 · sent 58 B, no reply after 2."))
-        #expect(rig.s.pendingTap != nil)
+        #expect(rig.s.network.pending != nil)
     }
 
     @Test func withoutANetworkThePassDoesNothing() throws {
@@ -163,7 +163,7 @@ import Testing
         _ = try rig.s.observe(minMs: 0, capMs: 1500)  // connected: the app in front is the one watched
         var report = TypeReport(
             action: "type e2 \"alice\"", method: "keys", verdict: .ok, value: "alice", settledMs: 150)
-        let net = rig.s.tapNet(rig.s.netStart())
+        let net = rig.s.network.atTouch(rig.s.network.start(appPid: rig.s.app?.pid) { rig.s.ax?.frontmostPID() })
         let t = rig.clock.now
         TypingNetworkPass().apply(to: &report, net: net, session: rig.s)
         #expect(rig.clock.now == t + NetJudge.graceMs)

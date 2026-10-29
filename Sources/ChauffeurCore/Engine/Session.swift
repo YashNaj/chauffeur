@@ -55,11 +55,8 @@ public final class Session {
     var relaunchedForAccessibility: Set<String> = []
     /// Seam for unit tests: how an app is relaunched (default: `launchCommand`).
     var relaunch: ((String) -> Output)?
-    /// The activity layer (M4b spec §2), built on the first tap; nil when NetworkStatistics is unavailable.
-    var flowSource: FlowSource?
-    var flowSourceTried = false
-    /// The last tap that came back PENDING, for a bare `wait` (M4b spec §9). Any other action forgets it.
-    var pendingTap: PendingTap?
+    /// The flow source, the watched pids, the telemetry list and the pending tap.
+    let network: NetworkWatch
     /// Test seam: the project's telemetry entries (default: `.chauffeur.json` from the client's directory).
     var telemetryOverride: [String]?
     /// Where the launched app's log lines start in `logs` (crash evidence is this launch's lines only).
@@ -78,6 +75,10 @@ public final class Session {
     public init(udid: String, environment: SessionEnvironment) {
         self.udid = udid
         self.environment = environment
+        network = NetworkWatch(
+            flows: environment.flows, processes: environment.processes, logs: environment.logs,
+            clock: environment.clock)
+        network.telemetry = { [unowned self] in self.telemetryHosts() }
         // A restarted daemon (upgrade, idle exit) keeps following an app that is still running.
         if let saved = TrackedApp.load(StatePaths.app(udid)) {
             if environment.processes.isAlive(saved.pid) { app = saved } else { TrackedApp.clear(StatePaths.app(udid)) }
@@ -219,7 +220,7 @@ public final class Session {
         let cursor = logs.cursor
         let previousActionCursor = lastActionLogCursor
         if Self.logged.contains(command) { lastActionLogCursor = cursor }
-        if Self.logged.contains(command) { pendingTap = nil }
+        if Self.logged.contains(command) { network.pending = nil }
         // A crash since the previous command must be noticed before this command can stop following the app
         // (launch, install, terminate and permission changes all do) and so hide it.
         let noticed = Self.watched.contains(command) ? detectCrash() : nil

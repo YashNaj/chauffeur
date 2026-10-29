@@ -6,25 +6,16 @@ import Foundation
 struct NetworkPass: EvidencePass {
     func apply(to report: inout ActionReport, context: ActionContext, session: Session) throws {
         guard let net = context.net, report.outcome == .noEffect || report.outcome == .changed else { return }
-        if report.outcome == .noEffect, net.pids.isEmpty || session.flowSource == nil {
-            report.networkNote = net.pids.isEmpty ? "no app process to watch" : "network statistics unavailable"
-        }
-        let clock = context.clock
-        var previous: [FlowActivity] = []
+        if report.outcome == .noEffect, let note = session.network.unavailableNote(net) { report.networkNote = note }
         let verdict: NetVerdict
         if report.outcome == .changed {
-            clock.sleep(ms: NetJudge.graceMs)
-            verdict = RequestEvidence.verdict(session.netItems(net, previous: &previous))
+            verdict = RequestEvidence.verdict(session.network.sampleOnce(net))
         } else {
             let textField = context.target.map { Perception.textEntry.contains($0.role) } ?? false
-            verdict = NetJudge.judge(
-                clock: clock, touchMs: net.touchMs, extraWindowMs: textField ? NetJudge.textFieldWindowMs : 0
-            ) {
-                session.netItems(net, previous: &previous)
-            }
+            verdict = session.network.judge(afterTouch: net, textField: textField)
         }
         report.requests = verdict.items
-        report.requestElapsedMs = clock.nowMs() - net.touchMs
+        report.requestElapsedMs = context.clock.nowMs() - net.touchMs
         guard report.outcome == .noEffect else { return }
         switch verdict {
         case .none:
@@ -32,7 +23,8 @@ struct NetworkPass: EvidencePass {
         case .pending:
             report.outcome = .pending
             report.hints = Verifier.hints(outcome: .pending, target: context.target)
-            session.pendingTap = PendingTap(report: report, before: context.before, net: net, target: context.target)
+            session.network.pending = PendingTap(
+                report: report, before: context.before, net: net, target: context.target)
         case .settled(let items):
             if let hint = ActionReport.lead(items, pending: false).flatMap(RequestText.hint) { report.hints = [hint] }
         }

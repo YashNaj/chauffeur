@@ -11,8 +11,8 @@ import Testing
             ax: ScriptedAX(frames: []), clock: clock, flows: ScriptedFlows(flows))
         let s = Session(udid: udid, environment: environment)
         s.telemetryOverride = []
-        // Build the flow source as production's `netStart()` has by the time a tap is judged (no pids: no sample).
-        _ = s.flows([])
+        // Build the flow source as production's `network.start` has by the time a tap is judged (no pids: no sample).
+        _ = s.network.start(appPid: nil) { nil }
         return s
     }
 

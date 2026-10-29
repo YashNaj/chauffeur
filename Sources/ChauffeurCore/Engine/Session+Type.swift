@@ -6,7 +6,7 @@ extension Session {
         let submit = a.flag("--submit")
         guard let ref = a.next(), let text = a.text(), !text.isEmpty else { throw ChauffeurError.usage(a.usage) }
         let (device, _) = try connect()
-        let network = netStart()
+        let network = self.network.start(appPid: app?.pid) { ax?.frontmostPID() }
         let (before, settled) = try baseline()
         let field = try before.resolve(ref: ref, refs: refs)
         guard Perception.textEntry.contains(field.role) else {
@@ -38,7 +38,7 @@ extension Session {
         let keyboard = try inputDeviceReady().keyboard(clock: clock)
         let method: String
         let sent: Bool
-        let typingNet = tapNet(network)
+        let typingNet = self.network.atTouch(network)
         if Keys.typeable(text) && text.count <= 15 {
             method = "keys"
             sent = keyboard.type(text)

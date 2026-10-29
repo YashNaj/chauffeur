@@ -67,8 +67,8 @@ private func noEffect(_ ref: String) -> String {
         Golden.check("sessions/tap-clipboard-with-requests.txt", out.text)
     }
 
-    /// A PENDING tap, then a bare `wait`: the wait's own observe gives the settle, not the time since the touch.
-    @Test func waitFinishesThePendingTap() throws {
+    /// A tap on "Show alert" that came back PENDING, with the form behind it for the wait.
+    func pendingTapOnShowAlert() throws -> ActRig {
         let home = try Act.home()
         let showAlert = try Act.ref(home, "Show alert")
         let form = try Act.form()
@@ -83,10 +83,31 @@ private func noEffect(_ ref: String) -> String {
             ActRig.head(tapped).hasPrefix(
                 "tap \(showAlert) \"Show alert\" → PENDING · 127.0.0.1:8765 · sent 58 B, no reply after 2."),
             "\(tapped.text)")
+        return rig
+    }
+
+    /// A PENDING tap, then a bare `wait`: the wait's own observe gives the settle, not the time since the touch.
+    @Test func waitFinishesThePendingTap() throws {
+        let rig = try pendingTapOnShowAlert()
         rig.flows.samples = [[Act.done]]
         let out = rig.s.run(["wait"])
         #expect(out.exit == 0, "\(out.text)")
-        #expect(rig.s.pendingTap == nil)
+        #expect(rig.s.network.pending == nil)
+        Golden.check("sessions/wait-finishes-pending.txt", out.text)
+    }
+
+    /// A slow reply: the wait samples every 200 ms until it arrives (12 polls, 13 samples), then looks at the screen
+    /// once. The request line prints no elapsed time, so the golden is the same as for a reply at once.
+    @Test func waitPollsUntilTheReplyArrives() throws {
+        let rig = try pendingTapOnShowAlert()
+        rig.flows.samples = Array(repeating: [Act.waiting], count: 12) + [[Act.done]]
+        let started = rig.clock.now
+        let out = rig.s.run(["wait"])
+        #expect(out.exit == 0, "\(out.text)")
+        #expect(rig.flows.samples == [[Act.done]])
+        // 2400 ms of polls, then the wait's observe settles on the form in 150 ms.
+        #expect(rig.clock.now - started == 2400 + 150)
+        #expect(rig.s.network.pending == nil)
         Golden.check("sessions/wait-finishes-pending.txt", out.text)
     }
 

@@ -43,4 +43,18 @@ public enum NetJudge {
             }
         }
     }
+
+    /// A bare `wait`: sample now, then every `pollMs` while the verdict is PENDING and `timeoutMs` hasn't passed. No
+    /// grace, no confirm look.
+    public static func finish(
+        clock: any SettleClock, timeoutMs: Int, pollMs: Int = 200, sample: () -> [RequestItem]
+    ) -> NetVerdict {
+        let start = clock.nowMs()
+        var verdict = RequestEvidence.verdict(sample())
+        while case .pending = verdict, clock.nowMs() - start < timeoutMs {
+            clock.sleep(ms: pollMs)
+            verdict = RequestEvidence.verdict(sample())
+        }
+        return verdict
+    }
 }

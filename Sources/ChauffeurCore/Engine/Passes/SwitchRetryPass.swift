@@ -17,10 +17,11 @@ struct SwitchRetryPass: EvidencePass {
                 hints: ["the switch changed only after 1.5s"])
             return
         }
+        let network = session.network.start(appPid: session.app?.pid) { session.ax?.frontmostPID() }
         // `shot: false`: the outer act takes the one shot, after every pass.
         report = try session.act(
             report.action, target: context.target, before: again, baselineSettled: settledAgain,
-            network: session.netStart(), passes: [NetworkPass(), ScreenAgainPass()], shot: false, gesture: gesture)
+            network: network, passes: [NetworkPass(), ScreenAgainPass()], shot: false, gesture: gesture)
         if report.outcome == .changed {
             report.hints.append("the first touch reached the app but the switch ignored it; chauffeur tapped once more")
         }
