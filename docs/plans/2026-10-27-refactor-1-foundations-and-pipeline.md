@@ -41,7 +41,7 @@ live tests on a booted iOS 27 simulator.
 3. A transport whose send fails must drop the HID client and rebuild it on the next action, as today (Task 12).
 4. A tap on a screen with an unattached touch log must come back UNVERIFIED, never `changed` (Task 12).
 5. After Stage 2, the evidence screenshot must exist exactly when the final verdict is NO EFFECT and never when a
-   pass upgraded it (Task 16).
+   pass upgraded it (Task 16b).
 
 ---
 
@@ -800,29 +800,65 @@ args are `Session.redactedType(...)`. `focusing the field failed` is pinned with
 
 Branch `refactor-2-pipeline`. PR title: "Refactor 2: evidence passes, one credit, one network watch".
 
+**The plan was amended before execution** (2026-10-29, against the code at e7b9fd0, after the Stage 1b findings; report
+`.superpowers/sdd/2026-10-27-refactor-1-foundations-and-pipeline/plan-refresh-2-report.md`). What changed: every
+file:line, signature and helper below is as the code is after Stage 1b (`act`'s real parameters, `inputDeviceReady()`,
+`FakeInputs.fakes`, `Golden.check`, the Task 12 pins); `EvidenceCarrier` shrank to the two fields both reports have
+and `credit` gained a copy form, because `TypeReport` has no `outcome` or `hints`; `act` gains `classifier`, `passes`,
+`shot` and a nil `gesture` for an action without a touch, `Classifier.classify` takes an `Attempt`, and `ActionContext`
+carries what the classifiers need so they run without a `Session`; the pipeline types are internal, not public; Task 16
+is split into 16a (the telemetry-only pin first, then the two network passes and the shot last) and 16b (switch retry,
+clipboard, typing); `NetworkWatch` builds without a telemetry closure and without `verdictNow`, and `NetJudge.finish`
+takes `any SettleClock` and a timeout; Task 18's expected string was wrong (`annotate` keeps only the first line);
+Task 19 excepts `Session.swift` from the 300-line check and counts `NetworkLiveTests` right (12).
+
 ### Task 14: `EvidenceCarrier` and `credit`
 
 **Files:**
-- Create: `Sources/ChauffeurCore/Engine/EvidenceCarrier.swift`
-- Modify: `Sources/ChauffeurCore/Verifier.swift` (`ActionReport: EvidenceCarrier`, `TypeReport: EvidenceCarrier`; `credit`)
+- Create: `Sources/ChauffeurCore/Engine/EvidenceCarrier.swift` (the protocol, the two conformances as extensions, `credit`)
+- Modify: nothing else. `Verifier.swift` is 316 lines and is not touched.
 - Test: `Tests/ChauffeurCoreTests/CreditTests.swift`
 
 **Interfaces:**
 - Produces:
   ```swift
-  public protocol EvidenceCarrier {
-      var outcome: Outcome { get set }
+  /// What a network pass writes on either report. `outcome` and `hints` are `ActionReport`'s alone: `TypeReport` has a
+  /// `verdict` and no hints, and gains nothing, so its JSON stays byte-identical.
+  protocol EvidenceCarrier {
       var requests: [RequestItem] { get set }
       var requestElapsedMs: Int { get set }
-      var hints: [String] { get set }
   }
+  extension ActionReport: EvidenceCarrier {}
+  extension TypeReport: EvidenceCarrier {}
   extension ActionReport {
-      /// The one way a NO EFFECT becomes a change. `settledMs` is passed, not computed: the three sites keep their conventions.
-      public mutating func credit(change after: Snapshot, from before: Snapshot, settledMs: Int, settled: Bool, hints: [String] = [])
-      // sets outcome = .changed, revAfter = after.rev, diff = Diff.lines(from: before, to: after), settledMs, settled, hints, evidenceShot = nil
+      /// The one way a NO EFFECT becomes a change. `settledMs` and `settled` are passed, not computed: each site keeps
+      /// its convention (below). Sets outcome, revAfter, diff (`Diff.lines(from:to:)`), settledMs, settled, hints;
+      /// clears evidenceShot.
+      mutating func credit(change after: Snapshot, from before: Snapshot, settledMs: Int, settled: Bool, hints: [String] = [])
+      /// A copy is a change with nothing to show on screen: the revisions and the settle stay as the act left them.
+      /// Sets outcome, copiedCharacters, hints = []; clears evidenceShot.
+      mutating func credit(copied characters: Int)
   }
   ```
-- [ ] **Step 1: Write the failing test** — a NO EFFECT report credited with two fixture snapshots has `outcome == .changed`, `diff` non-empty, `revAfter == after.rev`, `evidenceShot == nil`, and renders exactly like `GoldenReportTests`'s `changed-diff` case when given the same values.
+  Both forms go through one private `crediting(hints:)`. After Task 16b, `outcome = .changed` on a report appears in
+  `Sources` only in this file (the classifiers set an outcome once, through `Verifier.classify` or the no-touch rule).
+
+**The three `settledMs` conventions** (the Findings item), from the code at e7b9fd0:
+1. `judgeScreenAgain` (`Session+Network.swift:112`): `clock.nowMs() - net.touchMs`, the time since the touch, the 50 ms
+   hold included (770 in `sessions/tap-screen-again.txt`).
+2. The late switch (`Session+Act.swift:150-156`): untouched; the first act's `settle.elapsedMs` stays (150 in
+   `sessions/tap-late-switch.txt`). The pass passes `report.settledMs, report.settled` back in.
+3. `finishPending` (`Session+Wait.swift:83-84`): the wait's own observe, `settle.elapsedMs` (150 in
+   `sessions/wait-finishes-pending.txt`).
+The clipboard (`Session+Act.swift:171-178`) leaves the act's settle too, and the copy headline never prints it.
+
+- [ ] **Step 1: Write the failing test** — two snapshots built with `Perception.build` over `Act.home()` and
+  `Act.form()` (as `Act.ref` builds one); a NO EFFECT report over them credited with `settledMs: 420, settled: true`:
+  `outcome == .changed`, `diff == Diff.lines(from: before, to: after)` and not empty, `revAfter == after.rev`,
+  `hints == []`, `evidenceShot == nil`, and `render()` and `json` equal those of a report built directly with the same
+  values. `credit(copied: 24)` on a NO EFFECT: `outcome == .changed`, `copiedCharacters == 24`, `hints == []`,
+  `evidenceShot == nil`, `revAfter` and `settledMs` unchanged, `render()` ends its first line with
+  `→ changed · copied to clipboard (24 characters)` (the shape `reports/changed-copy.txt` pins).
 - [ ] **Step 2: Run to verify it fails** — `credit` undefined
 - [ ] **Step 3: Implement**
 - [ ] **Step 4: Run** — `swift test`; goldens unchanged
@@ -831,114 +867,342 @@ Branch `refactor-2-pipeline`. PR title: "Refactor 2: evidence passes, one credit
 ### Task 15: `Classifier`, `ActionContext`, and `act` as the pipeline's first half
 
 **Files:**
-- Create: `Sources/ChauffeurCore/Engine/Pipeline.swift` (`ActionContext`, `Classifier`, `TouchClassifier`, `NoTouchClassifier`, `EvidencePass`; under 200 lines)
-- Modify: `Sources/ChauffeurCore/Engine/Session+Act.swift:39-98` (`act` uses a classifier and runs passes), `Session+Apps.swift:201-225` (`actWithoutTouch` becomes `act(… classifier: NoTouchClassifier(capMs:note:hints:))`)
-- Test: `Tests/ChauffeurCoreTests/ClassifierTests.swift`
+- Create: `Sources/ChauffeurCore/Engine/Pipeline.swift` (`ActionContext`, `Attempt`, `Classifier`, `TouchClassifier`,
+  `NoTouchClassifier`, `EvidencePass`; under 200 lines)
+- Modify: `Sources/ChauffeurCore/Engine/Session+Act.swift:38-100` (`act`: the loop stays, the observe/evidence/classify
+  block at 53-84 becomes the classifier's, the empty pass loop runs before the inline network code at 85-97, which
+  stays until 16a), `Session+Apps.swift:201-228` (`actWithoutTouch` keeps its name and its prelude and calls `act`),
+  the `act` callers' gesture closures (`Session+Act.swift:140-144`, `:158-163`, `:244-248`; `Session+Gestures.swift:30-32`;
+  `Session+Type.swift:24-26`) gain `[self] in`, because the gesture now escapes into the context
+- Test: `Tests/ChauffeurCoreTests/ClassifierTests.swift`; `ActSupport.swift` gains `ActRig.context(before:target:net:capMs:)`
+
+**Interfaces:**
+- Produces (internal, like `Session`'s members; tests use `@testable import`):
+  ```swift
+  /// What one action's classifier and passes may read. `act` builds it; a test builds one over a scripted session.
+  struct ActionContext {
+      var before: Snapshot
+      var baselineSettled: Bool
+      var target: Node?
+      var capMs: Int
+      /// `clock.nowMs()` right before the gesture (equal to `net?.touchMs`).
+      var touchMs: Int
+      var net: TapNet?
+      /// `expectedApp(on: before)`: the launched app while it is in front.
+      var expectedApp: String?
+      var touchLogAttached: Bool
+      var clock: any SettleClock
+      var observe: (_ minMs: Int, _ capMs: Int) throws -> (snapshot: Snapshot, settle: Settled<AXElement>)
+      /// `touchLog.evidence(since:waitMs: 200)`.
+      var touchEvidence: (_ since: Int) -> Evidence
+      /// The gesture, for a pass that sends it once more; nil for an action without a touch.
+      var gesture: ((any TouchTransport) -> Bool)?
+  }
+  /// One send: what `act` knows after the gesture and before the screen is read.
+  struct Attempt {
+      var sent: Bool
+      var touchCursor: Int
+      var transport: String                 // "none" without a touch
+      var retriedFrom: String?
+      /// No transport is left after this one, so `.retry` is classified as `retried` (NOT DELIVERED) here, not by `act`.
+      var isLast: Bool
+      static let noTouch = Attempt(sent: true, touchCursor: 0, transport: "none", retriedFrom: nil, isLast: true)
+  }
+  protocol Classifier {
+      /// Observes, reads the evidence and classifies: today's `act` lines 53-84, or `actWithoutTouch`'s 212-226.
+      func classify(context: ActionContext, attempt: Attempt) throws -> (report: ActionReport, after: Snapshot)
+  }
+  /// `observe(150, capMs)`, then `!touchLogAttached ? .unavailable : sent ? touchEvidence(cursor) : .none`, then
+  /// `Verifier.classify(…, retried: attempt.retriedFrom != nil || attempt.isLast, …)`, hints and diff from the outcome.
+  struct TouchClassifier: Classifier { init() }
+  /// Today's `actWithoutTouch` rule: observe until the tree differs or `capMs` runs out (the `min(capMs, 600)` caps
+  /// and the final 1500 ms observe as at 213-217); UNVERIFIED with `note` and `hints`, else `changed` or
+  /// `unattributed` from `baselineSettled`; evidence `.unavailable`, transport "none".
+  struct NoTouchClassifier: Classifier { init(note: String, hints: [String]) }
+  protocol EvidencePass {
+      /// Looks again, with whatever the pass watches, and may upgrade the report through `credit`. Never downgrades.
+      func apply(to report: inout ActionReport, context: ActionContext, session: Session) throws
+  }
+  ```
+  `act` becomes
+  ```swift
+  func act(
+      _ label: String, target: Node?, before: Snapshot, baselineSettled: Bool = true, capMs: Int = 1500,
+      needsMove: Bool = false, network: NetStart? = nil, classifier: any Classifier = TouchClassifier(),
+      passes: [any EvidencePass] = [], shot: Bool = true, gesture: ((any TouchTransport) -> Bool)?
+  ) throws -> ActionReport
+  ```
+  `act` keeps `transportsReady()`, the transport order, the loop, `preferred`, and the reset and `inputDeviceLost` after
+  a failed send (lines 72-77, untouched). With `gesture == nil`: no `transportsReady()`, one attempt, `Attempt.noTouch`,
+  no reset. `act` never flips an outcome: `.retry` now only comes back while another transport is left, so the loop
+  advances (`retriedFrom = transport.name; index += 1; continue`), and the final hints are the classifier's (today they
+  are computed after the flip, which is the same outcome). `shot` is for Task 16a; `passes` is `[]` for every caller in
+  this task. `actWithoutTouch` keeps `baseline()`, `perform()` and the `FAILED` `Output` (an output, not a report), then
+  `act(label, target: nil, before:, baselineSettled:, capMs:, classifier: NoTouchClassifier(note:hints:), gesture: nil)`;
+  `button` and `open` are unchanged callers of it. `ActRig.context(before:target:net:capMs:)` builds a context over
+  `rig.s.observe`, `rig.clock`, `rig.touches`, `rig.s.expectedApp(on:)`, `gesture: nil`, `touchMs: rig.clock.now`.
+
+- [ ] **Step 1: Write the failing tests** — `NoTouchClassifier(note:hints:)` over `ActRig(frames: [home, home, form])`
+  (`ScriptedAX` holds its last frame; counts are test data): `before` from `rig.s.observe(minMs: 0, capMs: 1500)`, then
+  `classify(context: rig.context(before: before, capMs: 3000), attempt: .noTouch)` → `.changed`, `diff` not empty,
+  `transport == "none"`, `evidence == .unavailable`; over `[home]` → `.unverified` after the cap (`rig.clock.now`
+  advanced by at least 3000), `note` and `hints` the given ones. `TouchClassifier` over `[home]` with
+  `ScriptedTouches(evidence: [.app(Act.fixtureBundle)], attached: true)` and `Attempt(sent: true, touchCursor: 0,
+  transport: "digitizer", retriedFrom: nil, isLast: false)` → `.noEffect`; with `evidence: []` (`.none`) → `.retry`,
+  and `isLast: true` → `.notDelivered` with the doctor hint; `attached: false` → `.unverified` and
+  `rig.touches.requests.isEmpty`.
+- [ ] **Step 2: Run to verify they fail**
+- [ ] **Step 3: Implement**
+- [ ] **Step 4: Run** — `swift test` (goldens, `SessionActTests`, `SessionUpgradeTests`, `SessionTypeTests`, `OpenTests`,
+  `GestureTests` unchanged: no behaviour moves in this task)
+- [ ] **Step 5: Commit** — `git commit -m "act: a pluggable classify step; button and open are the same pipeline"`
+
+### Task 16a: the telemetry-only pin; `NetworkPass`, `ScreenAgainPass`, and the shot last
+
+**Files:**
+- Modify (tests, first): `Tests/ChauffeurCoreTests/Support.swift` (`ScriptedLogs.arriving`), `ActSupport.swift`
+  (`Act.requestLines(task:)`, lifted from `SessionNetworkTests.tap(_:task:)`, which then calls it),
+  `SessionUpgradeTests.swift` (the pin)
+- Create: `Sources/ChauffeurCore/Engine/Passes/NetworkPass.swift`, `ScreenAgainPass.swift`, `EvidenceShot.swift`
+- Modify: `Session+Act.swift` (`act` runs `passes`, then `EvidenceShot`; lines 85-97 deleted; `tapCommand`'s two `act`
+  calls declare `passes: [NetworkPass(), ScreenAgainPass()]`, the inline switch retry and clipboard code at 145-178
+  stay until 16b), `Session+Network.swift` (`applyNetwork` and `judgeScreenAgain` move into the passes; `watchedPids`,
+  `flows`, `netStart`, `tapNet`, `telemetryHosts`, `netItems` stay until Task 17)
+- Test: `Tests/ChauffeurCoreTests/PassTests.swift` (new); `SessionNetworkTests.swift` (its six `applyNetwork` calls
+  become `NetworkPass().apply(to:context:session:)`, assertions unchanged)
+
+**Interfaces:**
+- Consumes: Task 14's `credit`, Task 15's `EvidencePass`, `ActionContext`, `act(… passes: shot:)`.
+- Produces:
+  ```swift
+  /// Today's `applyNetwork` (`Session+Network.swift:71-101`) and the pending tap (`Session+Act.swift:85-89`): only with
+  /// `context.net`; a NO EFFECT may become PENDING or carry the reply that explains it; a change gets its request lines.
+  struct NetworkPass: EvidencePass { init() }
+  /// Today's `judgeScreenAgain` (`Session+Network.swift:105-115`): a non-telemetry reply arrived, so the screen is
+  /// judged again; credits with convention 1.
+  struct ScreenAgainPass: EvidencePass { init() }
+  enum EvidenceShot {
+      /// After every pass, only when `report.outcome == .noEffect` and the target has a frame (today's lines 92-97).
+      static func capture(_ report: inout ActionReport, context: ActionContext, session: Session)
+  }
+  ```
+  In `act`, after the loop: `for pass in passes { try pass.apply(to: &report, context: context, session: self) }`, then
+  `if shot { EvidenceShot.capture(&report, context: context, session: self) }`. `NetworkPass` reads
+  `session.flowSource == nil` for the note until Task 17.
+
+- [ ] **Step 1: The telemetry-only pin, before any production change.** `judgeScreenAgain` must not credit a change
+  when the only replies after the touch are telemetry (`Session+Network.swift:106`, the `!$0.telemetry` guard). Flow
+  items are never telemetry, so the lines must come from the log, after the touch:
+  - `ScriptedLogs` gains `var arriving: [LogLine] = []`: lines that land in the ring at the next `since(_:)` call,
+    shaped as `append` shapes them (`since` drains it first; the smallest change, behind the `LogSource` seam). For a
+    tap that call is the judge's first sample after the touch (`netItems`, `Session+Network.swift:65`; `runOne`'s
+    `detectCrash` reads nothing without a launched app), so the cursor taken at the touch (`tapNet`, line 53) is
+    before them.
+  - `Act.requestLines(task:) throws -> [LogLine]`: the fixture's lines for one task id and its connection, as
+    `SessionNetworkTests.tap` selects them.
+  - `SessionUpgradeTests.aTelemetryOnlyReplyIsNotJudgedAgain`: frames `Array(repeating: home, count: 7) + [form]`, as
+    in `aReplyThenAChangeIsJudgedAgain`; `rig.s.telemetryOverride = ["localhost"]`;
+    `rig.logs.arriving = try Act.requestLines(task: "A450514C")` (localhost:8765/fail → 500, telemetry under the
+    override, as `SessionNetworkTests.telemetryOnlyStaysNoEffect` uses it). The assertion, the full line:
+    `#expect(ActRig.head(out) == "tap \(showAlert) \"Show alert\" → NO EFFECT · the accessibility tree did not change in 1.5s (touch reached dev.chauffeur.fixture)", "\(out.text)")`,
+    with `#expect(out.text.contains("\ntelemetry: 1 request (localhost)"))` and
+    `#expect(out.exit == ExitCode.noEffect.rawValue)`. That NO EFFECT literal is already in the file twice (lines
+    98-99 and 115-116): lift it into a file-local `noEffect(_ ref: String) -> String` used by all three.
+  - Teeth, in compare mode: change the guard to `!report.requests.isEmpty` → the eighth read is the form and the head
+    reads `→ changed · settled`; restore it. Say so in the commit message.
+- [ ] **Step 2: Write the passes' failing tests** in `PassTests.swift`:
+  - `NetworkPass`: `ActRig(frames: [home], flows: [[], [], [Act.waiting]])`, a NO EFFECT report (as
+    `SessionNetworkTests.report`), `let net = rig.s.tapNet(rig.s.netStart())`, `apply(to: &r, context:
+    rig.context(before: before, net: net), session: rig.s)` → `.pending`, `exitCode == .pending`,
+    `render().hasPrefix("tap e4 \"Login\" → PENDING · 127.0.0.1:8765 · sent 58 B, no reply after 2.")`, and
+    `rig.s.pendingTap != nil` (the port of `aRawSocketWaitingIsPending`). Then port `SessionNetworkTests`' six
+    `applyNetwork` calls to the pass, assertions unchanged.
+  - `ScreenAgainPass`: `ActRig(frames: [home, home, form])`, `before` from `observe(0, 1500)`, a NO EFFECT with
+    `requests = [ReportFixtures.fail]` and a `net` whose `touchMs` is 600 ms ago → `.changed`,
+    `diff == Diff.lines(from: before, to: <the form snapshot>)`, `settledMs == rig.clock.now - net.touchMs`
+    (convention 1), `hints == []`. With `requests = [ReportFixtures.ping]` over `[home, form]` → still `.noEffect`
+    and `rig.s.rev` unchanged (the pass-level twin of Step 1).
+  - The shot: `capture` calls the shell before it loads the file, so offline the shell call is the evidence.
+    `aPlainNoEffectTakesOneShot`: `ActRig(frames: [home])`, `tap` → `rig.shell.calls.filter { $0.prefix(3) ==
+    ["io", udid, "screenshot"] }.count == 1`. `aScreenJudgedAgainTakesNoShot`: the `aReplyThenAChangeIsJudgedAgain`
+    rig → count 0.
+- [ ] **Step 3: Run to verify they fail**
+- [ ] **Step 4: Implement**; delete `Session+Act.swift:85-97`; the late-switch and clipboard code still clear
+  `evidenceShot` themselves until 16b (today's order, exactly)
+- [ ] **Step 5: Run** — `swift test`; goldens unchanged; all of `SessionUpgradeTests` (the pin included) unchanged
+- [ ] **Step 6: Commit** — `git commit -m "Evidence passes: network and screen again; the shot last"`
+
+### Task 16b: `SwitchRetryPass`, `ClipboardPass`, `TypingNetworkPass`; the inline code goes
+
+**Files:**
+- Create: `Sources/ChauffeurCore/Engine/Passes/SwitchRetryPass.swift`, `ClipboardPass.swift`, `TypingNetworkPass.swift`
+- Modify: `Session+Act.swift` (`tapCommand`: lines 145-178 deleted; the one `act` call declares
+  `passes: [NetworkPass(), ScreenAgainPass()] + (holdMs == 50 ? [SwitchRetryPass()] : []) + [ClipboardPass(before: clipboardBefore)]`),
+  `Session+Type.swift:72-77` (`if verdict == .ok { TypingNetworkPass().apply(to: &report, net: typingNet, session: self) }`),
+  `Session+Wait.swift:79-85` (`finishPending` credits through `credit` with convention 3; the rest stays until Task 17)
+- Test: `PassTests.swift`
 
 **Interfaces:**
 - Produces:
   ```swift
-  public struct ActionContext {
-      public var before: Snapshot; public var baselineSettled: Bool; public var target: Node?
-      public var touchMs: Int; public var capMs: Int
-      public var net: TapNet?
-      public var observe: (_ minMs: Int, _ capMs: Int) throws -> (snapshot: Snapshot, settle: Settled<AXElement>)
-      public var clock: any SettleClock
+  /// The late switch, or one more tap (today's `tapCommand` lines 145-169). Listed only for a plain tap (`holdMs == 50`).
+  struct SwitchRetryPass: EvidencePass { init() }
+  /// A copy changes nothing on screen (today's lines 170-178). `before` is the mark `tapCommand` took before the action.
+  struct ClipboardPass: EvidencePass { init(before: ClipboardMark?) }
+  /// Typing's one look after the grace, no window (today's `Session+Type.swift:72-77`). Not an `EvidencePass`: `type`
+  /// has no `ActionContext`, and its report is a `TypeReport`.
+  struct TypingNetworkPass {
+      init()
+      func apply<C: EvidenceCarrier>(to carrier: inout C, net: TapNet, session: Session)
   }
-  public protocol Classifier { func classify(context: ActionContext, sent: Bool, touchCursor: Int) throws -> (report: ActionReport, after: Snapshot) }
-  public struct TouchClassifier: Classifier { … }     // today's observe(150, capMs) + touch evidence + Verifier.classify
-  public struct NoTouchClassifier: Classifier { public init(capMs: Int, note: String, hints: [String]) }  // today's actWithoutTouch loop and rule
-  public protocol EvidencePass { func apply(to report: inout ActionReport, context: ActionContext, session: Session) throws }
   ```
-  `act(_ label:, target:, before:, baselineSettled:, capMs:, needsMove:, network:, classifier: any Classifier = TouchClassifier(), passes: [any EvidencePass], gesture:)`.
-  In this task `passes` is `[]` for every caller and the existing inline code stays where it is; Task 16 moves it.
+  `SwitchRetryPass.apply`: `guard report.outcome == .noEffect, context.target?.role == "switch", let gesture =
+  context.gesture`; `session.baseline()`; if the hash moved, `report.credit(change: again, from: context.before,
+  settledMs: report.settledMs, settled: report.settled, hints: ["the switch changed only after 1.5s"])` (convention 2);
+  else `report = try session.act(report.action, target: context.target, before: again, baselineSettled: settledAgain,
+  network: session.netStart(), passes: [NetworkPass(), ScreenAgainPass()], shot: false, gesture: gesture)` and the
+  "tapped once more" hint when it changed. `shot: false`: the outer act takes the one shot, last (Review Focus 5).
+  `ClipboardPass.apply`: `guard report.outcome == .noEffect, let copied = ClipboardMark.copied(before: before, after:
+  Session.readClipboard(udid: session.udid, shell: session.shell))`; `report.credit(copied: copied)`.
+  `TypingNetworkPass.apply`: `clock.sleep(ms: NetJudge.graceMs)`, one `netItems`, `requestElapsedMs`.
 
-- [ ] **Step 1: Write the failing tests** — `NoTouchClassifier` on frames [home, home, form, form] returns `.changed`; on frames [home ×4] after the cap returns `.unverified` with the note; `TouchClassifier` with `.app` evidence and no change returns `.noEffect`.
+- [ ] **Step 1: Write the failing tests** in `PassTests.swift`:
+  - `SwitchRetryPass`, the late switch: `ActRig(frames: [form, form, formOn])`, `before` from `observe(0, 1500)` with
+    `target` the switch node, a NO EFFECT report with `settledMs: 420` → `.changed`,
+    `hints == ["the switch changed only after 1.5s"]`, `settledMs == 420` (convention 2), `diff` shows
+    `value=off` → `value=on`, no touch sent. The second tap: frames `[form …] + [formOn]` with enough `form` reads for
+    `before` and the pass's `baseline()` (4 reads: the screen changed when `before` was published, so the quiet sleep
+    runs; counts are test data, see `Act`'s reads per observe) so the pass's act sees on,
+    `rig.context(…, gesture: <a tap at the switch>)` → `.changed`,
+    `hints.last == "the first touch reached the app but the switch ignored it; chauffeur tapped once more"`,
+    `rig.inputs.fakes[0].touches.count == 2`, no `io … screenshot` shell call (`shot: false`).
+  - `ClipboardPass`: `RecordingShell(replies: [["pbpaste", udid]: [Act.out("hello, clipboard")]])`,
+    `ClipboardPass(before: ClipboardMark(""))` on a NO EFFECT → `.changed`, `copiedCharacters == 16`, the first line
+    ends `→ changed · copied to clipboard (16 characters)`; `before: ClipboardMark("hello, clipboard")` → untouched.
+  - `TypingNetworkPass`: `ActRig(frames: [form], flows: [[], [], [Act.done]])`, a `TypeReport`, `let net =
+    rig.s.tapNet(rig.s.netStart())`, `let t = rig.clock.now`; apply → `rig.clock.now == t + NetJudge.graceMs`,
+    `requests.count == 1`, `requestElapsedMs == NetJudge.graceMs`.
+  - Order: `aCopyTakesNoShot`: the `aCopyWithARequestKeepsTheRequest` rig → no `io … screenshot` call;
+    `aSwitchTappedTwiceTakesOneShot`: the `anIgnoredSwitchIsTappedOnceMore` rig with frames all `form` (never on) →
+    exactly one `io … screenshot` call, NO EFFECT.
 - [ ] **Step 2: Run to verify they fail**
-- [ ] **Step 3: Implement; `button` and `open` go through `act` with `NoTouchClassifier`**
-- [ ] **Step 4: Run** — `swift test` (goldens, `SessionActTests`, `OpenTests`, `GestureTests` unchanged)
-- [ ] **Step 5: Commit** — `git commit -m "act: a pluggable classify step; button and open are the same pipeline"`
-
-### Task 16: The passes
-
-**Files:**
-- Create: `Sources/ChauffeurCore/Engine/Passes/NetworkPass.swift`, `ScreenAgainPass.swift`, `SwitchRetryPass.swift`, `ClipboardPass.swift`, `TypingNetworkPass.swift`, `EvidenceShot.swift` (the final screenshot step)
-- Modify: `Session+Act.swift` (`tapCommand` declares `passes: [NetworkPass(), ScreenAgainPass(), SwitchRetryPass(), ClipboardPass()]`; the inline switch retry, clipboard check and evidence shot code are deleted), `Session+Network.swift` (`applyNetwork` and `judgeScreenAgain` become the two passes' bodies), `Session+Act.swift:276-281` (`typeCommand` runs `[TypingNetworkPass()]` on its `TypeReport` through `EvidenceCarrier`)
-- Test: `Tests/ChauffeurCoreTests/PassTests.swift`
-
-**Interfaces:**
-- Consumes: Task 14's `credit`, Task 15's `EvidencePass` and `ActionContext`.
-- Produces: each pass `public struct … : EvidencePass { public init() }`. `ClipboardPass` reads the clipboard mark
-  taken before the action from `context` (add `clipboardBefore: ClipboardMark?` to `ActionContext`, filled by
-  `tapCommand` as today). `EvidenceShot.capture(report:context:session:)` runs after all passes, only when
-  `report.outcome == .noEffect`.
-
-- [ ] **Step 1: Write the failing tests**, offline, one per pass:
-  - `NetworkPass`: `ScriptedFlows([[waiting]])` → `.pending`, exit 6, headline `"→ PENDING · 127.0.0.1:8765 · sent 58 B, no reply after 2."` (port of `aRawSocketWaitingIsPending`).
-  - `ScreenAgainPass`: settled requests and a changed later frame → `.changed` with the diff.
-  - `SwitchRetryPass`: a switch target, unchanged after the first tap, changed after the second; two touches recorded.
-  - `ClipboardPass`: `clipboardBefore` differs from the shell's `pbpaste` reply → `changed · copied to clipboard (17 characters)`.
-  - `TypingNetworkPass`: one sample at `graceMs`; `clock.now` advanced by exactly `NetJudge.graceMs`.
-  - Order: with a NO EFFECT and a clipboard change, the evidence shot is not taken (`RecordingShell` saw no `io … screenshot` call); with a plain NO EFFECT it is taken once.
-- [ ] **Step 2: Run to verify they fail**
-- [ ] **Step 3: Implement the passes and delete the inline code**; `Session+Act.swift` must end under 300 lines
-- [ ] **Step 4: Run** — `swift test`; goldens unchanged; `SessionActTests` unchanged
-- [ ] **Step 5: Commit** — `git commit -m "Evidence passes: network, screen again, switch retry, clipboard, typing; the shot last"`
+- [ ] **Step 3: Implement and delete the inline code**; `Session+Act.swift` ends under 300 lines (268 today, about 215
+  after; `Pipeline.swift` under 200); `grep -rn "outcome = .changed" Sources/ChauffeurCore` finds `EvidenceCarrier.swift`
+  only
+- [ ] **Step 4: Run** — `swift test`; goldens unchanged; `SessionUpgradeTests`, `SessionActTests`, `SessionTypeTests`
+  unchanged
+- [ ] **Step 5: Commit** — `git commit -m "Evidence passes: switch retry, clipboard, typing; tap declares its list"`
 
 ### Task 17: `NetworkWatch` and `NetJudge.finish`
 
 **Files:**
-- Create: `Sources/ChauffeurCore/Engine/NetworkWatch.swift`
-- Modify: `Sources/ChauffeurCore/Network/NetJudge.swift` (add `finish`), `Sources/ChauffeurCore/Engine/Session.swift` (replace `flowSource`, `flowSourceTried`, `pendingTap`, `telemetryOverride` with `let network: NetworkWatch`; keep `telemetryOverride` as a forwarding property until Plan 2), `Session+Network.swift`, `Session+Wait.swift:60-110` (`finishPending` and `stillWaiting` call the watch)
-- Test: `Tests/ChauffeurCoreTests/NetJudgeTests.swift`, `Tests/ChauffeurCoreTests/NetworkWatchTests.swift`
+- Create: `Sources/ChauffeurCore/Engine/NetworkWatch.swift` (`NetStart`, `TapNet`, `PendingTap` move here from
+  `Session+Network.swift:4-24`)
+- Modify: `Sources/ChauffeurCore/Network/NetJudge.swift` (add `finish`), `Sources/ChauffeurCore/Engine/Session.swift:58-64`
+  (`flowSource`, `flowSourceTried`, `pendingTap` go; `let network: NetworkWatch`; `telemetryOverride` stays: it is a test
+  seam Plan 2 retires with the others), `Session.swift:78-86` (`init` builds the watch, then sets `network.telemetry`),
+  `Session.swift:222` (`network.pending = nil`), `Session+Network.swift` (down to `telemetryHosts()`),
+  `Session+Wait.swift:61-111` (`finishPending` and `stillWaiting` call the watch), `Session+Act.swift` and
+  `Session+Type.swift:9,41` (`netStart()` → `network.start(appPid: app?.pid) { ax?.frontmostPID() }`, `tapNet` →
+  `network.atTouch`), the three network passes (`session.network.*`)
+- Test: `Tests/ChauffeurCoreTests/NetJudgeTests.swift` (+2), `NetworkWatchTests.swift` (new);
+  `SessionNetworkTests.swift:15` and `ActSupport.swift:108-109` (the priming), `SessionUpgradeTests.swift:83`
+  (`rig.s.network.pending == nil`), `PassTests` (`pendingTap`, `netStart`, `tapNet` → the watch)
 
 **Interfaces:**
 - Produces:
   ```swift
   extension NetJudge {
-      /// A bare `wait`: poll every `pollMs` until the verdict isn't PENDING or `deadlineMs` passes. No grace, no confirm look.
-      public static func finish(clock: some SettleClock, deadlineMs: Int, pollMs: Int = 200, sample: () -> [RequestItem]) -> NetVerdict
+      /// A bare `wait`: sample now, then every `pollMs` while the verdict is PENDING and `timeoutMs` hasn't passed. No
+      /// grace, no confirm look (today's `finishPending` loop, `Session+Wait.swift:67-73`).
+      public static func finish(
+          clock: any SettleClock, timeoutMs: Int, pollMs: Int = 200, sample: () -> [RequestItem]
+      ) -> NetVerdict
   }
-  @MainActor public final class NetworkWatch {
-      public init(flows: @escaping () -> (any FlowSource)?, processes: any ProcessTable, logs: any LogSource, clock: any SettleClock, telemetry: @escaping () -> [String])
-      public var pending: PendingTap?
-      public func start(appPid: Int32?, frontmost: Int32?) -> NetStart
-      public func atTouch(_ start: NetStart) -> TapNet
-      public func judge(afterTouch net: TapNet, textField: Bool) -> NetVerdict          // today's applyNetwork verdict
-      public func sampleOnce(_ net: TapNet) -> [RequestItem]                             // typing's one look
-      public func finish(_ net: TapNet, deadlineMs: Int) -> NetVerdict                   // finishPending's loop
-      public func verdictNow(_ net: TapNet) -> NetVerdict                                // the changed-outcome sample after graceMs
-      public func stillWaiting(sinceLogCursor: Int) -> String?
+  /// One owner of the flow source, the watched pids, the telemetry list and the pending tap (spec §3).
+  @MainActor final class NetworkWatch {
+      init(flows: @escaping @MainActor () -> (any FlowSource)?, processes: any ProcessTable, logs: any LogSource,
+           clock: any SettleClock)
+      /// The project's telemetry entries. `Session.init` sets it once its stored properties exist (`[unowned self]`).
+      var telemetry: () -> [String] = { [] }
+      /// The last tap that came back PENDING; any logged command forgets it (`runOne`).
+      var pending: PendingTap?
+      /// `watchedPids` (the app, else `frontmost()`, plus the WebKit networking child) and the first sample. The flow
+      /// source is built on the first sample, at most once, as `flows(_:)` does today.
+      func start(appPid: Int32?, frontmost: () -> Int32?) -> NetStart
+      func atTouch(_ start: NetStart) -> TapNet
+      /// "no app process to watch" or "network statistics unavailable", for a NO EFFECT (today's lines 73-75).
+      func unavailableNote(_ net: TapNet) -> String?
+      func judge(afterTouch net: TapNet, textField: Bool) -> NetVerdict   // NetJudge.judge over netItems
+      func sampleOnce(_ net: TapNet) -> [RequestItem]                      // the grace, then one merged sample
+      func finish(_ net: TapNet, timeoutMs: Int) -> NetVerdict             // NetJudge.finish over netItems
+      func stillWaiting(sinceLogCursor: Int) -> String?
   }
   ```
-- [ ] **Step 1: Write the failing tests** — `NetJudgeTests.finishReturnsWhenTheReplyArrivesAndNeverConfirms` (FakeClock: `[open]` until 1000 ms then `[done]` → `.settled` at ≤ 1200 ms with no extra 300 ms); `finishStopsAtTheDeadline` (`[open]` forever, deadline 30 000 → `.pending` at 30 000 ± pollMs). `NetworkWatchTests`: port `SessionNetworkTests` to call the watch directly for `judge`, and a `wait` test through `Session` on `FakeClock` where the pending tap finishes at 2 500 ms (`WaitTests` style).
+  Changed from the plan as first written: no `telemetry:` init parameter (a closure over `self` can't be passed before
+  `Session.init` has initialised its stored properties); `verdictNow` dropped, it was
+  `RequestEvidence.verdict(sampleOnce(net))`, which `NetworkPass` writes for a changed tap and `TypingNetworkPass` for
+  typing; `frontmost` is a closure, so the bridge round trip still happens only without a launched app
+  (`watchedPids`, `Session+Network.swift:30`); `finish` counts a timeout from now, as `finishPending` does;
+  `any SettleClock`, as Stage 0 ruled for `judge`. `netItems`'s `previous` stays local to each call, as today.
+  `telemetryOverride` keeps its name and place; `telemetryHosts()` is what `network.telemetry` calls.
+
+- [ ] **Step 1: Write the failing tests** — `NetJudgeTests.finishReturnsWhenTheReplyArrivesAndNeverConfirms`
+  (`FakeClock`; `clock.now < 1000 ? [open] : [done]` → `.settled([done])` with `clock.now <= 1200`);
+  `finishStopsAtTheTimeout` (`[open]` for ever, `timeoutMs: 30_000` → `.pending([open])`, `clock.now == 30_000`).
+  `NetworkWatchTests`: a watch over `ScriptedFlows`, `FakeProcesses`, `ScriptedLogs` and `FakeClock`: `judge` gives
+  `.pending` for `[[Act.waiting]]` and `.settled` with a 500 for `Act.requestLines(task: "A450514C")` (the verdict and
+  its items; the report shape stays in `PassTests`); `stillWaiting(sinceLogCursor:)` with a pending tap names the open
+  request and its elapsed time, and nil when nothing is open. Through `Session`: the `waitFinishesThePendingTap` rig
+  with `rig.flows.samples = Array(repeating: [Act.waiting], count: 12) + [[Act.done]]` → the wait finishes after the
+  13th sample (12 polls, `rig.clock.now` advanced by 2400 before the observe), exit 0, and
+  `Golden.check("sessions/wait-finishes-pending.txt", out.text)` still holds (the request line prints no elapsed time).
 - [ ] **Step 2: Run to verify they fail**
-- [ ] **Step 3: Implement; `Session+Network.swift` shrinks to the two passes' helpers**
+- [ ] **Step 3: Implement; `Session+Network.swift` shrinks to `telemetryHosts()`**
 - [ ] **Step 4: Run** — `swift test`; goldens unchanged; `scripts/live-expectations.sh` unchanged
 - [ ] **Step 5: Commit** — `git commit -m "NetworkWatch: one owner of flows, pids and the pending tap; NetJudge.finish for a bare wait"`
 
 ### Task 18: The crash lead by contract, not by string search
 
 **Files:**
-- Modify: `Sources/ChauffeurCore/Engine/Args.swift:109` (`Output.withLead(_:)`), `Sources/ChauffeurCore/Engine/Session+Logs.swift:52-58`
-- Test: `Tests/ChauffeurCoreTests/AnnotateTests.swift`
+- Modify: `Sources/ChauffeurCore/Engine/Args.swift:103-123` (`Output`; add `withLead`), `Sources/ChauffeurCore/Engine/Session+Logs.swift:56-63`
+- Test: `Tests/ChauffeurCoreTests/AnnotateTests.swift` (242 lines; room)
 
 **Interfaces:**
-- Produces: `extension Output { /// Replaces what follows the first " → " on the first line; the lead contract every report renderer follows. public func withLead(_ lead: String) -> Output }` (my call: `Output` is text by the time `annotate` runs, so the contract is kept in one named function with its own test rather than moved into the renderers; Plan 2 may make it structural).
-- [ ] **Step 1: Write the failing test** — `Output("tap e4 \"Pay\" → NO EFFECT · x\nhint: y").withLead("APP CRASHED: z").text == "tap e4 \"Pay\" → APP CRASHED: z\nhint: y"`; a first line without " → " is replaced whole.
-- [ ] **Step 2: Run to verify it fails**; **Step 3: Implement and use it in `annotate`**; **Step 4: `swift test`**; **Step 5: Commit** — `git commit -m "The crash lead is placed by one function"`
+- Produces:
+  ```swift
+  extension Output {
+      /// The crash lead contract every action renderer follows: the first line keeps what precedes its first " → " and
+      /// takes `lead` after it; the other lines go (an action's diff after a crash would only show the home screen).
+      /// Nil when the first line has no " → ": the caller keeps that line alone and shows the lead on its own line.
+      public func withLead(_ lead: String) -> Output?
+  }
+  ```
+  (my call: `Output` is text by the time `annotate` runs, so the contract is kept in one named function with its own
+  test rather than moved into the renderers; Plan 2 may make it structural.) **Plan defect:** the test as first
+  written expected `hint: y` to survive; today's `annotate` keeps only the rewritten first line (`Session+Logs.swift:59`,
+  `out.text = …` from `first`), and `AnnotateTests.aVanishedAppIsACrashReportedOnce` pins that byte for byte.
+- [ ] **Step 1: Write the failing test** —
+  `Output("tap e4 \"Pay\" → NO EFFECT · x\nhint: y", exit: 3, data: ["a": 1]).withLead("APP CRASHED: z") == Output("tap e4 \"Pay\" → APP CRASHED: z", exit: 3, data: ["a": 1])`;
+  `Output("nothing to wait for\nmore").withLead("APP CRASHED: z") == nil`.
+- [ ] **Step 2: Run to verify it fails**; **Step 3: Implement and use it in `annotate`** (`if let led =
+  out.withLead(block[0]) { out = led; block.removeFirst() } else { out.text = String(first) }`; `AnnotateTests`
+  byte-identical); **Step 4: `swift test`**; **Step 5: Commit** — `git commit -m "The crash lead is placed by one function"`
 
 ### Task 19: Stage 2 verification and PR
 
-- [ ] **Step 1: Line counts** — `wc -l Sources/ChauffeurCore/Engine/*.swift | sort -rn | head -5`: every file under 300.
+- [ ] **Step 1: Line counts** — `wc -l Sources/ChauffeurCore/Engine/*.swift Sources/ChauffeurCore/Engine/Passes/*.swift | sort -rn | head -5`:
+  every file under 300 except `Session.swift` (323 before this stage and within a few lines of it after Task 17; it is
+  Plan 2's, as the Stage 1b Findings say). No "while I'm here" move.
 - [ ] **Step 2: `scripts/check.sh`** → `check: all passed`
-- [ ] **Step 3: Live suites** on a booted iOS 27 simulator, load under 10: `CHAUFFEUR_LIVE_UDID=<udid> swift test --no-parallel 2>&1 | grep -E "Suite .* (passed|failed)|Test run"` → every suite passes, including `NetworkLiveTests` (14 tests) and `TapLiveTests`.
-- [ ] **Step 4: Ledger** — `scripts/live-expectations.sh` → no diff.
+- [ ] **Step 3: Live suites** on a booted iOS 27 simulator, load under 10: `CHAUFFEUR_LIVE_UDID=<udid> swift test --no-parallel 2>&1 | grep -E "Suite .* (passed|failed)|Test run"` → every suite passes, including `NetworkLiveTests` (12 tests) and `TapLiveTests` (5).
+- [ ] **Step 4: Ledger** — `scripts/live-expectations.sh` → no diff from line 3 on.
 - [ ] **Step 5: Timing** — `time swift test` (unit only): no test sleeps; note the wall time in the PR.
-- [ ] **Step 6: Changelog** — under Unreleased: "Internal: one evidence pipeline for taps; no result changes." and the Doctor line from Task 13 if it isn't there yet.
+- [ ] **Step 6: Changelog** — under Unreleased: "Internal: one evidence pipeline for taps; no result changes." (the Doctor line from Task 13 is there).
 - [ ] **Step 7: Push and PR** — `git push -u origin refactor-2-pipeline && gh pr create --base main --title "Refactor 2: evidence passes, one credit, one network watch"`. Merge after CI; then write Plan 2.
   The PR must say that "the shot once, last" changes the artefacts folder: today a NO EFFECT later upgraded by the
-  switch retry or the clipboard check has already written its screenshot there; after Task 16 no file is written.
+  switch retry or the clipboard check has already written its screenshot there, and a switch tapped twice writes two;
+  after Task 16b one file is written, only when the final verdict is NO EFFECT.
 
 ---
 
