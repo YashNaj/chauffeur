@@ -54,11 +54,11 @@ extension Session {
             // the first line, where agents look (M4b spec §8). A crash noticed before the command ran leaves the
             // command's own result (launch, terminate…) intact.
             if logs && noticed == nil {
-                let first = out.text.prefix { $0 != "\n" }
-                if let arrow = first.range(of: " → ") {
-                    out.text = String(first[..<arrow.lowerBound]) + " → " + block.removeFirst()
+                if let led = out.withLead(block[0]) {
+                    out = led
+                    block.removeFirst()
                 } else {
-                    out.text = String(first)
+                    out.text = String(out.text.prefix { $0 != "\n" })
                 }
             }
             extra += block
