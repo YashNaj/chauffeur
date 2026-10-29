@@ -68,13 +68,7 @@ extension Session {
             after: now, submitted: false)
         var report = TypeReport(
             action: label, method: method, verdict: verdict, value: now?.value, settledMs: settle.elapsedMs)
-        if verdict == .ok {
-            // One look, no window: typing is verified by the field, so a late request can't make it a false NO EFFECT.
-            clock.sleep(ms: NetJudge.graceMs)
-            var previous: [FlowActivity] = []
-            report.requests = netItems(typingNet, previous: &previous)
-            report.requestElapsedMs = clock.nowMs() - typingNet.touchMs
-        }
+        if verdict == .ok { TypingNetworkPass().apply(to: &report, net: typingNet, session: self) }
         guard submit, verdict == .ok else { return Output(report.render(), exit: report.exitCode, data: report.json) }
 
         guard keyboard.press(Keys.returnKey) else {

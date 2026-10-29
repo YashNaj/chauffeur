@@ -113,4 +113,31 @@ import Testing
         #expect(rig.touches.requests.count == 2)
         #expect(rig.inputs.fakes[0].touches.map { $0.1 } == [.down, .up, .down, .up])
     }
+
+    /// A classifier that asks for `.retry` on the last transport too (`TouchClassifier` never does): the attempt is
+    /// NOT DELIVERED, with `Verifier`'s hints, and the transport is not preferred. One transport: the only one that moves.
+    @Test func aRetryOnTheLastTransportIsNotDelivered() throws {
+        let inputs = FakeInputs(transports: [
+            FakeTransport(name: "mouse", supportsMove: false), FakeTransport(name: "digitizer", supportsMove: true),
+        ])
+        let rig = ActRig(frames: [try Act.home()], inputs: inputs)
+        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let report = try rig.s.act("drag", target: nil, before: before, needsMove: true, classifier: AlwaysRetry()) {
+            _ in true
+        }
+        #expect(report.outcome == .notDelivered)
+        #expect(report.hints == Verifier.hints(outcome: .notDelivered, target: nil))
+        #expect(rig.s.preferred == 0)
+    }
+}
+
+/// Asks for another transport every time.
+private struct AlwaysRetry: Classifier {
+    func classify(context: ActionContext, attempt: Attempt) throws -> (report: ActionReport, after: Snapshot) {
+        let report = ActionReport(
+            action: context.label, outcome: .retry, evidence: .none, settledMs: 0, settled: true,
+            revBefore: context.before.rev, revAfter: context.before.rev, diff: [], transport: attempt.transport,
+            retriedFrom: attempt.retriedFrom, hints: [], capMs: context.capMs)
+        return (report, context.before)
+    }
 }

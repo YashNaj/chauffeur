@@ -70,14 +70,17 @@ extension Session {
                 touchEvidence: { [self] in touchLog.evidence(since: $0, waitMs: 200) }, gesture: gesture)
             var (report, _) = try classifier.classify(context: context, attempt: attempt)
             if let transport {
-                // A classifier classifies `.retry` on the last transport itself (`Attempt.isLast`); if one ever
-                // returns it there, the attempt is final as it is.
-                if report.outcome == .retry, index + 1 < order.count {
-                    retriedFrom = transport.name
-                    index += 1
-                    continue
-                }
-                if report.outcome != .notDelivered, let i = all.firstIndex(where: { $0 === transport }) {
+                if report.outcome == .retry {
+                    if index + 1 < order.count {
+                        retriedFrom = transport.name
+                        index += 1
+                        continue
+                    }
+                    // A classifier classifies `.retry` on the last transport itself (`Attempt.isLast`); one that
+                    // returns it there anyway has run out of transports: NOT DELIVERED, as `Verifier` would say.
+                    report.outcome = .notDelivered
+                    report.hints = Verifier.hints(outcome: .notDelivered, target: target)
+                } else if report.outcome != .notDelivered, let i = all.firstIndex(where: { $0 === transport }) {
                     preferred = i
                 }
                 if !attempt.sent {
@@ -123,53 +126,19 @@ extension Session {
         try a.done()
         let (device, _) = try connect()
         let network = netStart()
-        let peek: @Sendable () -> ClipboardMark? = { [udid, shell] in Self.readClipboard(udid: udid, shell: shell) }
-        let clipboard = Background(peek)
+        let clipboard = Background { [udid, shell] in Self.readClipboard(udid: udid, shell: shell) }
         let (before, settled) = try baseline()
         let aimed = try aim(target, in: before)
         if let refusal = Geometry.refusal(for: aimed.point, screen: device.size, allowEdge: allowEdge) {
             return Output("tap \(aimed.label) refused: \(refusal)", exit: .error)
         }
         let clipboardBefore = clipboard.result(waitingAtMost: 2000) ?? nil
-        var report = try act(
+        let report = try act(
             "tap \(aimed.label)", target: aimed.node, before: before, baselineSettled: settled, network: network,
-            passes: [NetworkPass(), ScreenAgainPass()]
+            passes: [NetworkPass(), ScreenAgainPass()] + (holdMs == 50 ? [SwitchRetryPass()] : [])
+                + [ClipboardPass(before: clipboardBefore)]
         ) { [self] in
             Gestures.tap($0, at: aimed.point, screen: device.size, holdMs: holdMs, clock: clock)
-        }
-        // Right after typing, a switch can ignore the first touch that reaches the app (F1, M2 dogfood; reproduced in
-        // M3a Task 7, no keyboard or overlay on screen). Its value is in the tree and did not change, so one more touch
-        // cannot toggle it twice unnoticed.
-        if report.outcome == .noEffect, aimed.node?.role == "switch", holdMs == 50 {
-            let (again, settledAgain) = try baseline()
-            if again.hash != before.hash {  // the first touch did work, only later than 1.5 s: never toggle it back
-                report.outcome = .changed
-                report.revAfter = again.rev
-                report.diff = Diff.lines(from: before, to: again)
-                report.hints = ["the switch changed only after 1.5s"]
-                report.evidenceShot = nil
-                return Output(report.render(), exit: report.exitCode, data: report.json)
-            }
-            var second = try act(
-                "tap \(aimed.label)", target: aimed.node, before: again, baselineSettled: settledAgain,
-                network: netStart(), passes: [NetworkPass(), ScreenAgainPass()]
-            ) { [self] in
-                Gestures.tap($0, at: aimed.point, screen: device.size, holdMs: holdMs, clock: clock)
-            }
-            if second.outcome == .changed {
-                second.hints.append(
-                    "the first touch reached the app but the switch ignored it; chauffeur tapped once more")
-            }
-            report = second
-        }
-        // A copy changes nothing on screen; read the pasteboard again only then (spec §7: a read costs ~100 ms).
-        if report.outcome == .noEffect,
-            let copied = ClipboardMark.copied(before: clipboardBefore, after: peek())
-        {
-            report.outcome = .changed
-            report.copiedCharacters = copied
-            report.hints = []
-            report.evidenceShot = nil
         }
         return Output(report.render(), exit: report.exitCode, data: report.json)
     }

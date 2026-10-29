@@ -77,12 +77,8 @@ extension Session {
         report.requestElapsedMs = clock.nowMs() - pending.net.touchMs
         report.evidenceShot = nil
         if after.hash != pending.before.hash {
-            report.outcome = .changed
-            report.revAfter = after.rev
-            report.diff = Diff.lines(from: pending.before, to: after)
-            report.settledMs = settle.elapsedMs
-            report.settled = settle.settled
-            report.hints = []
+            // The wait's own observe gives the settle (convention 3).
+            report.credit(change: after, from: pending.before, settledMs: settle.elapsedMs, settled: settle.settled)
         } else if case .pending = verdict {
             report.outcome = .pending
             report.hints = Verifier.hints(outcome: .pending, target: pending.target)
