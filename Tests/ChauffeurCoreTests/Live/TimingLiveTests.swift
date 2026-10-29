@@ -29,6 +29,13 @@ extension Live {
             #expect(out.exit == expected, "\(args) exited \(out.exit): \(out.text)")
             return ms
         }
+        /// Waits (untimed) until the query is in the tree, then takes its ref: right after a screen change the first
+        /// snapshot can still be the old screen (an alert hides the button under it), so a bare `ref` would race.
+        func refAfterWait(_ query: String) throws -> String {
+            let waited = s.run(["wait", query, "--timeout", "10"])
+            #expect(waited.exit == 0, "wait \(query) exited \(waited.exit): \(waited.text)")
+            return try ref(s, query)
+        }
         func median(_ xs: [Double]) -> Int {
             let sorted = xs.sorted()
             return Int((sorted[(sorted.count - 1) / 2] + sorted[sorted.count / 2]) / 2)
@@ -36,16 +43,16 @@ extension Live {
 
         var taps: [Double] = []
         for _ in 0..<7 {
-            taps.append(timed(["tap", try ref(s, "Show alert")], exit: 0))
-            taps.append(timed(["tap", try ref(s, "button:OK")], exit: 0))
+            taps.append(timed(["tap", try refAfterWait("Show alert")], exit: 0))
+            taps.append(timed(["tap", try refAfterWait("button:OK")], exit: 0))
         }
 
-        #expect(s.run(["tap", try ref(s, "tab:Form")]).exit == 0)
+        #expect(s.run(["tap", try refAfterWait("tab:Form")]).exit == 0)
         var dead: [Double] = []
-        for _ in 0..<7 { dead.append(timed(["tap", try ref(s, "button:Submit")], exit: 3)) }
+        for _ in 0..<7 { dead.append(timed(["tap", try refAfterWait("button:Submit")], exit: 3)) }
 
         var types: [Double] = []
-        for _ in 0..<5 { types.append(timed(["type", try ref(s, "textfield:email"), "x"], exit: 0)) }
+        for _ in 0..<5 { types.append(timed(["type", try refAfterWait("textfield:email"), "x"], exit: 0)) }
 
         print("timing: tap \(median(taps)) dead \(median(dead)) type \(median(types))")
     }
