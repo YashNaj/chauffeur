@@ -21,6 +21,7 @@ import Testing
         #expect(s.run(["install", try Live.buildFixture()]).exit == 0)
         #expect(s.run(["launch", Live.fixture]).exit == 0)
         #expect(s.run(["tap", try ref(s, "Network")]).exit == 0)
+        print("live: load \(Live.load())")
         return (s, server)
     }
 
@@ -116,6 +117,9 @@ import Testing
     @Test func aDeadButtonIsPlainAndNotSlower() throws {
         let (s, server) = try onNetworkTab()
         defer { done(s, server) }
+        // The web view loads its page once its row is on screen; that load must not land in a dead tap's window
+        // (Stage 5 names it; it stays a request line).
+        sleep(2)
         let dead = try ref(s, "Dead network button")
         var times: [Int] = []
         for _ in 0..<3 {
@@ -125,7 +129,7 @@ import Testing
             #expect(out.exit == 3 && !out.text.contains("request:") && !out.text.contains("PENDING"), "\(out.text)")
         }
         // Step 0 measured 0.98–1.02 s for a dead tap before M4b; the grace adds 20 ms plus one sample.
-        #expect(times.sorted()[1] < 1500, "\(times)")
+        #expect(times.sorted()[1] < 1500, "\(times) at load \(Live.load())")
     }
 
     @Test func typingIntoSearchIsNeverAFalseNoEffect() throws {

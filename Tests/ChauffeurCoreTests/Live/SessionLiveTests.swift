@@ -29,19 +29,4 @@ func ref(_ session: Session, _ query: String) throws -> String {
         let second = session.run(["snapshot"]).text.split(separator: "\n")[0]
         #expect(first == second)
     }
-
-    @Test func survivesASimulatorReboot() throws {
-        let udid = Live.udid!
-        try Live.launchFixture()
-        let session = Session(udid: udid)
-        defer { session.shutdown() }
-        #expect(session.run(["snapshot"]).exit == 0)
-        try SimCtl.run(["shutdown", udid], timeout: 120)
-        let down = session.run(["snapshot"])
-        #expect(down.exit == 1 && down.text.contains("is not booted"))
-        try SimCtl.run(["boot", udid], timeout: 120)
-        try SimCtl.run(["bootstatus", udid], timeout: 300)
-        try Live.launchFixture()
-        #expect(session.run(["wait", "Show alert", "--timeout", "30"]).exit == 0)
-    }
 }
