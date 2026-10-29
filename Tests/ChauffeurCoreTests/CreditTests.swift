@@ -70,17 +70,4 @@ struct CreditTests {
             report.render().split(separator: "\n").first?.hasSuffix("→ changed · copied to clipboard (24 characters)")
                 == true)
     }
-
-    @Test func bothReportsCarryRequests() {
-        func store<T: EvidenceCarrier>(_ report: inout T) {
-            report.requests = [ReportFixtures.fail]
-            report.requestElapsedMs = 2200
-        }
-        var action = noEffect()
-        var typed = TypeReport(action: "type", method: "paste", verdict: .ok, value: "a", settledMs: 1)
-        store(&action)
-        store(&typed)
-        #expect(action.requests.count == 1 && action.requestElapsedMs == 2200)
-        #expect(typed.requests.count == 1 && typed.requestElapsedMs == 2200)
-    }
 }

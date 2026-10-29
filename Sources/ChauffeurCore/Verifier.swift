@@ -239,78 +239,30 @@ public struct ActionReport: Sendable {
     }
 }
 
-public enum TypeVerdict: Equatable, Sendable {
-    case ok
-    case mismatch(String)
-    case fieldGone
-}
-
-/// Spec §6.6 and decision 5: verify typed text via the field's value; secure fields by bullet count.
-public enum TypeCheck {
-    public static func verify(typed: String, before: Node, after: Node?, submitted: Bool) -> TypeVerdict {
-        guard let after else { return submitted ? .ok : .fieldGone }
-        let old = before.value ?? ""
-        let new = after.value ?? ""
-        if before.role == "securefield" {
-            let added = new.filter { $0 == "•" }.count - old.filter { $0 == "•" }.count
-            return added == typed.count ? .ok : .mismatch(new)
-        }
-        // The text must be new: more occurrences than before (a pre-filled "banana" doesn't prove "a" was typed).
-        func count(_ s: String) -> Int { typed.isEmpty ? 0 : s.components(separatedBy: typed).count - 1 }
-        return new != old && count(new) > count(old) ? .ok : .mismatch(new)
-    }
-}
-
-public struct TypeReport: Sendable {
-    public var action: String
-    public var method: String
-    public var verdict: TypeVerdict
-    public var value: String?
-    public var settledMs: Int
-    /// Requests the typing started by the time it was verified (M4b spec §2).
-    public var requests: [RequestItem] = []
-    public var requestElapsedMs = 0
-
-    public init(action: String, method: String, verdict: TypeVerdict, value: String?, settledMs: Int) {
-        self.action = action
-        self.method = method
-        self.verdict = verdict
-        self.value = value
+extension ActionReport {
+    /// The one way a NO EFFECT becomes a change. `settledMs` and `settled` are passed, not computed: each site keeps
+    /// its convention (the time since the touch, or the act's own settle, or the wait's observe). Sets outcome,
+    /// revAfter, diff, settledMs, settled and hints; clears evidenceShot.
+    mutating func credit(
+        change after: Snapshot, from before: Snapshot, settledMs: Int, settled: Bool, hints: [String] = []
+    ) {
+        revAfter = after.rev
+        diff = Diff.lines(from: before, to: after)
         self.settledMs = settledMs
+        self.settled = settled
+        crediting(hints: hints)
     }
 
-    public var exitCode: ExitCode { verdict == .ok ? .ok : .noEffect }
-
-    public var json: JSON {
-        var o: [String: JSON] = [
-            "action": .string(action), "method": .string(method), "value": JSON(value),
-            "settledMs": JSON(settledMs),
-        ]
-        switch verdict {
-        case .ok:
-            o["verdict"] = "ok"
-        case .mismatch(let shown):
-            o["verdict"] = "mismatch"
-            o["shown"] = .string(shown)
-        case .fieldGone:
-            o["verdict"] = "fieldGone"
-        }
-        if !requests.isEmpty { o["requests"] = .array(requests.map(RequestText.json)) }
-        return .object(o)
+    /// A copy is a change with nothing to show on screen: the revisions and the settle stay as the act left them.
+    /// Sets outcome and copiedCharacters, empties hints; clears evidenceShot.
+    mutating func credit(copied characters: Int) {
+        copiedCharacters = characters
+        crediting(hints: [])
     }
 
-    public func render() -> String {
-        switch verdict {
-        case .ok:
-            return
-                ([
-                    "\(action) → typed via \(method) · value=\(Perception.quote(value ?? "")) · settled \(settledMs)ms"
-                ] + RequestText.lines(requests, elapsedMs: requestElapsedMs)).joined(separator: "\n")
-        case .mismatch(let shown):
-            return "\(action) → TEXT MISMATCH via \(method) · field shows \(Perception.quote(shown))\n"
-                + "hint: the field may limit or reformat input; run snapshot to see it"
-        case .fieldGone:
-            return "\(action) → FIELD GONE after typing · run snapshot"
-        }
+    private mutating func crediting(hints: [String]) {
+        outcome = .changed
+        self.hints = hints
+        evidenceShot = nil
     }
 }

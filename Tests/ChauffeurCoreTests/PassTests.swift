@@ -155,22 +155,6 @@ import Testing
         #expect(r.hints == Self.noEffect().hints)
     }
 
-    // TypingNetworkPass
-
-    /// One look after the grace, no window.
-    @Test func typingLooksOnceAfterTheGrace() throws {
-        let rig = ActRig(frames: [try Act.form()], flows: [[], [], [Act.done]])
-        _ = try rig.s.observe(minMs: 0, capMs: 1500)  // connected: the app in front is the one watched
-        var report = TypeReport(
-            action: "type e2 \"alice\"", method: "keys", verdict: .ok, value: "alice", settledMs: 150)
-        let net = rig.s.network.atTouch(rig.s.network.start(appPid: rig.s.app?.pid) { rig.s.ax?.frontmostPID() })
-        let t = rig.clock.now
-        TypingNetworkPass().apply(to: &report, net: net, session: rig.s)
-        #expect(rig.clock.now == t + NetJudge.graceMs)
-        #expect(report.requests.count == 1)
-        #expect(report.requestElapsedMs == NetJudge.graceMs)
-    }
-
     // The shot: `capture` calls the shell before it loads the file, so offline the shell call is the evidence.
 
     static func shots(_ rig: ActRig) -> Int {

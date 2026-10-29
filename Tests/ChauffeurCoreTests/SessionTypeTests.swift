@@ -26,6 +26,17 @@ import Testing
         #expect(rig.inputs.keyboard.typed.isEmpty)
     }
 
+    /// Typing looks once after the grace and takes no window: the field is the proof, so a late request can't make it a
+    /// false NO EFFECT, and a request in flight costs `type` no wait.
+    @Test func typingLooksOnceAfterTheGrace() throws {
+        let email = try Act.ref(try Act.form(), "email")
+        let rig = ActRig(frames: try typedFrames([try Act.formTyped()]), flows: [[], [], [Act.done]])
+        let out = rig.s.run(["type", email, "alice"])
+        #expect(out.exit == 0 && out.text.contains("typed via keys"), "\(out.text)")
+        #expect(out.data?["requests"]?.array?.count == 1, "\(out.text)")
+        #expect(rig.clock.now < NetJudge.requestWindowMs, "\(rig.clock.now) ms")
+    }
+
     @Test func submitThatChangesTheScreen() throws {
         let email = try Act.ref(try Act.form(), "email")
         let typed = try Act.formTyped()
