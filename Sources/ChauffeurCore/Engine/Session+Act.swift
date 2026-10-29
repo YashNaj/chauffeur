@@ -70,7 +70,9 @@ extension Session {
                 touchEvidence: { [self] in touchLog.evidence(since: $0, waitMs: 200) }, gesture: gesture)
             var (report, _) = try classifier.classify(context: context, attempt: attempt)
             if let transport {
-                if report.outcome == .retry {
+                // A classifier classifies `.retry` on the last transport itself (`Attempt.isLast`); if one ever
+                // returns it there, the attempt is final as it is.
+                if report.outcome == .retry, index + 1 < order.count {
                     retriedFrom = transport.name
                     index += 1
                     continue
@@ -86,19 +88,7 @@ extension Session {
                 }
             }
             for pass in passes { try pass.apply(to: &report, context: context, session: self) }
-            if let net {
-                applyNetwork(&report, net: net, target: target)
-                if report.outcome == .pending {
-                    pendingTap = PendingTap(report: report, before: before, net: net, target: target)
-                }
-                try judgeScreenAgain(&report, before: before, net: net, capMs: capMs)
-            }
-            if report.outcome == .noEffect, let frame = target?.frame,
-                let shot = try? capture(
-                    screen: before.size, zoom: Verifier.evidenceRegion(target: frame, screen: before.size))
-            {
-                report.evidenceShot = shot.path
-            }
+            if shot { EvidenceShot.capture(&report, context: context, session: self) }
             return report
         }
     }
@@ -142,7 +132,8 @@ extension Session {
         }
         let clipboardBefore = clipboard.result(waitingAtMost: 2000) ?? nil
         var report = try act(
-            "tap \(aimed.label)", target: aimed.node, before: before, baselineSettled: settled, network: network
+            "tap \(aimed.label)", target: aimed.node, before: before, baselineSettled: settled, network: network,
+            passes: [NetworkPass(), ScreenAgainPass()]
         ) { [self] in
             Gestures.tap($0, at: aimed.point, screen: device.size, holdMs: holdMs, clock: clock)
         }
@@ -161,7 +152,7 @@ extension Session {
             }
             var second = try act(
                 "tap \(aimed.label)", target: aimed.node, before: again, baselineSettled: settledAgain,
-                network: netStart()
+                network: netStart(), passes: [NetworkPass(), ScreenAgainPass()]
             ) { [self] in
                 Gestures.tap($0, at: aimed.point, screen: device.size, holdMs: holdMs, clock: clock)
             }

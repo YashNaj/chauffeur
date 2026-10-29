@@ -116,7 +116,7 @@ enum Act {
 /// A session over scripted seams, and the fakes behind it, so a test can read what the session did to them.
 ///
 /// The flow source is always there (empty by default), as production's `netStart()` builds NetworkStatistics on the
-/// first tap: without one, `applyNetwork` would add "network statistics unavailable" to every NO EFFECT.
+/// first tap: without one, `NetworkPass` would add "network statistics unavailable" to every NO EFFECT.
 @MainActor
 struct ActRig {
     let s: Session

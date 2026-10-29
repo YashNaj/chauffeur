@@ -13,7 +13,7 @@ private func noEffect(_ ref: String) -> String {
 /// them as evidence passes and must reproduce every line, `settledMs`, the hints and the request lines included.
 /// Frames: see `Act`'s reads per observe.
 @Suite @MainActor struct SessionUpgradeTests {
-    /// `judgeScreenAgain`: a reply arrived inside the window, so the screen is judged again and the change is the tap's.
+    /// `ScreenAgainPass`: a reply arrived inside the window, so the screen is judged again and the change is the tap's.
     @Test func aReplyThenAChangeIsJudgedAgain() throws {
         let home = try Act.home()
         let showAlert = try Act.ref(home, "Show alert")

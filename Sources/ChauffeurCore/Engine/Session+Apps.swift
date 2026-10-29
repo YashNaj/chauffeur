@@ -198,9 +198,8 @@ extension Session {
         }
     }
 
-    /// An action with no touch evidence (a URL, a hardware button): a settled screen change is `changed`, a change on
-    /// an unsettled screen is unattributed, and no change is UNVERIFIED with `note` (spec §6.2, last row).
-    /// `perform` returns nil when the action was sent, or why it could not be.
+    /// An action with no touch evidence (a URL, a hardware button), classified by `NoTouchClassifier` with `note` and
+    /// `hints`. `perform` returns nil when the action was sent, or why it could not be.
     func actWithoutTouch(
         _ label: String, capMs: Int, note: String, hints: [String],
         perform: () throws -> String?
