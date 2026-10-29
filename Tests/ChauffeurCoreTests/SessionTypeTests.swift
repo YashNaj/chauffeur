@@ -37,6 +37,15 @@ import Testing
         #expect(rig.clock.now < NetJudge.requestWindowMs, "\(rig.clock.now) ms")
     }
 
+    /// `requestElapsedMs` is not in the JSON; it shows as the wait in a request still pending: the touch to the look,
+    /// which is the settle's 150 ms minimum and the grace.
+    @Test func typingStatesTheTimeSinceTheTouch() throws {
+        let email = try Act.ref(try Act.form(), "email")
+        let rig = ActRig(frames: try typedFrames([try Act.formTyped()]), flows: [[], [], [Act.waiting]])
+        let out = rig.s.run(["type", email, "alice"])
+        #expect(out.text.contains("no reply after \(150 + NetJudge.graceMs) ms"), "\(out.text)")
+    }
+
     @Test func submitThatChangesTheScreen() throws {
         let email = try Act.ref(try Act.form(), "email")
         let typed = try Act.formTyped()

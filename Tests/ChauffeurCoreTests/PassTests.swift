@@ -206,3 +206,28 @@ import Testing
         #expect(Self.shots(rig) == 1)
     }
 }
+
+// A pass is one file and one entry
+
+/// Spec "Done when": an evidence pass is one file and one entry in a gesture's list.
+struct NextFramePass: EvidencePass {
+    func apply(to report: inout ActionReport, context: ActionContext, session: Session) throws {
+        guard report.outcome == .noEffect else { return }
+        let (after, settle) = try session.observe(minMs: 0, capMs: 1500)
+        guard after.hash != context.before.hash else { return }
+        report.credit(change: after, from: context.before, settledMs: settle.elapsedMs, settled: settle.settled)
+    }
+}
+
+extension PassTests {
+    @Test func aNewPassIsOneFileAndOneEntry() throws {
+        let home = try Act.home()
+        // baseline 4, the act 3, then the pass sees the form (counts are test data)
+        let rig = ActRig(frames: Array(repeating: home, count: 7) + [try Act.form()])
+        let (before, settled) = try rig.s.baseline()
+        let report = try rig.s.act(
+            "tap e1", target: nil, before: before, baselineSettled: settled, passes: [NextFramePass()]
+        ) { _ in true }
+        #expect(report.outcome == .changed && !report.diff.isEmpty)
+    }
+}

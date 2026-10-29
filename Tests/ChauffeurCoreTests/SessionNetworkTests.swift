@@ -78,8 +78,7 @@ import Testing
             var r = report(.noEffect)
             try NetworkPass().apply(to: &r, context: context(s, net: try tap(s, task: "A450514C")), session: s)
             #expect(!dirs.isEmpty && dirs.allSatisfy { $0 == project }, "\(dirs)")
-            let telemetryOnly = r.requests.allSatisfy(\.telemetry)
-            #expect(telemetryOnly)
+            #expect(!r.requests.isEmpty && r.requests.allSatisfy(\.telemetry))
         }
     }
 

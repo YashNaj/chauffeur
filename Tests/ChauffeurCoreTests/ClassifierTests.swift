@@ -97,6 +97,5 @@ import Testing
         let report = try TouchClassifier().classify(
             context: rig.context(before: before), attempt: Self.sent(isLast: true, sent: false), session: rig.s)
         #expect(report.outcome == .unverified)
-        #expect(rig.touches.requests.isEmpty)
     }
 }

@@ -28,6 +28,26 @@ import Testing
         #expect(inputs.fakes.map(\.touches.count) == [2, 2])
     }
 
+    /// The only transport that can move has no touch evidence: `Attempt.isLast` makes the classifier itself say NOT
+    /// DELIVERED, so `act` never changes an outcome and the preferred transport stays.
+    @Test func theLastTransportWithoutEvidenceIsNotDeliveredByTheClassifier() throws {
+        let home = try Act.home()
+        let inputs = FakeInputs(transports: [
+            FakeTransport(name: "digitizer", supportsMove: false), FakeTransport(name: "mouse", supportsMove: true),
+        ])
+        let rig = ActRig(
+            frames: [home], touches: ScriptedTouches(evidence: [.none], attached: true), inputs: inputs)
+        let (before, settled) = try rig.s.baseline()
+        let report = try rig.s.act(
+            "swipe", target: nil, before: before, baselineSettled: settled, needsMove: true
+        ) { $0.touch(Point(x: 0.5, y: 0.5), .down) }
+        #expect(report.outcome == .notDelivered)
+        #expect(report.hints == Verifier.hints(outcome: .notDelivered, target: nil))
+        #expect(report.retriedFrom == nil)
+        #expect(inputs.fakes.map(\.touches.count) == [0, 1])
+        #expect(rig.s.preferred == 0)  // the mover is index 1: a delivery would have made it preferred
+    }
+
     @Test func anUnattachedTouchLogIsUnverified() throws {
         let home = try Act.home()
         let showAlert = try Act.ref(home, "Show alert")
