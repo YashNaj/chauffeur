@@ -4,15 +4,16 @@
 set -uo pipefail
 udid="${1:?usage: scripts/live.sh <udid>}"
 cd "$(dirname "$0")/.."
+logs=$(mktemp -d "${TMPDIR:-/tmp}/chauffeur-live.XXXXXX")
 quiet() { until [ "$(sysctl -n vm.loadavg | awk '{print int($2)}')" -lt 10 ]; do sleep 5; done; }
 show() { grep -E "Suite .* (passed|failed)|Test run" "$1"; }
 quiet
-CHAUFFEUR_LIVE_UDID="$udid" swift test --no-parallel >/tmp/chauffeur-live-all.log 2>&1
+CHAUFFEUR_LIVE_UDID="$udid" swift test --no-parallel >"$logs/all.log" 2>&1
 all=$?
-show /tmp/chauffeur-live-all.log
+show "$logs/all.log"
 quiet
 CHAUFFEUR_LIVE_UDID="$udid" CHAUFFEUR_LIVE_REBOOT=1 swift test --no-parallel --filter RebootLiveTests \
-  >/tmp/chauffeur-live-reboot.log 2>&1
+  >"$logs/reboot.log" 2>&1
 reboot=$?
-show /tmp/chauffeur-live-reboot.log
-[ "$all" -eq 0 ] && [ "$reboot" -eq 0 ]
+show "$logs/reboot.log"
+[ "$all" -eq 0 ] && [ "$reboot" -eq 0 ] || { echo "live tests failed: logs in $logs (all.log, reboot.log)"; exit 1; }

@@ -42,10 +42,12 @@ enum Live {
         return getloadavg(&averages, 1) == 1 ? averages[0] : 0
     }
 
-    /// After a boot: waits until the 1-minute load is under `max`, at most `seconds`; returns the seconds waited.
-    static func waitForQuietHost(under max: Double = 10, atMost seconds: Int = 300) -> Int {
+    /// After a boot: waits until the 1-minute load is under `max`, at most `seconds`; returns the seconds waited, or
+    /// nil when the load was still `max` or more at the end.
+    static func waitForQuietHost(under max: Double = 10, atMost seconds: Int = 300) -> Int? {
         var waited = 0
-        while load() >= max && waited < seconds {
+        while load() >= max {
+            if waited >= seconds { return nil }
             sleep(5)
             waited += 5
         }

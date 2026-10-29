@@ -19,7 +19,6 @@ import Testing
         try SimCtl.run(["bootstatus", udid], timeout: 300)
         try Live.launchFixture()
         #expect(session.run(["wait", "Show alert", "--timeout", "30"]).exit == 0)
-        let waited = Live.waitForQuietHost()
-        #expect(waited < 300, "the host did not quiet down after the boot")
+        #expect(Live.waitForQuietHost() != nil, "the host did not quiet down after the boot")
     }
 }
