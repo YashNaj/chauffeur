@@ -1082,3 +1082,26 @@ Branch `refactor-4b-helpers`. PR title: "Refactor 4b: small helpers, each replac
 - Task 35: any enum the derivation added to a property that had none.
 - Task 40: whether `RTLD_GLOBAL` had to come back for the accessibility framework.
 - Each stage: `one-way.sh` before and after, the live run (load, duration, failures), the timing table.
+
+### Stage 2b (branch `refactor-2b-collapse`, 2026-10-29)
+
+- **Task 21, `one-way.sh` at 5b609fc (= main 7f456a8):** `sources-lines 9312`, `sources-files 94`, `over-300` Verifier,
+  MCPTools, Session, `usage-literals 25`, `session-seams 4`, `outcome-changed 1`, `outcome-list 3`, `exit-code-line 2`,
+  `bridge-dlopen 4`, `bridge-dlsym 17`, `bridge-semaphore 3`, `bridge-error 0`, `bridge-kvc 12`, `hid-owners 1`,
+  `quote-callers 45`. The Measure table had three counts wrong: `usage-literals` is 25 (not 24), `outcome-list` is 3
+  files (not 4), `bridge-error` is 0 outside `CHInternal` (not 1; Task 40 Step 1's "1 error constructor" is 0 too).
+  The script's output is the baseline.
+- **After 2b:** `sources-lines 9274` (−38 against a −60 ceiling: Tasks 24-26 added the pins the reviews asked for and
+  Task 25 added the `telemetry` member and `projectDir`; every count 2b owns is met), `sources-files 93`, `over-300`
+  MCPTools only, `session-seams 0`, `outcome-changed 1`; the rest unchanged.
+- **T (files opened to follow one tap) = 10:** `Session+Act`, `Pipeline`, `Verifier`, `NetworkPass`, `NetworkWatch`,
+  `NetJudge`, `ScreenAgainPass`, `SwitchRetryPass`, `ClipboardPass`, `EvidenceShot`.
+- **Live run** (`scripts/live.sh`, iPhone 17, iOS 27, 8 GB host; 16:01, load 3.9, 552 tests, 1,075 s): only
+  `AXLiveTests.anAppStartedWithTheFlagsOffIsToldToRelaunch` failed (pre-existing on main).
+  `aDeadButtonIsPlainAndNotSlower` passes with Task 20's wait for the page load. The reboot run's reboot assertions
+  passed; its new last expectation failed: the host did not get under load 10 within 300 s of the boot. On this host a
+  boot's storm (SpringBoard, widget extensions, Spotlight and `diskimagesiod` paging the runtime image at ~4,400
+  page-ins/s with 5 GB of swap in use) lasts about ten minutes. The bound was not raised; it is the owner's call.
+- **Timing baseline** (`scripts/live-timing.sh`, debug builds, warm-up then base/branch/branch/base, loads 3.7-4.9):
+  base 7f456a8 vs branch 86e4dfd: tap 746 → 748 ms (+2), dead 1,114 → 1,121 ms (+6), type 1,372 → 1,350 ms (−22).
+  Exit 0. The suite needed a fix on its first live run (86e4dfd: wait for each element before its ref, untimed).
