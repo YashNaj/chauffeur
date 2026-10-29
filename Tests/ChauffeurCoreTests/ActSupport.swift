@@ -96,8 +96,9 @@ enum Act {
         ProcessResult(status: status, out: text, timedOut: false)
     }
 
-    /// The shell replies an offline `launch dev.chauffeur.fixture` needs: its Info.plist and its pid, 4321.
-    static func launchReplies(udid: String) -> [[String]: [ProcessResult]] {
+    /// The shell replies an offline `launch dev.chauffeur.fixture` (or `bundle`, the same app under another id) needs:
+    /// its Info.plist and its pid, 4321.
+    static func launchReplies(udid: String, bundle: String = fixtureBundle) -> [[String]: [ProcessResult]] {
         let plist = """
             <?xml version="1.0" encoding="UTF-8"?>
             <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -107,8 +108,8 @@ enum Act {
             </dict></plist>
             """
         return [
-            ["appinfo", udid, fixtureBundle]: [out(plist)],
-            ["launch", udid, fixtureBundle]: [out("\(fixtureBundle): 4321")],
+            ["appinfo", udid, bundle]: [out(plist)],
+            ["launch", udid, bundle]: [out("\(bundle): 4321")],
         ]
     }
 }
@@ -134,7 +135,7 @@ struct ActRig {
         touches: ScriptedTouches = ScriptedTouches(evidence: [.app(Act.fixtureBundle)], attached: true),
         shell: RecordingShell = RecordingShell(), flows: [[Flow]] = [[]],
         processes: FakeProcesses = FakeProcesses(alive: []), inputs: FakeInputs = FakeInputs(),
-        logs: ScriptedLogs = ScriptedLogs()
+        logs: ScriptedLogs = ScriptedLogs(), telemetry: @escaping (URL) -> [String] = { _ in [] }
     ) {
         self.touches = touches
         self.shell = shell
@@ -148,8 +149,7 @@ struct ActRig {
             udid: udid,
             environment: .scripted(
                 ax: ax, touches: touches, shell: shell, clock: clock, flows: self.flows,
-                processes: processes, inputs: inputs, logs: logs))
-        s.telemetryOverride = []
+                processes: processes, inputs: inputs, logs: logs, telemetry: telemetry))
     }
 
     /// The output's first line.

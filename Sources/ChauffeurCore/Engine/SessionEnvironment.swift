@@ -1,8 +1,8 @@
 import Foundation
 
 /// Everything `Session` reaches outside itself: the clock, the simulator, its accessibility tree, the touch log,
-/// `simctl`, the network flows, the host's processes, the boot state, the crash report, the input device and the
-/// launched app's log. `.live` in the daemon; tests script each one.
+/// `simctl`, the network flows, the host's processes, the boot state, the crash report, the input device, the
+/// launched app's log and the project's telemetry entries. `.live` in the daemon; tests script each one.
 public struct SessionEnvironment {
     public var clock: any SettleClock
     public var device: @MainActor (String) throws -> any SimDevice
@@ -20,8 +20,11 @@ public struct SessionEnvironment {
     public var inputs: @MainActor (any SimDevice) throws -> any InputDevice
     /// The launched app's unified log.
     public var logs: any LogSource
+    /// The project's telemetry entries for a directory (M4b spec §4).
+    public var telemetry: (URL) -> [String]
 
-    /// The real simulator: CoreSimulator, the accessibility bridge, the touch log, `simctl`, NetworkStatistics, `Proc`.
+    /// The real simulator: CoreSimulator, the accessibility bridge, the touch log, `simctl`, NetworkStatistics, `Proc`,
+    /// and the nearest `.chauffeur.json`.
     public static func live(udid: String) -> SessionEnvironment {
         SessionEnvironment(
             clock: SystemClock(),
@@ -49,6 +52,7 @@ public struct SessionEnvironment {
                 }
                 return HID(device: d)
             },
-            logs: LogTap(udid: udid))
+            logs: LogTap(udid: udid),
+            telemetry: { Target.telemetryHosts(from: $0) })
     }
 }

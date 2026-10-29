@@ -33,7 +33,6 @@ import Testing
             bundle: "dev.chauffeur.fixture", executable: "Fixture", displayName: "Fixture", pid: 4321,
             launchedAt: Date())
         s.app = app
-        s.crashReportWaitMs = 0
         s.logTapAttemptMs = s.clock.nowMs()  // no real `log stream` for a fake simulator
         return (s, app)
     }

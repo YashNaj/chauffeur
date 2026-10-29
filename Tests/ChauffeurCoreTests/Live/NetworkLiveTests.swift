@@ -15,9 +15,12 @@ import Testing
         return p
     }
 
-    func onNetworkTab() throws -> (Session, Process) {
+    /// The fixture on its Network tab, with the server up; `telemetry` replaces the project's telemetry entries.
+    func onNetworkTab(telemetry: ((URL) -> [String])? = nil) throws -> (Session, Process) {
         let server = try Self.server()
-        let s = Session(udid: Live.udid!)
+        var env = SessionEnvironment.live(udid: Live.udid!)
+        if let telemetry { env.telemetry = telemetry }
+        let s = Session(udid: Live.udid!, environment: env)
         #expect(s.run(["install", try Live.buildFixture()]).exit == 0)
         #expect(s.run(["launch", Live.fixture]).exit == 0)
         #expect(s.run(["tap", try ref(s, "Network")]).exit == 0)
@@ -72,9 +75,8 @@ import Testing
     }
 
     @Test func analyticsAloneStaysNoEffect() throws {
-        let (s, server) = try onNetworkTab()
+        let (s, server) = try onNetworkTab(telemetry: { _ in ["127.0.0.1/metrics"] })
         defer { done(s, server) }
-        s.telemetryOverride = ["127.0.0.1/metrics"]
         let out = s.run(["tap", try ref(s, "Analytics only")])
         #expect(out.exit == 3 && out.text.contains("telemetry: 1 request (127.0.0.1)"), "\(out.text)")
     }
