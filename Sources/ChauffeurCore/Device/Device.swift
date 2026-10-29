@@ -12,11 +12,17 @@ public final class Device: SimDevice {
         self.udid = udid
         let developerDir = Xcode.developerDir()
         do {
-            simulatorKitPath = try CHSimulator.loadFrameworks(developerDir: developerDir)
+            simulatorKitPath = try Self.loadFrameworks(developerDir: developerDir)
             sim = try CHSimulator(udid: udid, developerDir: developerDir)
         } catch {
             throw ChauffeurError.bridge(error.localizedDescription)
         }
+    }
+
+    /// Loads CoreSimulator and SimulatorKit from `developerDir` and returns SimulatorKit's path. Throws the bridge's
+    /// own error, which `doctor` shows as it is.
+    public static func loadFrameworks(developerDir: String) throws -> String {
+        try CHSimulator.loadFrameworks(developerDir: developerDir)
     }
 
     public var size: Size { Size(w: Double(sim.pointSize.width), h: Double(sim.pointSize.height)) }

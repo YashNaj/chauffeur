@@ -19,7 +19,7 @@ import Testing
             first.exit == 0 && first.text.hasPrefix("launch dev.chauffeur.fixture → running (pid "), "\(first.text)")
         #expect(first.text.contains("\napp \"Fixture\""), "\(first.text)")
         let pid = try #require(s.app?.pid)
-        #expect(s.logTap.executable == "Fixture")
+        #expect(s.logs.executable == "Fixture")
 
         let second = s.run(["launch", "dev.chauffeur.fixture"])
         #expect(second.exit == 0, "\(second.text)")

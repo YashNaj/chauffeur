@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `doctor` describes accessibility problems in the same words as a result's note. With no accessibility tree and
+  app accessibility off, it now says to relaunch the app (as a result's note does) instead of pointing at the
+  accessibility bridge.
+
 ## 0.2.0
 
 - A crash now leads the action's result: `tap Pay → APP CRASHED: …` on the first line.

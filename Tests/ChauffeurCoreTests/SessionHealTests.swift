@@ -21,7 +21,7 @@ import Testing
         let write = [
             "spawn", udid, "defaults", "write", AXSettings.domain, "ApplicationAccessibilityEnabled", "-bool", "true",
         ]
-        let shell = RecordingShell(replies: [read: defaultsRead(0, for: ["ApplicationAccessibilityEnabled"])])
+        let shell = RecordingShell(replies: [read: [defaultsRead(0, for: ["ApplicationAccessibilityEnabled"])]])
         let clock = FakeClock()
         let s = Session(
             udid: udid, environment: .scripted(ax: ScriptedAX(frames: [nil]), shell: shell, clock: clock))
@@ -43,7 +43,7 @@ import Testing
 
     @Test func aPoisonedBridgeIsRestartedThroughTheShell() {
         let read = ["spawn", udid, "defaults", "read", AXSettings.domain]
-        let shell = RecordingShell(replies: [read: defaultsRead(1, for: AXSettings.flags)])
+        let shell = RecordingShell(replies: [read: [defaultsRead(1, for: AXSettings.flags)]])
         let clock = FakeClock()
         let s = Session(
             udid: udid, environment: .scripted(ax: ScriptedAX(frames: [nil]), shell: shell, clock: clock))

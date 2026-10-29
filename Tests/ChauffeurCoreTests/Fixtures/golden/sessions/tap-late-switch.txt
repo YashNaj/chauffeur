@@ -1,0 +1,4 @@
+tap e3 "Agree to terms" → changed · settled 150ms · rev 1→2
+- switch "Agree to terms" [e3] value=off
++ switch "Agree to terms" [e3] value=on
+hint: the switch changed only after 1.5s

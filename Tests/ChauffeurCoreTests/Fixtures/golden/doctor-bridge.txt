@@ -1,0 +1,1 @@
+✗ accessibility: the simulator's accessibility bridge is not answering (it was queried while booting). Fix: xcrun simctl spawn U launchctl stop com.apple.CoreSimulator.bridge (chauffeur does this itself after 4 s)

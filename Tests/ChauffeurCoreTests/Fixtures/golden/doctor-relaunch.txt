@@ -1,0 +1,1 @@
+✗ the app in front shows no accessibility tree. If it has finished launching, it started while app accessibility was off. relaunch it: chauffeur launch <bundle>

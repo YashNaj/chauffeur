@@ -84,8 +84,8 @@ extension Session {
         release(bundle)
         _ = try shell.simctl(["terminate", udid, bundle], timeout: 30)
         let reenabled = try ensureAccessibility()
-        let following = logTap.start(executable: appInfo.executable)  // before launch, so launch-time lines are kept
-        appLogCursor = logTap.cursor  // crash evidence comes from this launch's lines only
+        let following = logs.start(executable: appInfo.executable)  // before launch, so launch-time lines are kept
+        appLogCursor = logs.cursor  // crash evidence comes from this launch's lines only
         let r = try shell.simctl(["launch", udid, bundle] + a.rest, timeout: 60)
         guard r.status == 0, let pid = SimApps.launchedPID(r.out) else {
             return Output("launch \(bundle) → FAILED: \(SimCtl.message(r))", exit: .error)
@@ -103,7 +103,7 @@ extension Session {
         var lines: [String]
         var exit = ExitCode.ok
         if !Self.showsLaunchedApp(front.snapshot.kind, stale: stale) {
-            let alive = isAlive(pid)
+            let alive = processes.isAlive(pid)
             lines = [
                 alive
                     ? "launch \(bundle) → UNVERIFIED: pid \(pid) is running, but after \(after) the accessibility tree still shows \(Self.describe(front.snapshot.kind))"

@@ -485,91 +485,298 @@ frames. Adjust the "Email" query to a label that exists in `fixture-form.json` (
 
 Branch `refactor-1b-inputs`. PR title: "Refactor 1b: HID, the log seam, act runs offline, Doctor shares the wrappers".
 
-### Task 10: `InputDevice` and `HID`
+**Amended 2026-10-28, before execution** (the Fable review of Stage 1a, ledger "## Fable review"): Task 10 is split
+into 10a (the closure seams move into `SessionEnvironment`, `typeCommand` gets its own file) and 10b (HID); Task 12
+pins the four verdict-upgrade paths and `finishPending` line by line before Stage 2 rewrites them as passes. Line
+numbers below are from `main` at 0b50039 (after Stage 1a); the ones in the Stage 1a amendment text were older.
+
+### Task 10a: `typeCommand` in its own file; boot state and the crash report into the environment; `isAlive` retires
+
+**Files:**
+- Create: `Sources/ChauffeurCore/Engine/Session+Type.swift` (`typeCommand`, `redactedType`, `provisionalType`, `shown`,
+  moved unchanged from `Session+Act.swift:211-334`; `Session+Act.swift` drops from 391 to about 270 lines, so 10b's
+  HID diff is readable)
+- Modify: `Sources/ChauffeurCore/Engine/SessionEnvironment.swift` (three new members; `.live` provides today's
+  implementations), `Sources/ChauffeurCore/Engine/Session.swift:35-40` (the `simulatorBooted`, `simulatorBootDate`,
+  `isAlive`, `findCrashReport` properties go), `:86-91` (their defaults go), `Session+Logs.swift:15,17,29,105`,
+  `Session+Device.swift:49-50`, `Session+Apps.swift:106` (read `processes.isAlive(_:)` and the environment's members)
+- Modify tests: `Tests/ChauffeurCoreTests/Support.swift` (`FakeProcesses` becomes a class; `.scripted` gains
+  `processes:`, `flows:` and the three members; `RecordingShell` records stdin and timeout and answers a repeated call
+  from an ordered list; the comment at `:136-140` stops naming the closures),
+  `Tests/ChauffeurCoreTests/AnnotateTests.swift:13-23` (`session(alive:report:)` builds the environment first),
+  `:100,102,113` (liveness flips on the fake), `:119,129,136,139,192` (members set before the session is built),
+  `Tests/ChauffeurCoreTests/DeviceTests.swift:8,24,35` (the same), `Tests/ChauffeurCoreTests/SeamsTests.swift:72`
+  (still compiles; one more assertion)
+
+**Interfaces:**
+- Produces, in `SessionEnvironment` (today's closure types, copied from `Session.swift:36-40`):
+  ```swift
+  /// Is the simulator booted (nil: could not tell), when did its current boot start, and the report for a gone app.
+  public var simulatorBooted: () -> Bool?
+  public var simulatorBootDate: () -> Date?
+  public var findCrashReport: (TrackedApp) -> CrashReport?
+  ```
+  `.live(udid:)` fills them with `{ SimBoot.booted(udid: udid) }`, `{ SimBoot.date(udid: udid) }` and
+  `{ app in CrashFinder.find(bundle: app.bundle, pid: app.pid, udid: udid, since: app.launchedAt) }`, moved from
+  `Session.init` (`Session.swift:86-90`). `Session` reads `environment.simulatorBooted()`,
+  `environment.simulatorBootDate()`, `environment.findCrashReport(app)` and `processes.isAlive(pid)`; the four
+  properties are deleted. `processes` is then the only liveness seam. `relaunch`, `commandHook`, `telemetryOverride`
+  and `crashReportWaitMs` stay as they are (Plan 2).
+- Test support (`Support.swift`):
+  ```swift
+  /// A `ProcessTable` whose live pids a test changes between commands (a reference, so the session sees the change).
+  final class FakeProcesses: ProcessTable, @unchecked Sendable { var alive: Set<Int32>; init(alive: Set<Int32>) }
+  static func scripted(
+      ax: ScriptedAX, touches: ScriptedTouches = ScriptedTouches(evidence: [], attached: false),
+      shell: RecordingShell = RecordingShell(), clock: FakeClock = FakeClock(),
+      flows: (any FlowSource)? = nil, processes: FakeProcesses = FakeProcesses(alive: []),
+      simulatorBooted: @escaping () -> Bool? = { true }, simulatorBootDate: @escaping () -> Date? = { nil },
+      findCrashReport: @escaping (TrackedApp) -> CrashReport? = { _ in nil }
+  ) -> SessionEnvironment
+  /// Replies in order for a repeated call (`pbpaste` before and after a tap); the last one holds.
+  RecordingShell(replies: [[String]: [ProcessResult]] = [:])
+  var calls: [[String]]                                           // as today
+  var recorded: [(args: [String], stdin: String?, timeout: Double)] // new: Task 12 asserts pbcopy's stdin
+  ```
+  A test that flips liveness keeps the `FakeProcesses` it passed and sets `procs.alive`; one that needs a boot date or
+  a report passes it to `.scripted` (or sets `env.<member>` before `Session(udid:environment:)`).
+
+- [ ] **Step 1: Move `typeCommand`** — a pure move into `Session+Type.swift` (`import ChauffeurBridge` moves with it for
+  now; 10b removes it); `swift test`; `git commit -m "Session+Type: typeCommand in its own file"`.
+- [ ] **Step 2: Write the failing tests** — `SeamsTests`: `let procs = FakeProcesses(alive: [1]); let table: any ProcessTable = procs; procs.alive = []; #expect(!table.isAlive(1))`.
+  `SessionEnvironmentTests`: a `.scripted(ax: ScriptedAX(frames: []), processes: procs)` session with
+  `procs.alive = [4321]` and `s.app = TrackedApp(bundle: "dev.chauffeur.fixture", executable: "Fixture", displayName: "Fixture", pid: 4321, launchedAt: Date())`;
+  `procs.alive = []` then `s.annotate(Output("snapshot"), since: 0, logs: false).exit == 5`; the same session built with
+  `simulatorBooted: { false }` exits 0 and ends with `s.app == nil` (today's `aShutDownSimulatorIsNotACrash` through the
+  environment). `defer { TrackedApp.clear(StatePaths.app(s.udid)) }` as `AnnotateTests` does.
+- [ ] **Step 3: Run to verify they fail** — compile errors: `.scripted` has no `processes:`; `procs.alive` on a struct copy changes nothing.
+- [ ] **Step 4: Implement** — the three members, `.live`, `.scripted`, the six `Session` call sites; port `AnnotateTests`
+  and `DeviceTests`: every `s.isAlive = { _ in x }` becomes `procs.alive = x ? [4321] : []`; every
+  `s.simulatorBooted`, `s.simulatorBootDate`, `s.findCrashReport` assignment moves into the environment built before
+  the session (`session(alive:report:booted:bootDate:)`). Assertions stay byte for byte. Where a ported test relies on
+  `connect()` failing on the fake udid today (`aCrashBetweenCommandsIsReportedByTheNextCommandThatEndsTheApp` runs
+  `terminate`, `launch`, `install`, `permission` through `s.run`), give the scripted environment a device that is not
+  booted (`env.device = { FakeDevice(udid: $0, booted: false, size: Size(w: 402, h: 874)) }`) rather than falling back
+  to `.live`; if any assertion must change, say why in the PR.
+- [ ] **Step 5: Run** — `swift test`; `grep -n "isAlive\|simulatorBooted\|simulatorBootDate\|findCrashReport" Sources/ChauffeurCore/Engine/*.swift`
+  shows only `processes.isAlive(` and `environment.<member>(` reads; `scripts/check-code.sh`.
+- [ ] **Step 6: Commit** — `git commit -m "SessionEnvironment: boot state and the crash report are members; processes is the one liveness seam"`
+
+### Task 10b: `InputDevice` and `HID`
 
 **Files:**
 - Create: `Sources/ChauffeurCore/Device/HID.swift`
-- Modify: `Sources/ChauffeurCore/Device/Input.swift` (transports and `Keyboard` take `HID`, not `CHHIDClient`; the
-  `import ChauffeurBridge` moves to `HID.swift`), `Sources/ChauffeurCore/Engine/Session.swift:10-12` (remove `hid`,
-  `transports`, `preferred` stays), `Session+Act.swift:19-35` (`transportsReady` uses `environment.inputs`),
-  `Session+Act.swift:238-239` (`Keyboard` from inputs), `Session+Gestures.swift:56-66` (`press` moves into `HID`),
-  `Sources/ChauffeurCore/Engine/SessionEnvironment.swift` (add `inputs`)
-- Test: `Tests/ChauffeurCoreTests/HIDTests.swift`
+- Modify: `Sources/ChauffeurCore/Device/Input.swift` (`DigitizerTransport`, `MouseTransport` and `Keyboard` are built
+  by `HID` only; `Gestures.tap`/`drag` and `Keyboard.press` sleep through a `SettleClock` parameter; `import
+  ChauffeurBridge` leaves the file if the transports' `CHHIDClient` can be hidden behind `HID`, else the client type
+  stays referenced here and the lint rule below allows it), `Sources/ChauffeurCore/Engine/Session.swift:1,10-11`
+  (`import ChauffeurBridge`, `hid`, `transports` go; `preferred` stays; `drop()` at `:144-150` forgets the input
+  device), `Session+Act.swift:18-36` (`transportsReady` asks `environment.inputs`; its `(device as? Device)?.sim` cast
+  and the "until Task 10" comment are deleted, so a fake device gets fake transports instead of silently none),
+  `:71-74` (`hid = nil; transports = []` becomes `inputs?.reset()`), `:141,160,191,370` and `Session+Gestures.swift:32`, `Session+Type.swift` (`Gestures.tap`/`drag`
+  take `clock`), `Session+Type.swift` (`guard let hid` and `Keyboard(hid:)` become `try inputDevice().keyboard(clock: clock)`),
+  `Session+Gestures.swift:46-47,52,56-64` (`press` moves into `HID`; the `guard let hid` goes), `Session+Gestures.swift:1`,
+  `Session+Act.swift:1`, `Session+Type.swift:1` (`import ChauffeurBridge` goes), `SessionEnvironment.swift` (add
+  `inputs`), `scripts/check-code.sh` (new rule), `scripts/tests/test-check-code.sh` (one case)
+- Test: `Tests/ChauffeurCoreTests/HIDTests.swift`, `Tests/ChauffeurCoreTests/Support.swift` (`FakeInputs`,
+  `FakeTransport`, `FakeTextInput`)
 
 **Interfaces:**
 - Produces:
   ```swift
   @MainActor public protocol InputDevice: AnyObject {
-      func transports() throws -> [TouchTransport]   // digitizer first, then mouse
-      func keyboard() throws -> any TextInput
-      func press(_ button: HardwareButton, holdMs: Int, clock: any SettleClock) throws -> Bool
-      func reset()                                      // after a failed send: rebuild the client next time
+      /// Digitizer first, then mouse. The same objects until `reset()`: `act` compares transports by identity.
+      func transports() throws -> [any TouchTransport]
+      func keyboard(clock: any SettleClock) throws -> any TextInput
+      func press(_ button: HardwareButton, clock: any SettleClock) throws -> Bool   // holds for button.holdMs
+      /// After a failed send: drop the client; the next call rebuilds it.
+      func reset()
   }
-  public protocol TextInput { func type(_ text: String) -> Bool; func press(_ usage: UInt32, modifiers: [UInt32]) -> Bool }
+  @MainActor public protocol TextInput {
+      func type(_ text: String) -> Bool
+      func press(_ usage: UInt32, modifiers: [UInt32]) -> Bool
+  }
+  extension TextInput { public func press(_ usage: UInt32) -> Bool }   // typeCommand's bare `press(Keys.returnKey)`
   @MainActor public final class HID: InputDevice { public init(device: Device) }   // the ONE owner of CHHIDClient
+  public enum Gestures {
+      static func tap(_ t: any TouchTransport, at: Point, screen: Size, holdMs: Int = 50, clock: any SettleClock) -> Bool
+      static func drag(_ t: any TouchTransport, from: Point, to: Point, screen: Size, steps: Int = 12, stepMs: Int = 16, clock: any SettleClock) -> Bool
+  }
+  public struct Keyboard: TextInput { init(hid: CHHIDClient, clock: any SettleClock) }   // the two 15 ms waits through `clock`
   ```
-  `SessionEnvironment.inputs: @MainActor (any SimDevice) throws -> any InputDevice`. Test fake `FakeInputs`
-  (`Support.swift`): `init(transports: [FakeTransport], keyboard: FakeTextInput = …, press: Bool = true)`;
-  `FakeTransport(name: String, supportsMove: Bool, sends: Bool)` records every `touch` call in `touches`;
-  `FakeInputs.resetCount` counts `reset()` calls (Task 12 asserts it). `SessionEnvironment.scripted` gains an
-  `inputs:` parameter here and a `logs:` parameter in Task 11.
+  `SessionEnvironment.inputs: @MainActor (any SimDevice) throws -> any InputDevice`; `.live` downcasts to `Device`
+  beside `ax`'s cast (the two casts in the one place the plan allows) and returns `HID(device:)`. `Session` keeps
+  `var inputDevice: (any InputDevice)?`, built on first use from `environment.inputs(device)`, set to nil in `drop()`;
+  a failed send calls `inputDevice?.reset()` (the device rebuilds its client; the session keeps the same device, so a
+  fake can count resets). Test fakes (`Support.swift`):
+  ```swift
+  @MainActor final class FakeTransport: TouchTransport {
+      init(name: String, supportsMove: Bool, sends: Bool = true); private(set) var touches: [(Point, TouchPhase)]
+  }
+  final class FakeTextInput: TextInput {
+      init(types: Bool = true, presses: [Bool] = [true])   // `press` pops the next result and holds the last
+      private(set) var typed: [String]; private(set) var pressed: [(usage: UInt32, modifiers: [UInt32])]
+  }
+  @MainActor final class FakeInputs: InputDevice {
+      init(transports: [FakeTransport] = [FakeTransport(name: "digitizer", supportsMove: true), FakeTransport(name: "mouse", supportsMove: false)],
+           keyboard: FakeTextInput = FakeTextInput(), press: Bool = true)
+      private(set) var resetCount = 0; private(set) var pressed: [HardwareButton]
+  }
+  ```
+  `SessionEnvironment.scripted` gains `inputs: FakeInputs = FakeInputs()` here and `logs:` in Task 11.
 
-- [ ] **Step 1: Write the failing tests** (`FakeInputs` behaviour; `HID` is an `InputDevice`; `grep -c CHHIDClient Sources/ChauffeurCore/Engine` is 0 — assert via a test that reads the files? No: add the rule to `scripts/check-code.sh`: `CHHIDClient` may appear only in `Device/HID.swift`.)
-- [ ] **Step 2: Run to verify it fails**
-- **Amendment (Stage 1a final review):** `Gestures.tap`/`Gestures.drag` (`Device/Input.swift`) and `Keyboard` call
-  `usleep` themselves (50 ms per tap, 192 ms per drag, 15 ms per key). Route them through the session's clock in this
-  task, so Task 12's offline gesture tests don't sleep for real (spec "Done when": no unit test sleeps).
-  `SessionEnvironment.scripted` also gains a `processes:` argument and neutral `simulatorBooted`,
-  `simulatorBootDate` and `findCrashReport` closures for the session it builds, and `RecordingShell` records stdin and
-  timeout, so Task 12 can launch offline and assert the cleared pasteboard after a secure paste.
-- [ ] **Step 3: Implement `HID`, `InputDevice`, `TextInput`; move `press`; route `transportsReady`, `typeCommand` and `buttonCommand` through `environment.inputs`; `drop()` calls `inputs.reset()` semantics (the session forgets its `InputDevice` and asks the environment again)**
-- [ ] **Step 4: Run** — `swift test`; `scripts/check-code.sh` (new rule passes)
+- [ ] **Step 1: Write the failing tests** — `HIDTests`: `FakeInputs().transports().map(\.name) == ["digitizer", "mouse"]`;
+  a `Gestures.tap` on a `FakeTransport` with a `FakeClock` records `[.down, .up]` and advances the clock by exactly
+  `holdMs`; `Gestures.drag` records 1 + 12 + 1 touches and advances by 12 × 16 ms; `FakeTextInput(presses: [true, false])`
+  answers true then false then false; `let _: any InputDevice = HID(device:)` is compile-only (no simulator in unit
+  tests). Lint: `scripts/check-code.sh` gains `hid-owner`: `CHHIDClient` outside `Sources/ChauffeurBridge` may appear
+  only in `Sources/ChauffeurCore/Device/HID.swift` (and `Device/Input.swift` if the transports keep the type);
+  `scripts/tests/test-check-code.sh` gets one case for it.
+- [ ] **Step 2: Run to verify it fails** — `swift test --filter HIDTests` (undefined types); the lint case fails on `Session.swift`.
+- [ ] **Step 3: Implement** `HID`, `InputDevice`, `TextInput`; move `press`; route `transportsReady`, `typeCommand`,
+  `buttonCommand` and `selftestCommand` through `inputDevice()`; `usleep` leaves `Input.swift`
+  (`grep -c usleep Sources/ChauffeurCore/Device/Input.swift` → 0). Delete `transportsReady`'s `device as? Device` cast.
+- [ ] **Step 4: Run** — `swift test`; `scripts/check-code.sh` (new rule passes); `grep -rn CHHIDClient Sources/ChauffeurCore/Engine` → nothing.
 - [ ] **Step 5: Commit** — `git commit -m "HID: one owner of the HID client; InputDevice is the seam"`
 
 ### Task 11: `LogSource`
 
 **Files:**
 - Create: add `LogSource` to `Sources/ChauffeurCore/Device/Seams.swift`
-- Modify: `Sources/ChauffeurCore/Logs/LogTap.swift:112` (conform), `SessionEnvironment` (add `logs`), every `logTap.` use in `Engine` (`grep -n "logTap" Sources/ChauffeurCore/Engine/*.swift`)
-- Test: existing tests that call `s.logTap.append` keep working through `s.logs.append`
+- Modify: `Sources/ChauffeurCore/Logs/LogTap.swift:112` (conform), `:168-173` (`append` becomes `public`, its comment
+  updated: tests feed lines through the seam), `SessionEnvironment` (add `logs`; `.live` builds `LogTap(udid:)`),
+  `Session.swift:14,85` (`let logTap: LogTap` and its construction go; `var logs: any LogSource { environment.logs }`),
+  every `logTap.` use in `Engine` (`grep -n "logTap" Sources/ChauffeurCore/Engine/*.swift`: `Session.swift:105,134,230`,
+  `Session+Apps.swift:87-88`, `Session+Logs.swift:6,9,34,70,114,124,147`, `Session+Network.swift:53,65`,
+  `Session+Wait.swift:107`; `logTapAttemptMs` keeps its name)
+- Test: `Tests/ChauffeurCoreTests/Support.swift` (`ScriptedLogs`), `Tests/ChauffeurCoreTests/SessionNetworkTests.swift`
+  (rename, and the `.live` build at `:15-24` becomes `.scripted(ax: ScriptedAX(frames: []), flows: ScriptedFlows(flows), clock: clock)`:
+  it set `s.flowSource` and `s.flowSourceTried` directly, bypassing `environment.flows`; `telemetryOverride = []`
+  stays, it is a closure seam until Plan 2), `Tests/ChauffeurCoreTests/AnnotateTests.swift` (rename),
+  `Tests/ChauffeurCoreTests/Live/AppsLiveTests.swift:22` (`s.logs.executable`). `LogTapTests` and `LogRedactTests`
+  use `LogTap` directly and are untouched.
 
 **Interfaces:**
-- Produces: `public protocol LogSource: AnyObject { var isAttached: Bool { get }; var cursor: Int { get }; func since(_ cursor: Int) -> [LogLine]; func append(_ line: LogLine); func start(bundle: String, pid: Int32) throws; func stop() }`
-  (copy `LogTap`'s real `start` signature). `Session.logs: any LogSource`.
+- Produces (every member `Session` reads today; `LogTap` already has each one):
+  ```swift
+  public protocol LogSource: AnyObject {
+      var isAttached: Bool { get }
+      /// The executable whose log is followed while the stream is attached.
+      var executable: String? { get }
+      var cursor: Int { get }
+      var all: [LogLine] { get }
+      func since(_ cursor: Int) -> [LogLine]
+      /// False when `log stream` did not attach; following the same executable again keeps the lines.
+      @discardableResult func start(executable: String) -> Bool
+      func stop()
+      /// Tests feed lines; `LogTap` shapes URLs as it stores them.
+      func append(_ line: LogLine)
+  }
+  ```
+  `SessionEnvironment.logs: any LogSource`. Test fake `ScriptedLogs: LogSource` (`Support.swift`): a `LogRing` behind
+  the protocol; `init(attaches: Bool = true)`; `start` records the executable, sets `executable` and `isAttached =
+  attaches`, returns `attaches`; `stop` clears `isAttached`. `.scripted` gains `logs: ScriptedLogs = ScriptedLogs()`.
 
-- [ ] **Step 1: Rename in tests first** (`logTap` → `logs` in `SessionNetworkTests`, `AnnotateTests`, `LogTapTests` where they go through Session) and run: compile error.
-- [ ] **Step 2: Implement; run `swift test`; commit** — `git commit -m "LogSource: the launched app's log is a seam"`
+- [ ] **Step 1: Rename in tests first** (`s.logTap` → `s.logs` in `SessionNetworkTests`, `AnnotateTests`,
+  `Live/AppsLiveTests.swift:22`; move `SessionNetworkTests.session(flows:clock:)` to `.scripted(... flows:)`) and run:
+  compile error.
+- [ ] **Step 2: Implement; run `swift test`** (`SessionNetworkTests` still 0.06 s) **; commit** — `git commit -m "LogSource: the launched app's log is a seam"`
 
-### Task 12: `act` offline
+### Task 12: `act` offline, and the upgrade paths pinned line by line
 
 **Files:**
-- Test: `Tests/ChauffeurCoreTests/SessionActTests.swift` (under 600 lines; split into `SessionActTests` and `SessionGestureTests` if needed)
+- Test: `Tests/ChauffeurCoreTests/SessionActTests.swift` (classify paths, delivery, the intercepted tap),
+  `Tests/ChauffeurCoreTests/SessionGestureTests.swift` (scroll, swipe), `Tests/ChauffeurCoreTests/SessionUpgradeTests.swift`
+  (the five pins below), `Tests/ChauffeurCoreTests/SessionTypeTests.swift` (`type` and `type --submit`); each under
+  600 lines, sharing one `Tests/ChauffeurCoreTests/ActSupport.swift` for the session builder, the ref lookup and the
+  mutated fixture frames. Goldens: `Tests/ChauffeurCoreTests/Fixtures/golden/sessions/*.txt` (new folder; `Golden.check`
+  creates it on record).
 
-- [ ] **Step 1: Write the failing tests**, each building a session with `.scripted(...)` plus `inputs: FakeInputs(...)` and `touches: ScriptedTouches(...)`:
+**Test data every test shares** (`ActSupport.swift`):
+- The session: `.scripted(ax:touches:shell:clock:flows:processes:inputs:logs:)` with `inputs: FakeInputs()`,
+  `touches: ScriptedTouches(evidence: [.app("dev.chauffeur.fixture")], attached: true)` unless the test says otherwise,
+  a random `ZZxxxxxx-TEST` udid, and `defer { TrackedApp.clear(StatePaths.app(s.udid)) }` where an app is tracked.
+- Refs: look them up, never hard-code: `Perception.build(root: home, size: Size(w: 402, h: 874), previous: nil, refs: &refs, rev: 1).find("Show alert").first?.ref`
+  (`fixture-home`), `.find("Agree to terms")` (`fixture-form`; its `AXCheckBox` has subrole `AXSwitch`, so its role is
+  `switch`, value `0` → `off`), `.find("email")` / `.find("password")` (`fixture-form`'s `AXTextField`s, identifiers
+  `email`/`password`; the second has subrole `AXSecureTextField` → `securefield`).
+- Mutated frames, since `AXElement`'s fields are `var`s: `formOn` = `fixture-form` with the switch's `value = "1"`;
+  `formTyped` = the email field's `value = "alice@example.com"`; `formSecure` = the password field's `value` = 21 bullets
+  (`•`) for a 21-character password (`TypeCheck.verify` counts added bullets).
+- Reads per observe on the fake clock (Stage 1a Findings): a stable screen costs 2 reads at `minMs: 0` and 3 at
+  `minMs: 150`; `baseline()` is 4 reads when the screen just changed (observe, 500 ms sleep, observe) and 2 when it
+  has been quiet ≥ 500 ms; `act` then reads 3. `ScriptedAX` holds its last frame, so only the earlier frames need exact
+  counts. Frame counts are test data the implementer may adjust with a comment; the assertions below may not change.
+- Flows: `ScriptedFlows` (move it from `SessionNetworkTests.swift` to `ActSupport.swift`) pops one sample per
+  `flows(pids:)` call and holds the last. A tap samples at `netStart` (before the baseline), at `tapNet` (the touch),
+  once after `NetJudge.graceMs`, then every 100 ms while pending and once more after `confirmMs`. `waiting` =
+  `Flow(id: 1, pid: 4321, process: "Fixture", proto: "tcp", remote: "127.0.0.1:8765", tx: 58, rx: 0, openedMs: 1, closedMs: nil)`;
+  `done` = the same with `rx: 512, closedMs: 2`. `watchedPids()` is `[4321]` from `ScriptedAX.scriptedPID`.
+- No evidence screenshot is ever written: `capture` runs `io … screenshot` through `RecordingShell`, finds no file and
+  `act`'s `try?` drops it, so a NO EFFECT renders without its `screen:` line offline.
+
+- [ ] **Step 1: Write the failing tests.** `SessionActTests` and `SessionGestureTests`, as before:
 
 ```swift
 @Test func aChangeOnTheNextFrameIsCredited() throws {
-    // frames: home ×2 (baseline), form ×2 (after); touches: .app("dev.chauffeur.fixture")
-    let out = s.run(["tap", "e3"])   // the ref for "Show alert" in fixture-home
-    #expect(out.exit == 0 && out.text.hasPrefix("tap e3 \"Show alert\" → changed · settled"), out.text)
+    // frames: [home ×4 (baseline), form] ; touches: .app("dev.chauffeur.fixture")
+    let out = s.run(["tap", showAlert])
+    #expect(out.exit == 0 && out.text.hasPrefix("tap \(showAlert) \"Show alert\" → changed · settled"), out.text)
 }
 @Test func noTouchEvidenceRetriesOnTheNextTransportThenNotDelivered() throws {
     // touches: [.none, .none]; transports: [digitizer, mouse], both send
-    #expect(out.text.contains("NOT DELIVERED")); #expect(inputs.transports.map(\.touches.count) == [2, 2])
+    #expect(out.text.contains("NOT DELIVERED · retried via mouse")); #expect(inputs.transports.map(\.touches.count) == [2, 2])
 }
-@Test func anUnattachedTouchLogIsUnverified() throws { /* ScriptedTouches(attached: false) → "UNVERIFIED" */ }
-@Test func aFailedSendDropsTheClientAndRebuildsIt() throws { /* FakeTransport(sends: false) → after the action, inputs.resetCount == 1 */ }
-@Test func aTouchThatLandedInAnotherAppIsIntercepted() throws { /* .app("com.apple.springboard") with expectedApp set via launch bookkeeping → "INTERCEPTED" */ }
-@Test func theSwitchIsTappedAgainWhenTheFirstTouchWasIgnored() throws { /* frames: a switch row, unchanged, then changed; two touches recorded */ }
-@Test func scrollReportsTheFoundLine() throws { /* fixture-longlist, --until "Row 48" */ }
-@Test func swipeIsVerifiedByTheScreen() throws { /* frames differ after → changed */ }
+@Test func anUnattachedTouchLogIsUnverified() throws { /* ScriptedTouches(evidence: [], attached: false) → "UNVERIFIED" */ }
+@Test func aFailedSendDropsTheClientAndRebuildsIt() throws { /* both FakeTransport(sends: false) → NOT DELIVERED and inputs.resetCount == 1 */ }
+@Test func aTouchThatLandedInAnotherAppIsIntercepted() throws {
+    // launch offline first: shell replies ["appinfo", udid, bundle] → an Info.plist XML with CFBundleExecutable and
+    // CFBundleDisplayName "Fixture"; ["launch", udid, bundle] → "dev.chauffeur.fixture: 4321"; processes alive [4321];
+    // frames [home …]; then touches .app("com.apple.springboard") → "INTERCEPTED by com.apple.springboard"
+}
+@Test func theSwitchIsTappedAgainWhenTheFirstTouchWasIgnored() throws { /* see SessionUpgradeTests; here assert only the two touches */ }
+@Test func scrollReportsTheFoundLine() throws {
+    // fixture-longlist has Row 1–14 only (the plan's "Row 48" does not exist): frames [longlist ×4, longScrollview],
+    // query "Label 69" (`long-scrollview.json`) → hasPrefix("found text \"Label 69\" [e") and hasSuffix("after 1 scroll down")
+}
+@Test func swipeIsVerifiedByTheScreen() throws { /* frames [home ×4, form] → changed */ }
 ```
 
-Use `fixture-home.json` refs by running `Perception.build` in the test to look up `"Show alert"`'s ref rather than
-hard-coding `e3`.
+`SessionUpgradeTests`: five pins, each `Golden.check("sessions/<name>.txt", out.text)` on the whole output (every line,
+so Stage 2's passes must reproduce `settledMs`, the hints and the request lines exactly). The upgrade sites today:
 
-- [ ] **Step 2: Run to verify they fail/compile** — the first run must compile and the assertions must pass; a failure is a wiring bug in Tasks 10 and 11. Record every live `Expected:` these tests duplicate in the ledger's "unit twin" column (`scripts/live-expectations.sh` gains that column: a test name per line where one exists).
-- [ ] **Step 3: Commit** — `git commit -m "act, tap, scroll and swipe have offline tests"`
+| Pin | Site | Frames, touches, flows, shell | What the recorded golden must show |
+|---|---|---|---|
+| `tap-screen-again` | `Session+Network.swift:105-115` (`judgeScreenAgain`) | tap `showAlert`; frames `[home ×7, form]` (baseline 4, the NO EFFECT act 3, then the second look); flows `[[], [], [waiting], [done]]` | `changed · settled <N>ms · rev 1→2` where N is the time since the touch (the act's 150 ms settle + grace + one 100 ms poll + the 300 ms confirm + the second observe), the diff, then the request line for `127.0.0.1:8765`; no `hint:` line (`:114` clears them); exit 0 |
+| `tap-late-switch` | `Session+Act.swift:146-155` | tap `agree` (`holdMs` 50); frames `[form ×7, formOn]`; no flows | `changed · settled 150ms · rev 1→2` (the FIRST act's settle, `:149-151` keep `settledMs`), the `~ … off → on` diff line, `hint: the switch changed only after 1.5s`; exit 0 |
+| `tap-second-tap` | `Session+Act.swift:156-167` | tap `agree`; frames `[form ×9, formOn]` (baseline 4, act 3, second baseline 2, then the second act sees `formOn`); touches `[.app(fixture), .app(fixture)]` | the second act's line `changed · settled 150ms · rev 1→2`, the diff, `hint: the first touch reached the app but the switch ignored it; chauffeur tapped once more`; also `touches.requests.count == 2` and the digitizer's `touches.count == 4` |
+| `tap-clipboard-with-requests` | `Session+Act.swift:169-176` | tap `showAlert`; frames `[home]`; flows `[[], [], [done]]`; shell replies `["pbpaste", udid]: [out "", out "hello, clipboard"]` | `changed · copied to clipboard (16 characters)` then the `127.0.0.1:8765` request line (`:170-176` keep `requests`); no `hint:`; exit 0 |
+| `wait-finishes-pending` | `Session+Wait.swift:61-97` (`finishPending`, `settledMs` at `:83`) | tap `showAlert` with flows `[[], [], [waiting]]` → `s.run(["tap", …])` is `PENDING`, exit 6, headline `→ PENDING · 127.0.0.1:8765 · sent 58 B, no reply after 2.`; then `flows.samples = [[done]]` and `s.run(["wait"])`; frames `[home ×7, form]` | the wait's output: `changed · settled 150ms · rev 1→2` (`:83` uses the wait's own observe, not the time since the touch), the diff, the request line; no `hint:`; exit 0; `s.pendingTap == nil` |
+
+Also pin, with `==` on the first line, that the four NO EFFECT paths do not fire when they should not: a `button` target
+is not tapped twice (`touches.requests.count == 1`), an unchanged pasteboard stays NO EFFECT.
+
+`SessionTypeTests` (the Stage 0 Findings' missing §1 shape): `type` into `email` with `"alice@example.com"` (17
+characters → the paste path: `shell.recorded` has `["pbcopy", udid]` with that stdin, then `FakeTextInput.pressed`
+has `(Keys.v, [Keys.command])`); frames `[form ×7, formTyped]`; then three goldens with `--submit`:
+`type-submit-changed` (frames `[form ×7, formTyped ×3, home]` → `submit → changed · rev 2→3` and the diff),
+`type-submit-noeffect` (frames `[form ×7, formTyped]` → `submit → NO EFFECT · nothing changed after Return`),
+`type-submit-notdelivered` (`FakeTextInput(presses: [true, false])`: the paste's ⌘V succeeds, Return fails →
+`submit → NOT DELIVERED: Return failed to send`, exit 3). And the secure paste: `type password "correct horse battery"`
+(21 characters), frames `[form ×7, formSecure]` → the label is `type eN (21 characters)`, the pasteboard is cleared:
+`shell.recorded.filter { $0.args == ["pbcopy", udid] }.map(\.stdin) == ["correct horse battery", ""]`, and the trace
+args are `Session.redactedType(...)`. `focusing the field failed` is pinned with touches `[.none, .none]`.
+
+- [ ] **Step 2: Run** — every test must compile and pass on the first run: these are regression pins, and a failure is a
+  wiring bug in Tasks 10a-11, not a reason to change an assertion. Record the goldens with
+  `CHAUFFEUR_GOLDEN_RECORD=1 swift test --filter SessionUpgradeTests` and `--filter SessionTypeTests`, then READ each
+  recorded file and check the table's facts (which `settledMs`, which hint, the request line present or absent) before
+  committing; a golden that pins the wrong behaviour is worse than none. Teeth: temporarily delete one line at each
+  upgrade site (`report.hints = []` at `Session+Network.swift:114`; `report.settledMs = settle.elapsedMs` at
+  `Session+Wait.swift:83`) and watch the matching golden fail; revert, don't commit. Record every live `Expected:`
+  these tests duplicate in the ledger's "unit twin" column (`scripts/live-expectations.sh` gains that column: a test
+  name per line where one exists).
+- [ ] **Step 3: Commit** — `git commit -m "act, tap, scroll, swipe, type and wait have offline tests; the four upgrade paths are pinned"`
 
 ### Task 13: Doctor through the wrappers (the §9 wording ruling)
 
@@ -577,10 +784,13 @@ hard-coding `e3`.
 - Modify: `Sources/ChauffeurCore/Doctor.swift:85-189` (use `Device`, `AXProvider`, `HID`, `AXSettings`, `AXHealth.message`; delete its own probe and messages; `import ChauffeurBridge` goes)
 - Modify: `Tests/ChauffeurCoreTests/DoctorTests.swift`, `Tests/ChauffeurCoreTests/Fixtures/golden/` (a new `doctor-*.txt` golden per Doctor message, recorded in this task since the text changes by ruling)
 - Modify: `CHANGELOG.md` ("Unreleased: `doctor` describes accessibility problems in the same words as a result's note")
+- Modify: `CONTRIBUTING.md:31-32` — only the Xcode 27 job (`build-test`) is required since 2026-10-28 (the macos-26
+  runners are starved); reword to: CI also runs Xcode 26 when runners are available; it is not required, so check it
+  when it runs.
 
 - [ ] **Step 1: Write the failing test** — `DoctorTests` asserts each accessibility finding equals `AXHealth.message(plan, recovered: false)` for the matching plan.
 - [ ] **Step 2: Run to verify it fails**
-- [ ] **Step 3: Implement**; the lint rule from Task 10 now also forbids `import ChauffeurBridge` in `Doctor.swift`
+- [ ] **Step 3: Implement**; the lint rule from Task 10b now also forbids `import ChauffeurBridge` in `Doctor.swift`
 - [ ] **Step 4: Run the stage** — `scripts/check.sh`; live suites; `scripts/live-expectations.sh` (only Doctor lines differ; note them in the PR)
 - [ ] **Step 5: Commit and PR** — `git commit -m "Doctor uses the engine's wrappers and wording"`, push `refactor-1b-inputs`, open the PR.
 
@@ -727,6 +937,8 @@ Branch `refactor-2-pipeline`. PR title: "Refactor 2: evidence passes, one credit
 - [ ] **Step 5: Timing** — `time swift test` (unit only): no test sleeps; note the wall time in the PR.
 - [ ] **Step 6: Changelog** — under Unreleased: "Internal: one evidence pipeline for taps; no result changes." and the Doctor line from Task 13 if it isn't there yet.
 - [ ] **Step 7: Push and PR** — `git push -u origin refactor-2-pipeline && gh pr create --base main --title "Refactor 2: evidence passes, one credit, one network watch"`. Merge after CI; then write Plan 2.
+  The PR must say that "the shot once, last" changes the artefacts folder: today a NO EFFECT later upgraded by the
+  switch retry or the clipboard check has already written its screenshot there; after Task 16 no file is written.
 
 ---
 
@@ -820,7 +1032,61 @@ load from outside the session rose to about 51: a request from the Network tab's
 the dead tap's window (the attribution Stage 5 fixes) and the taps took 1.1 to 2.0 s. `NetworkLiveTests` re-run alone
 at load 3: 12 of 12 passed, the dead button included. The ledger body is unchanged.
 
-**For Plan 2:** a task must retire the closure seams (`isAlive`, `simulatorBooted`, `simulatorBootDate`,
-`findCrashReport`, `relaunch`, `commandHook`, `telemetryOverride`, `crashReportWaitMs`) into `SessionEnvironment`;
-until then two seams answer "is this process alive" and "is the simulator booted". Stage 5's `Sweep` should also lift
-`complete` off `AXSource`, so the bar sweep runs on top of any source (spec §2) and can be tested offline.
+**For Plan 2:** a task must retire the closure seams still on `Session` after Task 10a: `relaunch`, `commandHook`,
+`telemetryOverride` and `crashReportWaitMs` (`isAlive`, `simulatorBooted`, `simulatorBootDate` and `findCrashReport`
+move into `SessionEnvironment` in Task 10a, after the Fable review of this stage found that neutral closures set on the
+session would have been a second seam style; `processes` is then the only answer to "is this process alive" and the
+environment's `simulatorBooted` the only one to "is the simulator booted", beside `device.booted` for the connected
+device). Stage 5's `Sweep` should also lift `complete` off `AXSource`, so the bar sweep runs on top of any source
+(spec §2) and can be tested offline.
+
+### Stage 1b (branch `refactor-1b-inputs`)
+
+**The plan was amended before execution** (commit 0106398), from the Fable review of Stage 1a: Task 10 split into 10a and
+10b, the closures moved into the environment, and Task 12 gained the upgrade-path pins. That supersedes two Stage 1a
+lines above: Task 7's "the closure seams stay as they are in this plan" and the "Two seams for one fact, until Plan 2"
+paragraph. After 10a, `processes` is the only liveness seam, and `.live`'s `inputs` holds the `Device` cast that
+`transportsReady` used to make.
+
+**HID owns the client.** `CHHIDClient` appears only in `Device/HID.swift` (lint `hid-owner`); `HID.open()` returns
+nothing, so no other file can get hold of the client without naming it. `Input.swift` has no `usleep`: taps, drags and
+the keyboard wait on the session's clock. A failed send now does explicitly what the rebuild used to do implicitly:
+`inputDevice.reset()`, `preferred = 0`, and `inputDeviceLost`, which keeps `type`'s "HID client lost after focusing"
+error. The plan's `try inputDevice().keyboard(...)` would have removed that error on two reachable paths (a focus tap
+whose send failed with the touch log unattached, and a reconnect inside `observe`), so it was kept by ruling. The method
+is `inputDeviceReady()`, since Swift won't allow a method and a property both named `inputDevice`.
+
+**Task 11's protocol was wrong in the plan** (a `start(bundle:pid:)` that doesn't exist); `LogSource` lists what
+`Session` reads from `LogTap`, and `LogTap.append` is public. `SessionNetworkTests` runs on `.scripted` (0.05 s) with
+its flow source built up front, as `netStart()` builds it in production.
+
+**Task 12: what the recorded goldens showed against the table.** Diff lines are `-`/`+` only (the table's `~ … off → on`
+was notation). A text node gets no ref, so a scroll's found line is `found text "Label 69" after …`, as the live
+`ScrollLiveTests` expects; "Row 48" isn't in `fixture-longlist`, so the scroll uses `long-scrollview`. The screen-again
+`settledMs` (770 ms) counts from the touch and so includes the 50 ms hold. The `wait` pin needs a tap that settles later
+than the wait (225 ms against 150 ms), or deleting `Session+Wait.swift:83` changes nothing. Offline, a NO EFFECT has no
+`screen:` line, because `capture` finds no file. The live ledger's unit-twin column comes from `scripts/live-twins.tsv`;
+only the twinned lines changed.
+
+**Not pinned yet, and needed before Stage 2 Task 16:** `judgeScreenAgain` skips replies that are telemetry only
+(`Session+Network.swift`, the `!$0.telemetry` guard). Nothing pins that it doesn't fire for them, and it guards against
+a false `changed`. A pin needs `ScriptedLogs` to release log lines after the touch, because flow-only items are never
+telemetry. **Task 16 writes that pin first.** Also unpinned: the drop-inside-`observe` path of `inputDeviceLost`.
+
+**Task 13: Doctor's wording, by ruling.** The relaunch and no-tree findings are `AXHealth.message(plan, recovered:
+false)`. The relaunch line has no flags clause, because Doctor only reads the flags. The poisoned-bridge line keeps
+Doctor's own text, because every `AXHealth` bridge message says chauffeur restarted the bridge, and Doctor never does.
+The flags-off warning keeps its text, because no plan covers flags off with a tree. One finding changed, not only
+its wording: with no tree and the flags off, Doctor says to relaunch, as `Session` decides, where it used to point at
+the bridge or say "no tree". The old bridge text's "chauffeur does this itself after 4 s" was false in that case.
+This is in the CHANGELOG. For Plan 2's glossary: the two `AXHealth` lines drop Doctor's `accessibility:` prefix, and
+the no-tree line says "run: chauffeur doctor" inside doctor's own output.
+
+**For Plan 2:** `AXProvider` has two public inits (`init(sim:)` for `.live` and the live tests, `init(device:)` for
+Doctor); `button` and `selftest` have no offline test (`FakeInputs.pressed` is ready for one); `Session.swift` is 323
+lines, over the 300 aim.
+
+**Live run at the end of Stage 1b** (ab24da8, iPhone 17 on iOS 27, load 5 at start and about 57 by the end from
+activity outside the session, 881 s): 515 tests; only the pre-existing `anAppStartedWithTheFlagsOffIsToldToRelaunch`
+failed (2 issues, fails on `main` too). `NetworkLiveTests` passed, the dead button included. The live ledger's body is
+unchanged from line 3 on; against `main`, only the nine twinned lines gained their twin column.

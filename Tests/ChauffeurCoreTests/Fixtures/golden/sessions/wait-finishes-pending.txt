@@ -1,0 +1,15 @@
+tap e1 "Show alert" → changed · settled 150ms · rev 1→2
++ heading "Form"
++ textfield "email" [e6] value="Email"
++ securefield "password" [e7] value="Password"
++ switch "Agree to terms" [e8] value=off
++ button "Submit" [e9] disabled
+- heading "Status"
+- text "Last action: none"
+- heading "Actions"
+- button "Show alert" [e1]
+- button "Request location" [e2]
+- button "Request notifications" [e3]
+- button "Long list" [e4]
+… 1 more changes — run snapshot
+request: 127.0.0.1:8765 · sent 58 B, got 512 B · telemetry filter unavailable for 127.0.0.1

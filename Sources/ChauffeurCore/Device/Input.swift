@@ -1,4 +1,3 @@
-import ChauffeurBridge
 import Foundation
 
 public enum TouchPhase: Sendable { case down, move, up }
@@ -11,51 +10,52 @@ public protocol TouchTransport: AnyObject {
     func touch(_ normalised: Point, _ phase: TouchPhase) -> Bool
 }
 
+/// What `Session` sends input through: `HID` in production, a fake in tests.
 @MainActor
-public final class DigitizerTransport: TouchTransport {
-    public let name = "digitizer"
-    public let supportsMove = true
-    private let hid: CHHIDClient
-    public init(hid: CHHIDClient) { self.hid = hid }
-    public func touch(_ p: Point, _ phase: TouchPhase) -> Bool {
-        hid.digitizer(at: CGPoint(x: p.x, y: p.y), touching: phase != .up)
-    }
+public protocol InputDevice: AnyObject {
+    /// Digitizer first, then mouse. The same objects until `reset()`: `act` compares transports by identity.
+    func transports() throws -> [any TouchTransport]
+    func keyboard(clock: any SettleClock) throws -> any TextInput
+    /// Presses and releases `button`, holding it for `button.holdMs`.
+    func press(_ button: HardwareButton, clock: any SettleClock) throws -> Bool
+    /// After a failed send: drop the client; the next call rebuilds it.
+    func reset()
 }
 
+/// Key presses on the HID keyboard page (spec §5.1).
 @MainActor
-public final class MouseTransport: TouchTransport {
-    public let name = "mouse"
-    public let supportsMove = false
-    private let hid: CHHIDClient
-    public init(hid: CHHIDClient) { self.hid = hid }
-    public func touch(_ p: Point, _ phase: TouchPhase) -> Bool {
-        switch phase {
-        case .down: return hid.mouse(at: CGPoint(x: p.x, y: p.y), down: true)
-        case .up: return hid.mouse(at: CGPoint(x: p.x, y: p.y), down: false)
-        case .move: return false
-        }
-    }
+public protocol TextInput {
+    /// Types page-7 text (call only when `Keys.typeable`).
+    func type(_ text: String) -> Bool
+    func press(_ usage: UInt32, modifiers: [UInt32]) -> Bool
+}
+
+extension TextInput {
+    public func press(_ usage: UInt32) -> Bool { press(usage, modifiers: []) }
 }
 
 @MainActor
 public enum Gestures {
-    public static func tap(_ t: TouchTransport, at p: Point, screen: Size, holdMs: Int = 50) -> Bool {
+    public static func tap(
+        _ t: any TouchTransport, at p: Point, screen: Size, holdMs: Int = 50, clock: any SettleClock
+    ) -> Bool {
         let n = Geometry.normalised(p, screen: screen)
         let down = t.touch(n, .down)
-        usleep(UInt32(holdMs) * 1000)
+        clock.sleep(ms: holdMs)
         let up = t.touch(n, .up)
         return down && up
     }
 
     /// A straight drag in `steps` moves, `stepMs` apart. Needs a transport that supports moves.
     public static func drag(
-        _ t: TouchTransport, from a: Point, to b: Point, screen: Size, steps: Int = 12, stepMs: Int = 16
+        _ t: any TouchTransport, from a: Point, to b: Point, screen: Size, steps: Int = 12, stepMs: Int = 16,
+        clock: any SettleClock
     ) -> Bool {
         guard t.supportsMove else { return false }
         var ok = t.touch(Geometry.normalised(a, screen: screen), .down)
         for i in 1...steps {
             let f = Double(i) / Double(steps)
-            usleep(UInt32(stepMs) * 1000)
+            clock.sleep(ms: stepMs)
             ok =
                 t.touch(
                     Geometry.normalised(Point(x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f), screen: screen),
@@ -118,31 +118,4 @@ public enum Keys {
     }
 
     public static func typeable(_ text: String) -> Bool { text.allSatisfy { usage(for: $0) != nil } }
-}
-
-@MainActor
-public struct Keyboard {
-    let hid: CHHIDClient
-    public init(hid: CHHIDClient) { self.hid = hid }
-
-    /// Types page-7 text (call only when `Keys.typeable`). ~35 ms per character (S4).
-    public func type(_ text: String) -> Bool {
-        var ok = true
-        for c in text {
-            guard let k = Keys.usage(for: c) else { return false }
-            ok = press(k.usage, modifiers: k.shift ? [Keys.shift] : []) && ok
-        }
-        return ok
-    }
-
-    public func press(_ usage: UInt32, modifiers: [UInt32] = []) -> Bool {
-        var ok = true
-        for m in modifiers { ok = hid.key(usage: m, down: true) && ok }
-        ok = hid.key(usage: usage, down: true) && ok
-        usleep(15_000)
-        ok = hid.key(usage: usage, down: false) && ok
-        for m in modifiers.reversed() { ok = hid.key(usage: m, down: false) && ok }
-        usleep(15_000)
-        return ok
-    }
 }

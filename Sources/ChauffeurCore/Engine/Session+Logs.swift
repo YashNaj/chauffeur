@@ -3,18 +3,20 @@ import Foundation
 extension Session {
     /// After a daemon restart the launched app is known but its log is not followed yet; retried every 30 s at most.
     func followLaunchedApp() {
-        guard let app, logTap.executable != app.executable else { return }
+        guard let app, logs.executable != app.executable else { return }
         if let last = logTapAttemptMs, clock.nowMs() - last < 30_000 { return }
         logTapAttemptMs = clock.nowMs()
-        logTap.start(executable: app.executable)
+        logs.start(executable: app.executable)
     }
 
     /// Notices that the launched app is gone without chauffeur ending it. Reported once: the app stops being
     /// followed, and the crash is kept for `logs`, which keeps looking for the report.
     func detectCrash() -> CrashInfo? {
-        guard let gone = app, !isAlive(gone.pid) else { return nil }
+        guard let gone = app, !processes.isAlive(gone.pid) else { return nil }
         // A simulator that was shut down, or rebooted since the app launched, explains the missing process.
-        if simulatorBooted() == false || simulatorBootDate().map({ $0 > gone.launchedAt }) == true {
+        if environment.simulatorBooted() == false
+            || environment.simulatorBootDate().map({ $0 > gone.launchedAt }) == true
+        {
             simulatorWentDown()
             return nil
         }
@@ -26,12 +28,12 @@ extension Session {
         var info = CrashInfo(app: gone, detectedAt: Date(), report: nil)
         let deadline = clock.nowMs() + crashReportWaitMs
         while true {
-            info.report = findCrashReport(gone)
+            info.report = environment.findCrashReport(gone)
             if info.report != nil || clock.nowMs() >= deadline { break }
             clock.sleep(ms: 250)
         }
         // After the wait: under load the log stream lags the exit.
-        info.fatalLine = CrashInfo.fatalLine(in: Array(logTap.since(appLogCursor ?? 0).suffix(50)))
+        info.fatalLine = CrashInfo.fatalLine(in: Array(logs.since(appLogCursor ?? 0).suffix(50)))
         crash = info
         return info
     }
@@ -67,7 +69,7 @@ extension Session {
             let from = crashed == nil ? cursor : min(cursor, actionCursor ?? lastActionLogCursor)
             // CFNetwork's lines about a request the result already shows add nothing but noise (spec §3).
             let shown = out.data?["requests"] != nil
-            let errors = logTap.since(from).filter {
+            let errors = self.logs.since(from).filter {
                 $0.isError && !(shown && $0.sender == "CFNetwork" && $0.message.hasPrefix("Task <"))
             }
             extra += LogLine.summary(errors)
@@ -102,7 +104,7 @@ extension Session {
         }
 
         _ = detectCrash()
-        if var c = crash, c.report == nil, let report = findCrashReport(c.app) {
+        if var c = crash, c.report == nil, let report = environment.findCrashReport(c.app) {
             c.report = report
             crash = c
         }
@@ -111,7 +113,7 @@ extension Session {
                 "no app launched through chauffeur yet: logs follow the app started with chauffeur launch <bundle>",
                 exit: .error)
         }
-        let pool = sinceLast ? logTap.since(lastActionLogCursor) : logTap.all
+        let pool = sinceLast ? logs.since(lastActionLogCursor) : logs.all
         let filtered = level == "error" ? pool.filter(\.isError) : pool
         let lines = Array(filtered.suffix(count ?? (sinceLast ? 200 : 30)))
         let file = writeLogFile()
@@ -121,7 +123,7 @@ extension Session {
             "logs · \(followed.bundle) (pid \(followed.pid), \(state)) · \(lines.count) of \(filtered.count) lines (\(scope))"
                 + (file.map { " · full log: \($0.path)" } ?? "")
         ]
-        if app != nil && !logTap.isAttached {
+        if app != nil && !logs.isAttached {
             text.append("note: the log stream is not attached; recent lines may be missing")
         }
         text += lines.map { $0.render() }
@@ -144,7 +146,7 @@ extension Session {
             return nil
         }
         let url = dir.appendingPathComponent("logs.txt")
-        let text = logTap.all.map { $0.render(limit: 4000) }.joined(separator: "\n") + "\n"
+        let text = logs.all.map { $0.render(limit: 4000) }.joined(separator: "\n") + "\n"
         return (try? text.write(to: url, atomically: true, encoding: .utf8)) != nil ? url : nil
     }
 }

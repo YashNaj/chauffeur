@@ -1,4 +1,3 @@
-import ChauffeurBridge
 import Foundation
 
 /// Warm per-simulator state: bridge objects, refs, the latest snapshot, the touch log.
@@ -7,11 +6,12 @@ public final class Session {
     public let udid: String
     var device: (any SimDevice)?
     var ax: (any AXSource)?
-    var hid: CHHIDClient?
-    var transports: [TouchTransport] = []
+    /// Touches, keys and buttons, built on first use (`inputDeviceReady()`); `drop()` forgets it.
+    var inputDevice: (any InputDevice)?
+    /// Set when the input device is reset (a failed send) or dropped; `type` clears it before focusing the field.
+    var inputDeviceLost = false
+    /// The transport that last delivered, as an index into the input device's transports.
     var preferred = 0
-    /// The launched app's unified log (spec §6.8).
-    let logTap: LogTap
     /// The app `chauffeur launch` started; its exit without chauffeur ending it is a crash.
     var app: TrackedApp?
     /// The last crash noticed, kept for `logs`, which keeps looking for its report.
@@ -32,12 +32,6 @@ public final class Session {
     nonisolated static let endedGraceMs = 10_000
     /// Test seam: runs inside a command, just before it executes (stands in for what it does to the launched app).
     var commandHook: ((String) -> Void)?
-    /// Seams for unit tests: is the simulator booted (nil: could not tell), and when did its current boot start.
-    var simulatorBooted: () -> Bool? = { nil }
-    var simulatorBootDate: () -> Date? = { nil }
-    /// Seams for unit tests: process liveness and the crash-report lookup.
-    var isAlive: (Int32) -> Bool
-    var findCrashReport: (TrackedApp) -> CrashReport?
     var refs = RefTable()
     var rev = 0
     var last: Snapshot?
@@ -68,7 +62,7 @@ public final class Session {
     var pendingTap: PendingTap?
     /// Test seam: the project's telemetry entries (default: `.chauffeur.json` from the client's directory).
     var telemetryOverride: [String]?
-    /// Where the launched app's log lines start in `logTap` (crash evidence is this launch's lines only).
+    /// Where the launched app's log lines start in `logs` (crash evidence is this launch's lines only).
     var appLogCursor: Int?
     /// What the session reaches outside itself: `.live` in the daemon, scripted in tests.
     let environment: SessionEnvironment
@@ -78,20 +72,15 @@ public final class Session {
     var touchLog: any TouchEvidenceSource { environment.touchEvidence }
     var shell: any ShellRunner { environment.shell }
     var processes: any ProcessTable { environment.processes }
+    /// The launched app's unified log (spec §6.8).
+    var logs: any LogSource { environment.logs }
 
     public init(udid: String, environment: SessionEnvironment) {
         self.udid = udid
         self.environment = environment
-        logTap = LogTap(udid: udid)
-        simulatorBooted = { SimBoot.booted(udid: udid) }
-        simulatorBootDate = { SimBoot.date(udid: udid) }
-        let processes = environment.processes
-        isAlive = { processes.isAlive($0) }
-        findCrashReport = { app in CrashFinder.find(bundle: app.bundle, pid: app.pid, udid: udid, since: app.launchedAt)
-        }
         // A restarted daemon (upgrade, idle exit) keeps following an app that is still running.
         if let saved = TrackedApp.load(StatePaths.app(udid)) {
-            if processes.isAlive(saved.pid) { app = saved } else { TrackedApp.clear(StatePaths.app(udid)) }
+            if environment.processes.isAlive(saved.pid) { app = saved } else { TrackedApp.clear(StatePaths.app(udid)) }
         }
     }
 
@@ -102,7 +91,7 @@ public final class Session {
 
     public func shutdown() {
         touchLog.stop()
-        logTap.stop()
+        logs.stop()
     }
 
     /// Connects lazily; after the device stops being booted, drops everything (spec §6.9).
@@ -131,7 +120,7 @@ public final class Session {
     func simulatorWentDown() {
         noTreeSinceMs = nil
         lastNoTreeMs = nil
-        logTap.stop()
+        logs.stop()
         if app != nil {
             app = nil
             TrackedApp.clear(StatePaths.app(udid))
@@ -145,8 +134,8 @@ public final class Session {
         touchLog.stop()
         device = nil
         ax = nil
-        hid = nil
-        transports = []
+        inputDevice = nil
+        inputDeviceLost = true
     }
 
     /// Polls the raw tree until it settles, completes it (bar sweep) and publishes a snapshot.
@@ -227,7 +216,7 @@ public final class Session {
         traceTarget = nil
         traceArgs = command == "type" ? Self.provisionalType(argv) : nil
         if Self.logged.contains(command) || command == "logs" { followLaunchedApp() }
-        let cursor = logTap.cursor
+        let cursor = logs.cursor
         let previousActionCursor = lastActionLogCursor
         if Self.logged.contains(command) { lastActionLogCursor = cursor }
         if Self.logged.contains(command) { pendingTap = nil }

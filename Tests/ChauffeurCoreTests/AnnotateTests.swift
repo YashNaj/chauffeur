@@ -9,15 +9,22 @@ import Testing
         bundle: "dev.chauffeur.fixture", executable: "Fixture", displayName: "Fixture", pid: 4321,
         launchedAt: Date())
 
-    /// A session whose launched app is `fixture`, with no simulator, no waiting and a fake liveness check.
-    func session(alive: Bool, report: CrashReport? = nil) -> Session {
-        let s = Session(udid: "ZZ" + String(format: "%06X", UInt32.random(in: 0...0xFFFFFF)) + "-TEST")
+    /// A session whose launched app is `fixture`, with no simulator, no waiting and a fake liveness check: `procs`
+    /// (alive: just the app's pid) is what a test changes between commands.
+    func session(
+        alive: Bool, report: CrashReport? = nil, booted: Bool? = true, bootDate: Date? = nil,
+        procs: FakeProcesses? = nil, findReport: ((TrackedApp) -> CrashReport?)? = nil
+    ) -> Session {
+        var env = SessionEnvironment.scripted(
+            ax: ScriptedAX(frames: []), processes: procs ?? FakeProcesses(alive: alive ? [4321] : []),
+            simulatorBooted: { booted }, simulatorBootDate: { bootDate }, findCrashReport: findReport ?? { _ in report }
+        )
+        // The fake udid has no simulator: connecting fails, as it does for the real device.
+        env.device = { FakeDevice(udid: $0, booted: false, size: Size(w: 402, h: 874)) }
+        let s = Session(
+            udid: "ZZ" + String(format: "%06X", UInt32.random(in: 0...0xFFFFFF)) + "-TEST", environment: env)
         s.app = fixture
-        s.isAlive = { _ in alive }
-        s.findCrashReport = { _ in report }
         s.crashReportWaitMs = 0
-        s.simulatorBooted = { true }
-        s.simulatorBootDate = { nil }
         s.logTapAttemptMs = s.clock.nowMs()  // no real `log stream` for a fake simulator
         return s
     }
@@ -27,10 +34,10 @@ import Testing
 
     @Test func actionsGetTheirNewErrorLines() {
         let s = session(alive: true)
-        s.logTap.append(LogLine(time: "t", level: "error", message: "before the action"))
-        let cursor = s.logTap.cursor
-        s.logTap.append(LogLine(time: "t", level: "info", message: "fine"))
-        s.logTap.append(LogLine(time: "t", level: "error", message: "save failed"))
+        s.logs.append(LogLine(time: "t", level: "error", message: "before the action"))
+        let cursor = s.logs.cursor
+        s.logs.append(LogLine(time: "t", level: "info", message: "fine"))
+        s.logs.append(LogLine(time: "t", level: "error", message: "save failed"))
         let out = s.annotate(Output("tap e2 \"Save\" → changed · settled 200ms · rev 1→2"), since: cursor, logs: true)
         #expect(out.text == "tap e2 \"Save\" → changed · settled 200ms · rev 1→2\nlogs: [error] \"save failed\"")
         #expect(out.exit == 0 && out.data?["logs"]?.array?.count == 1)
@@ -40,8 +47,8 @@ import Testing
 
     @Test func aVanishedAppIsACrashReportedOnce() {
         let s = session(alive: false)
-        let cursor = s.logTap.cursor
-        s.logTap.append(LogLine(time: "t", level: "fault", message: "fixture: crashing"))
+        let cursor = s.logs.cursor
+        s.logs.append(LogLine(time: "t", level: "fault", message: "fixture: crashing"))
         let out = s.annotate(tapped, since: cursor, logs: true)
         #expect(out.exit == 5)
         #expect(
@@ -58,10 +65,10 @@ import Testing
 
     @Test func aCrashNoticedByALaterCommandStillShowsTheLastActionsErrors() {
         let s = session(alive: false)
-        s.logTap.append(LogLine(time: "t", level: "error", message: "long before"))
-        s.lastActionLogCursor = s.logTap.cursor  // the tap that triggered the crash started here
-        s.logTap.append(LogLine(time: "t", level: "fault", message: "fixture: crashing"))
-        let later = s.logTap.cursor  // a snapshot starts after the crash was logged
+        s.logs.append(LogLine(time: "t", level: "error", message: "long before"))
+        s.lastActionLogCursor = s.logs.cursor  // the tap that triggered the crash started here
+        s.logs.append(LogLine(time: "t", level: "fault", message: "fixture: crashing"))
+        let later = s.logs.cursor  // a snapshot starts after the crash was logged
         let out = s.annotate(Output("app \"SpringBoard\" · rev 9"), since: later, logs: false)
         #expect(out.exit == 5 && out.text.contains("\nlogs: [fault] \"fixture: crashing\"\n"))
         #expect(!out.text.contains("long before"))
@@ -94,29 +101,30 @@ import Testing
     }
 
     @Test func anAppThatDiesSlowlyAfterAPermissionChangeIsNotACrash() throws {
-        let s = session(alive: true)
+        let procs = FakeProcesses(alive: [4321])
+        let s = session(alive: true, procs: procs)
         defer { TrackedApp.clear(StatePaths.app(s.udid)) }
         let ended = try #require(s.release("dev.chauffeur.fixture"))  // what `permission grant` does first
-        s.isAlive = { _ in true }  // still alive when the 1 s grace window ends: followed again
+        procs.alive = [4321]  // still alive when the 1 s grace window ends: followed again
         #expect(s.afterPermissionChange(ended, waitMs: 0) == nil && s.app == ended)
-        s.isAlive = { _ in false }  // …and it dies a little later, because chauffeur's change ended it
+        procs.alive = []  // …and it dies a little later, because chauffeur's change ended it
         let out = s.annotate(Output("snapshot"), since: 0, logs: false)
         #expect(out == Output("snapshot") && s.app == nil && s.crash == nil)
     }
 
     @Test func aDeathLongAfterChauffeurEndedItIsStillACrash() throws {
-        let s = session(alive: true)
+        let procs = FakeProcesses(alive: [4321])
+        let s = session(alive: true, procs: procs)
         defer { TrackedApp.clear(StatePaths.app(s.udid)) }
         let ended = try #require(s.release("dev.chauffeur.fixture"))
         s.endedByChauffeur[ended.pid] = s.clock.nowMs() - 11_000
         s.track(ended)
-        s.isAlive = { _ in false }
+        procs.alive = []
         #expect(s.annotate(Output("snapshot"), since: 0, logs: false).exit == 5)
     }
 
     @Test func aShutDownSimulatorIsNotACrash() {
-        let s = session(alive: false)
-        s.simulatorBooted = { false }
+        let s = session(alive: false, booted: false)
         #expect(s.annotate(tapped, since: 0, logs: true) == tapped)
         #expect(s.app == nil && s.crash == nil)
         let logs = try? s.logsCommand([])
@@ -124,19 +132,18 @@ import Testing
     }
 
     @Test func logsAfterAShutdownDoesNotReportACrash() throws {
-        let s = session(alive: false)
+        let s = session(alive: false, booted: false)
         defer { try? FileManager.default.removeItem(at: StatePaths.artifacts(s.udid)) }
-        s.simulatorBooted = { false }
         let logs = try s.logsCommand([])
         #expect(logs.exit == 1 && !logs.text.contains("APP CRASHED") && s.crash == nil)
     }
 
     @Test func aRebootedSimulatorIsNotACrash() {
-        let s = session(alive: false)
-        s.simulatorBootDate = { self.fixture.launchedAt.addingTimeInterval(5) }  // booted again after the app launched
+        // booted again after the app launched
+        let s = session(alive: false, bootDate: fixture.launchedAt.addingTimeInterval(5))
         #expect(s.annotate(tapped, since: 0, logs: true) == tapped && s.app == nil && s.crash == nil)
-        let steady = session(alive: false)
-        steady.simulatorBootDate = { self.fixture.launchedAt.addingTimeInterval(-600) }  // same boot: a real crash
+        // same boot: a real crash
+        let steady = session(alive: false, bootDate: fixture.launchedAt.addingTimeInterval(-600))
         #expect(steady.annotate(tapped, since: 0, logs: true).exit == 5)
     }
 
@@ -166,7 +173,7 @@ import Testing
         ] {
             let s = session(alive: false)
             defer { try? FileManager.default.removeItem(at: StatePaths.artifacts(s.udid)) }
-            s.logTap.append(LogLine(time: "t", level: "fault", message: "fixture: crashing"))
+            s.logs.append(LogLine(time: "t", level: "fault", message: "fixture: crashing"))
             // These commands stop following the app (`release`) as soon as they run; that must not hide the crash.
             s.commandHook = { _ in s.release("dev.chauffeur.fixture") }
             let out = s.run(command)
@@ -187,10 +194,9 @@ import Testing
     @Test func logsShowsTheReportOnceMacOSHasWrittenIt() throws {
         let report = try #require(CrashReport.parse(try Fixtures.crash("Fixture-sample"), path: "/r/Fixture.ips"))
         var written = false
-        let s = session(alive: false)
+        let s = session(alive: false, findReport: { _ in written ? report : nil })
         defer { try? FileManager.default.removeItem(at: StatePaths.artifacts(s.udid)) }
-        s.findCrashReport = { _ in written ? report : nil }
-        s.logTap.append(LogLine(time: "22:31:04.120", level: "fault", message: "fixture: crashing"))
+        s.logs.append(LogLine(time: "22:31:04.120", level: "fault", message: "fixture: crashing"))
         #expect(
             s.annotate(tapped, since: 0, logs: true).text.contains(
                 "APP CRASHED: dev.chauffeur.fixture (pid 4321) · crash report not written yet"))
@@ -215,8 +221,8 @@ import Testing
     /// M2 transcripts: agents asked for `--since-last --last 40` and got a usage error.
     @Test func logsTakesSinceLastWithACount() throws {
         let s = session(alive: true)
-        s.lastActionLogCursor = s.logTap.cursor
-        for i in 1...3 { s.logTap.append(LogLine(time: "t", level: "error", message: "line \(i)")) }
+        s.lastActionLogCursor = s.logs.cursor
+        for i in 1...3 { s.logs.append(LogLine(time: "t", level: "error", message: "line \(i)")) }
         let out = try s.logsCommand(["--since-last", "--last", "2"])
         #expect(
             out.text.contains("2 of 3 lines (since the last action)") && !out.text.contains("line 1"), "\(out.text)")
@@ -225,12 +231,12 @@ import Testing
     @Test func onlyThisLaunchsOwnFatalLinesMakeACrash() {
         let s = session(alive: false)
         defer { try? FileManager.default.removeItem(at: StatePaths.artifacts(s.udid)) }
-        s.logTap.append(
+        s.logs.append(
             LogLine(
                 time: "t", level: "default", message: "Fixture/FixtureApp.swift:57: Fatal error: fixture crash",
                 sender: "libswiftCore"))
-        s.appLogCursor = s.logTap.cursor  // the relaunch
-        s.logTap.append(LogLine(time: "t", level: "fault", message: "UIKit fault", sender: "UIKitCore"))
+        s.appLogCursor = s.logs.cursor  // the relaunch
+        s.logs.append(LogLine(time: "t", level: "fault", message: "UIKit fault", sender: "UIKitCore"))
         #expect(s.annotate(Output("ok"), since: 0, logs: false).text.contains("APP EXITED"))
     }
 }

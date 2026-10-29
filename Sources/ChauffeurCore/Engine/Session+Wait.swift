@@ -104,7 +104,7 @@ extension Session {
             let open = netItems(pending.net, previous: &previous).filter { $0.waiting && !$0.telemetry }
             return open.isEmpty ? nil : open.map { RequestText.target($0) + " (\(elapsed))" }.joined(separator: ", ")
         }
-        let open = RequestLog.parse(logTap.since(lastActionLogCursor)).filter { !$0.finished && $0.host != nil }
+        let open = RequestLog.parse(logs.since(lastActionLogCursor)).filter { !$0.finished && $0.host != nil }
         let items = RequestEvidence.merge(records: open, activity: [], streaming: [], telemetryExtra: telemetryHosts())
             .filter { !$0.telemetry }
         return items.isEmpty ? nil : items.map(RequestText.target).joined(separator: ", ")

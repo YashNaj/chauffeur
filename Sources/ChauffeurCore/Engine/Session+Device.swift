@@ -46,8 +46,8 @@ extension Session {
     /// After a permission change: follows the app again if it survived, or says the change ended it (not a crash).
     func afterPermissionChange(_ tracked: TrackedApp, waitMs: Int) -> String? {
         let deadline = clock.nowMs() + waitMs
-        while isAlive(tracked.pid), clock.nowMs() < deadline { clock.sleep(ms: 100) }
-        guard !isAlive(tracked.pid) else {
+        while processes.isAlive(tracked.pid), clock.nowMs() < deadline { clock.sleep(ms: 100) }
+        guard !processes.isAlive(tracked.pid) else {
             track(tracked)
             return nil
         }

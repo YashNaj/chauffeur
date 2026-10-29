@@ -1,4 +1,3 @@
-import ChauffeurBridge
 import Foundation
 import Testing
 
@@ -6,16 +5,16 @@ import Testing
 
 @Suite(.enabled(if: Live.enabled), .serialized)
 @MainActor struct InputLiveTests {
-    func setUp() throws -> (Device, AXProvider, CHHIDClient) {
+    func setUp() throws -> (Device, AXProvider, HID) {
         try Live.launchFixture()
         let device = try Device(udid: Live.udid!)
-        return (device, try AXProvider(sim: device.sim), try CHHIDClient(simulator: device.sim))
+        return (device, try AXProvider(sim: device.sim), HID(device: device))
     }
 
-    func tapAndExpectAlert(_ transport: TouchTransport, _ device: Device, _ ax: AXProvider) throws {
+    func tapAndExpectAlert(_ transport: any TouchTransport, _ device: Device, _ ax: AXProvider) throws {
         let home = try #require(waitForTree(ax) { element($0, "Show alert") != nil })
         let button = try #require(element(home, "Show alert"))
-        #expect(Gestures.tap(transport, at: button.frame.center, screen: device.size))
+        #expect(Gestures.tap(transport, at: button.frame.center, screen: device.size, clock: SystemClock()))
         _ = try #require(
             waitForTree(ax, timeout: 3) { element($0, "Fixture alert") != nil }, "\(transport.name) tap did not land")
         // A just-presented alert drops touches for a few hundred ms even after its tree settles (measured
@@ -26,33 +25,33 @@ import Testing
         }
         usleep(400_000)
         let ok = try #require(settled.value?.all.first { $0.label == "OK" })
-        #expect(Gestures.tap(transport, at: ok.frame.center, screen: device.size))
+        #expect(Gestures.tap(transport, at: ok.frame.center, screen: device.size, clock: SystemClock()))
         #expect(waitForTree(ax, timeout: 3) { element($0, "alert ok") != nil } != nil)
     }
 
     @Test func digitizerTapLands() throws {
         let (device, ax, hid) = try setUp()
-        try tapAndExpectAlert(DigitizerTransport(hid: hid), device, ax)
+        try tapAndExpectAlert(try hid.transports()[0], device, ax)
     }
 
     @Test func mouseTapLands() throws {
         let (device, ax, hid) = try setUp()
-        try tapAndExpectAlert(MouseTransport(hid: hid), device, ax)
+        try tapAndExpectAlert(try hid.transports()[1], device, ax)
     }
 
     @Test func keyboardTypesIntoTheFocusedField() throws {
         let (device, ax, hid) = try setUp()
-        let digitizer = DigitizerTransport(hid: hid)
+        let digitizer = try hid.transports()[0]
         let root = try #require(waitForTree(ax) { element($0, "Show alert") != nil })
         // Ruling (Task 10): tab items are AXRadioButton, not AXButton.
         let formTab = try #require(ax.complete(root).all.first { $0.label == "Form" && $0.role == "AXRadioButton" })
-        #expect(Gestures.tap(digitizer, at: formTab.frame.center, screen: device.size))
+        #expect(Gestures.tap(digitizer, at: formTab.frame.center, screen: device.size, clock: SystemClock()))
         let form = try #require(waitForTree(ax) { $0.all.contains { $0.identifier == "email" } })
         let email = try #require(form.all.first { $0.identifier == "email" })
         print("email placeholder attribute: \(email.placeholder ?? "nil"), value: \(email.value ?? "nil")")
-        #expect(Gestures.tap(digitizer, at: email.frame.center, screen: device.size))
+        #expect(Gestures.tap(digitizer, at: email.frame.center, screen: device.size, clock: SystemClock()))
         usleep(300_000)
-        #expect(Keyboard(hid: hid).type("Ab@1.test_X"))
+        #expect(try hid.keyboard(clock: SystemClock()).type("Ab@1.test_X"))
         let typed = waitForTree(ax, timeout: 3) {
             $0.all.contains { $0.identifier == "email" && $0.value == "Ab@1.test_X" }
         }

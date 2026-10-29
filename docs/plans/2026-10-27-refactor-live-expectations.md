@@ -1,4 +1,4 @@
-Literals the live tests expect (contains, hasPrefix, hasSuffix, == "…"), one `file: literal` per line, made by scripts/live-expectations.sh at 381f60b.
+Literals the live tests expect (contains, hasPrefix, hasSuffix, == "…"), one `file: literal` per line, made by scripts/live-expectations.sh at ffeb3da.
 
 AXLiveTests.swift: == "Fixture"
 AXLiveTests.swift: == "Form"
@@ -37,7 +37,7 @@ DeviceLiveTests.swift: hasPrefix("push dev.chauffeur.fixture → sent ("
 GesturesLiveTests.swift: contains("from the left edge"
 GesturesLiveTests.swift: contains("→ UNVERIFIED: no visible change (a button press leaves no touch evidence)"
 GesturesLiveTests.swift: hasPrefix("button home → changed"
-GesturesLiveTests.swift: hasPrefix("swipe (201,650)→(201,250) → changed"
+GesturesLiveTests.swift: hasPrefix("swipe (201,650)→(201,250) → changed" — unit twin: SessionGestureTests.swipeIsVerifiedByTheScreen
 InputLiveTests.swift: == "AXRadioButton"
 InputLiveTests.swift: == "Ab@1.test_X"
 InputLiveTests.swift: == "Form"
@@ -70,7 +70,7 @@ NetworkLiveTests.swift: contains("request: 127.0.0.1:8765/slow → 200 OK"
 NetworkLiveTests.swift: contains("request:"
 NetworkLiveTests.swift: contains("telemetry: 1 request (127.0.0.1)"
 NetworkLiveTests.swift: contains("→ NO EFFECT · 127.0.0.1:8765/fail → 500 Internal Server Error"
-NetworkLiveTests.swift: contains("→ PENDING · 127.0.0.1:8765 · sent"
+NetworkLiveTests.swift: contains("→ PENDING · 127.0.0.1:8765 · sent" — unit twin: SessionUpgradeTests.waitFinishesThePendingTap
 NetworkLiveTests.swift: contains("→ PENDING · 127.0.0.1:8765/slow still running after"
 NetworkLiveTests.swift: contains("→ PENDING"
 NetworkLiveTests.swift: contains("→ PENDING"
@@ -99,9 +99,9 @@ TapLiveTests.swift: contains("3pt from the left edge"
 TapLiveTests.swift: contains("Fixture alert"
 TapLiveTests.swift: contains("\nscreen: "
 TapLiveTests.swift: contains("is disabled"
-TapLiveTests.swift: contains("→ NO EFFECT · the accessibility tree did not change"
+TapLiveTests.swift: contains("→ NO EFFECT · the accessibility tree did not change" — unit twin: SessionUpgradeTests.aButtonsNoEffectIsTappedOnceAndNotJudgedAgain
 TapLiveTests.swift: contains("→ changed"
-TapLiveTests.swift: hasPrefix("tap \(showAlert) \"Show alert\" → changed"
+TapLiveTests.swift: hasPrefix("tap \(showAlert) \"Show alert\" → changed" — unit twin: SessionActTests.aChangeOnTheNextFrameIsCredited
 TouchLogLiveTests.swift: == "OK"
 TouchLogLiveTests.swift: == "debug"
 TraceLiveTests.swift: == "<secret: 7 characters>"
@@ -113,9 +113,9 @@ TraceLiveTests.swift: == "type"
 TraceLiveTests.swift: contains("hunter2"
 TypeLiveTests.swift: contains("Submitted: Ab@1.test_X café 🚕"
 TypeLiveTests.swift: contains("hunter2"
-TypeLiveTests.swift: contains("not a text field"
+TypeLiveTests.swift: contains("not a text field" — unit twin: SessionTypeTests.aSwitchIsNotATextField
 TypeLiveTests.swift: contains("typed via keys · value=\"Ab@1.test_X\""
-TypeLiveTests.swift: contains("typed via paste"
-TypeLiveTests.swift: contains("value=off"
-TypeLiveTests.swift: contains("value=on"
-TypeLiveTests.swift: contains("value=on"
+TypeLiveTests.swift: contains("typed via paste" — unit twin: SessionTypeTests.aLongTextIsPastedWithCommandV
+TypeLiveTests.swift: contains("value=off" — unit twin: SessionUpgradeTests.anIgnoredSwitchIsTappedOnceMore
+TypeLiveTests.swift: contains("value=on" — unit twin: SessionUpgradeTests.anIgnoredSwitchIsTappedOnceMore
+TypeLiveTests.swift: contains("value=on" — unit twin: SessionUpgradeTests.anIgnoredSwitchIsTappedOnceMore

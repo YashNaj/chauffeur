@@ -1,7 +1,8 @@
 import Foundation
 
 /// Everything `Session` reaches outside itself: the clock, the simulator, its accessibility tree, the touch log,
-/// `simctl`, the network flows and the host's processes. `.live` in the daemon; tests script each one.
+/// `simctl`, the network flows, the host's processes, the boot state, the crash report, the input device and the
+/// launched app's log. `.live` in the daemon; tests script each one.
 public struct SessionEnvironment {
     public var clock: any SettleClock
     public var device: @MainActor (String) throws -> any SimDevice
@@ -11,6 +12,14 @@ public struct SessionEnvironment {
     /// Built on the first tap, at most once; nil when NetworkStatistics is unavailable.
     public var flows: @MainActor () -> (any FlowSource)?
     public var processes: any ProcessTable
+    /// Is the simulator booted (nil: could not tell), when did its current boot start, and the report for a gone app.
+    public var simulatorBooted: () -> Bool?
+    public var simulatorBootDate: () -> Date?
+    public var findCrashReport: (TrackedApp) -> CrashReport?
+    /// Touches, keys and buttons for a connected device; the session keeps it until it drops the device.
+    public var inputs: @MainActor (any SimDevice) throws -> any InputDevice
+    /// The launched app's unified log.
+    public var logs: any LogSource
 
     /// The real simulator: CoreSimulator, the accessibility bridge, the touch log, `simctl`, NetworkStatistics, `Proc`.
     public static func live(udid: String) -> SessionEnvironment {
@@ -18,7 +27,8 @@ public struct SessionEnvironment {
             clock: SystemClock(),
             device: { try Device(udid: $0) },
             ax: { device in
-                // The one place a `SimDevice` must be a `Device`: the bridge reads the tree through its `CHSimulator`.
+                // The two places a `SimDevice` must be a `Device`: the bridge reads the tree and sends input through
+                // its `CHSimulator`.
                 guard let d = device as? Device else {
                     throw ChauffeurError.bridge("the accessibility bridge needs a CoreSimulator device")
                 }
@@ -27,6 +37,18 @@ public struct SessionEnvironment {
             touchEvidence: TouchLog(udid: udid, levelFile: StatePaths.level(udid)),
             shell: SimCtlRunner(),
             flows: { try? NetStatsSource() },
-            processes: LiveProcessTable())
+            processes: LiveProcessTable(),
+            simulatorBooted: { SimBoot.booted(udid: udid) },
+            simulatorBootDate: { SimBoot.date(udid: udid) },
+            findCrashReport: { app in
+                CrashFinder.find(bundle: app.bundle, pid: app.pid, udid: udid, since: app.launchedAt)
+            },
+            inputs: { device in
+                guard let d = device as? Device else {
+                    throw ChauffeurError.bridge("HID input needs a CoreSimulator device")
+                }
+                return HID(device: d)
+            },
+            logs: LogTap(udid: udid))
     }
 }

@@ -1,0 +1,8 @@
+TapLiveTests.swift: hasPrefix("tap \(showAlert) \"Show alert\" → changed"	SessionActTests.aChangeOnTheNextFrameIsCredited
+TapLiveTests.swift: contains("→ NO EFFECT · the accessibility tree did not change"	SessionUpgradeTests.aButtonsNoEffectIsTappedOnceAndNotJudgedAgain
+GesturesLiveTests.swift: hasPrefix("swipe (201,650)→(201,250) → changed"	SessionGestureTests.swipeIsVerifiedByTheScreen
+NetworkLiveTests.swift: contains("→ PENDING · 127.0.0.1:8765 · sent"	SessionUpgradeTests.waitFinishesThePendingTap
+TypeLiveTests.swift: contains("not a text field"	SessionTypeTests.aSwitchIsNotATextField
+TypeLiveTests.swift: contains("typed via paste"	SessionTypeTests.aLongTextIsPastedWithCommandV
+TypeLiveTests.swift: contains("value=off"	SessionUpgradeTests.anIgnoredSwitchIsTappedOnceMore
+TypeLiveTests.swift: contains("value=on"	SessionUpgradeTests.anIgnoredSwitchIsTappedOnceMore

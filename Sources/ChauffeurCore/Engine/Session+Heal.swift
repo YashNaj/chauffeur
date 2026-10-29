@@ -6,8 +6,7 @@ extension Session {
         guard noTreeForMs >= AXHealth.patienceMs else {
             return AXHealth.Plan(enableFlags: [], restartBridge: false, relaunchApp: false)
         }
-        let flagsOff =
-            (try? shell.simctl(["spawn", udid, "defaults", "read", AXSettings.domain]).out).map(AXSettings.off) ?? []
+        let flagsOff = (try? AXSettings.off(udid: udid, shell: shell)) ?? []
         let probe = ax.probe(center: Point(x: screen.w / 2, y: screen.h / 2))
         let plan = AXHealth.plan(
             noTreeForMs: noTreeForMs, frontmostIsEmptyApp: probe.frontmostIsEmptyApp,

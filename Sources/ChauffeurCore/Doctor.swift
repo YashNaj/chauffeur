@@ -1,4 +1,3 @@
-import ChauffeurBridge
 import Foundation
 
 public struct Check: Equatable, Sendable {
@@ -82,6 +81,58 @@ public enum Doctor {
         return (true, pid)
     }
 
+    /// The accessibility findings from one read: the tree, or why there is none, then the app-accessibility flags
+    /// (`flagsOff` is nil when they could not be read). `probe` runs only when there is no tree.
+    static func accessibilityChecks(
+        root: AXElement?, ms: Int, flagsOff: [String]?, udid: String,
+        probe: () -> (frontmostIsEmptyApp: Bool, screenAnswers: Bool)
+    ) -> [Check] {
+        var checks: [Check] = []
+        if let root, !root.frame.isEmpty {
+            let name = (root.label ?? "").trimmingCharacters(in: .whitespaces)
+            checks.append(
+                Check(
+                    status: .ok,
+                    text:
+                        "accessibility: \(name.isEmpty ? "SpringBoard" : "app \"\(name)\""), \(root.all.count) elements in \(ms)ms"
+                ))
+        } else {
+            checks.append(noTreeCheck(probe(), flagsOff: flagsOff ?? [], udid: udid))
+        }
+        if let flagsOff {
+            checks.append(
+                flagsOff.isEmpty
+                    ? Check(status: .ok, text: "app accessibility on")
+                    : Check(
+                        status: .warn,
+                        text: "app accessibility off (\(flagsOff.joined(separator: ", "))), as an Xcode "
+                            + "device session leaves it; chauffeur turns it back on, and apps opened since then need a relaunch"
+                    ))
+        }
+        return checks
+    }
+
+    /// Why there is no tree, in the words a result's note uses (`AXHealth.message`), with Doctor's one read judged
+    /// past `AXHealth.patienceMs`. Doctor cures nothing, so the plan it renders turns no flag on (the flags line names
+    /// them), and a poisoned bridge keeps its own text: `AXHealth`'s bridge texts report a restart Doctor never makes.
+    static func noTreeCheck(
+        _ probe: (frontmostIsEmptyApp: Bool, screenAnswers: Bool), flagsOff: [String], udid: String
+    ) -> Check {
+        let plan = AXHealth.plan(
+            noTreeForMs: AXHealth.patienceMs, frontmostIsEmptyApp: probe.frontmostIsEmptyApp,
+            screenAnswers: probe.screenAnswers, flagsOff: flagsOff, msSinceBridgeRestart: nil)
+        if plan.restartBridge {
+            return Check(
+                status: .fail,
+                text:
+                    "accessibility: the simulator's accessibility bridge is not answering (it was queried while booting). "
+                    + "Fix: xcrun simctl spawn \(udid) launchctl stop com.apple.CoreSimulator.bridge (chauffeur does this itself after 4 s)"
+            )
+        }
+        let rendered = AXHealth.Plan(enableFlags: [], restartBridge: false, relaunchApp: plan.relaunchApp)
+        return Check(status: .fail, text: AXHealth.message(rendered, recovered: false))
+    }
+
     @MainActor public static func run(udidFlag: String?, live: Bool, env e: CLI.Environment) -> Output {
         var checks: [Check] = []
         let xcode = Shell.run("/usr/bin/xcrun", ["xcodebuild", "-version"], timeout: 30).out
@@ -96,7 +147,7 @@ public enum Doctor {
         }
         do {
             checks.append(
-                Check(status: .ok, text: "SimulatorKit: " + (try CHSimulator.loadFrameworks(developerDir: dir))))
+                Check(status: .ok, text: "SimulatorKit: " + (try Device.loadFrameworks(developerDir: dir))))
         } catch {
             checks.append(Check(status: .fail, text: error.localizedDescription))
             return output(checks)
@@ -124,42 +175,14 @@ public enum Doctor {
             let device = try Device(udid: udid)
             guard device.booted else { throw ChauffeurError.notBooted(udid) }
             let start = Date()
-            let root = try AXProvider(sim: device.sim).read()
+            let ax = try AXProvider(device: device)
+            let root = ax.read()
             let ms = Int(Date().timeIntervalSince(start) * 1000)
-            if let root, !root.frame.isEmpty {
-                let name = (root.label ?? "").trimmingCharacters(in: .whitespaces)
-                checks.append(
-                    Check(
-                        status: .ok,
-                        text:
-                            "accessibility: \(name.isEmpty ? "SpringBoard" : "app \"\(name)\""), \(root.all.count) elements in \(ms)ms"
-                    ))
-            } else {
-                let probe = (try? AXProvider(sim: device.sim))?.probe(
-                    center: Point(x: device.size.w / 2, y: device.size.h / 2))
-                checks.append(
-                    Check(
-                        status: .fail,
-                        text: probe?.frontmostIsEmptyApp == true
-                            ? "accessibility: the app in front has no accessibility server (it started while app accessibility was off, "
-                                + "as an Xcode device session leaves it). Fix: relaunch it with chauffeur launch <bundle>"
-                            : probe?.screenAnswers == true
-                                ? "accessibility: the simulator's accessibility bridge is not answering (it was queried while booting). "
-                                    + "Fix: xcrun simctl spawn \(udid) launchctl stop com.apple.CoreSimulator.bridge (chauffeur does this itself after 4 s)"
-                                : "accessibility: no tree (is the simulator still booting?)"))
+            let flagsOff = try? AXSettings.off(udid: udid, shell: SimCtlRunner())
+            checks += accessibilityChecks(root: root, ms: ms, flagsOff: flagsOff, udid: udid) {
+                ax.probe(center: Point(x: device.size.w / 2, y: device.size.h / 2))
             }
-            if let read = try? SimCtl.run(["spawn", udid, "defaults", "read", AXSettings.domain]) {
-                let off = AXSettings.off(read.out)
-                checks.append(
-                    off.isEmpty
-                        ? Check(status: .ok, text: "app accessibility on")
-                        : Check(
-                            status: .warn,
-                            text: "app accessibility off (\(off.joined(separator: ", "))), as an Xcode "
-                                + "device session leaves it; chauffeur turns it back on, and apps opened since then need a relaunch"
-                        ))
-            }
-            _ = try CHHIDClient(simulator: device.sim)
+            try HID(device: device).open()
             checks.append(Check(status: .ok, text: "HID client ready"))
         } catch {
             checks.append(Check(status: .fail, text: "\(error)"))

@@ -17,6 +17,21 @@ public protocol TouchEvidenceSource: AnyObject {
     func evidence(since cursor: Int, waitMs: Int) -> Evidence
 }
 
+/// The launched app's unified log: `LogTap` in production, a scripted ring in tests.
+public protocol LogSource: AnyObject {
+    var isAttached: Bool { get }
+    /// The executable whose log is followed while the stream is attached.
+    var executable: String? { get }
+    var cursor: Int { get }
+    var all: [LogLine] { get }
+    func since(_ cursor: Int) -> [LogLine]
+    /// False when `log stream` did not attach; following the same executable again keeps the lines.
+    @discardableResult func start(executable: String) -> Bool
+    func stop()
+    /// Tests feed lines; `LogTap` shapes URLs as it stores them.
+    func append(_ line: LogLine)
+}
+
 /// How `Session` runs `xcrun simctl`: through `SimCtl` in production, recorded in tests.
 public protocol ShellRunner: Sendable {
     /// `xcrun simctl <args>`; throws `ChauffeurError.simulatorServiceUnresponsive` on timeout, as `SimCtl.run` does.

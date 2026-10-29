@@ -18,10 +18,14 @@ public enum AXSettings {
         }
     }
 
+    /// The flags that are off on the simulator `udid`.
+    public static func off(udid: String, shell: any ShellRunner) throws -> [String] {
+        off(try shell.simctl(["spawn", udid, "defaults", "read", domain]).out)
+    }
+
     /// Turns on the flags that are off and returns them (empty when all were on).
     public static func ensure(udid: String, shell: any ShellRunner) throws -> [String] {
-        let read = try shell.simctl(["spawn", udid, "defaults", "read", domain])
-        let missing = off(read.out)
+        let missing = try off(udid: udid, shell: shell)
         for key in missing {
             try shell.simctl(["spawn", udid, "defaults", "write", domain, key, "-bool", "true"])
         }

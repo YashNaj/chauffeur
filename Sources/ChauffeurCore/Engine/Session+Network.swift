@@ -50,7 +50,7 @@ extension Session {
     /// Right before the touch.
     func tapNet(_ start: NetStart) -> TapNet {
         TapNet(
-            pids: start.pids, earlier: start.earlier, atTouch: flows(start.pids), logCursor: logTap.cursor,
+            pids: start.pids, earlier: start.earlier, atTouch: flows(start.pids), logCursor: logs.cursor,
             touchMs: clock.nowMs())
     }
 
@@ -62,7 +62,7 @@ extension Session {
         let streaming = ConnectionWatch.streaming(previous: previous, now: activity)
         previous = activity
         return RequestEvidence.merge(
-            records: RequestLog.parse(logTap.since(net.logCursor)), activity: activity, streaming: streaming,
+            records: RequestLog.parse(logs.since(net.logCursor)), activity: activity, streaming: streaming,
             telemetryExtra: telemetryHosts())
     }
 
