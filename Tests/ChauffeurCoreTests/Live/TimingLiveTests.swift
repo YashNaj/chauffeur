@@ -11,7 +11,7 @@ extension Live {
 /// Medians of 7 rounds of plain taps (Show alert, then OK; both change the screen, so 14 taps), 7 dead taps (the Form
 /// tab's disabled Submit: NO EFFECT with its screenshot, no server needed) and 5 types into the Form's email field,
 /// printed as one line `timing: tap <ms> dead <ms> type <ms>` for scripts/live-timing.sh. Every action's exit code is
-/// asserted. Self-contained (it uses only what `main` already has) so the script can copy it into a base worktree.
+/// asserted. The plain-tap median pools 14 taps (7 Show alert and 7 OK). Self-contained (it uses only what `main` already has) so the script can copy it into a base worktree.
 @Suite(.enabled(if: Live.timing), .serialized)
 @MainActor struct TimingLiveTests {
     @Test func medians() throws {

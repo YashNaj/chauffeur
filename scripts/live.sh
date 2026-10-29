@@ -16,4 +16,4 @@ CHAUFFEUR_LIVE_UDID="$udid" CHAUFFEUR_LIVE_REBOOT=1 swift test --no-parallel --f
   >"$logs/reboot.log" 2>&1
 reboot=$?
 show "$logs/reboot.log"
-[ "$all" -eq 0 ] && [ "$reboot" -eq 0 ] || { echo "live tests failed: logs in $logs (all.log, reboot.log)"; exit 1; }
+if [ "$all" -eq 0 ] && [ "$reboot" -eq 0 ]; then rm -rf "$logs"; else echo "live tests failed: logs in $logs (all.log, reboot.log)"; exit 1; fi
