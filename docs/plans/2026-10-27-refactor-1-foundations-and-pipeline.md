@@ -1354,3 +1354,44 @@ lines, over the 300 aim.
 activity outside the session, 881 s): 515 tests; only the pre-existing `anAppStartedWithTheFlagsOffIsToldToRelaunch`
 failed (2 issues, fails on `main` too). `NetworkLiveTests` passed, the dead button included. The live ledger's body is
 unchanged from line 3 on; against `main`, only the nine twinned lines gained their twin column.
+
+### Stage 2 (branch `refactor-2-pipeline`)
+
+**The plan was refreshed before execution** (31c0e62), against the code after Stage 1b; see the paragraph at the top of
+Stage 2. Task 16 ran as 16a and 16b.
+
+**The three `settledMs` conventions** are written in Task 14 and each is now one `credit` call: the time since the touch
+(`ScreenAgainPass`), the first act's settle (`SwitchRetryPass`, the late switch), and the wait's own observe
+(`finishPending`). After Task 16b, `outcome = .changed` appears in `Sources` only in `EvidenceCarrier.swift`.
+
+**Seams the plan didn't foresee.** `ActionContext` gained `label` (the classifier builds the report) and reads the touch
+log's state through a closure, after `observe`: `observe` can reconnect and stop the log, and a Bool taken before it
+would turn a failed send during a reconnect from UNVERIFIED into NOT DELIVERED. `ScriptedLogs.arriving` releases log
+lines at the next read, which the telemetry-only pin needed. A `.retry` on the last transport (unreachable with
+`TouchClassifier`) is now NOT DELIVERED and leaves `preferred` alone, pinned by a classifier that always retries.
+
+**One timing changed, by ruling.** The shot is taken once, after every pass (Review Focus 5). Before, the NO EFFECT
+screenshot ran between the first act and the late-switch look and the pasteboard read, a few hundred ms of real time.
+Those looks now come right after the network passes. A switch whose late change landed in that window was credited
+"changed only after 1.5s"; it can now be tapped once more. `baseline()` still waits for the screen to settle. Watched in
+the live run.
+
+**No shot for a wait or a coordinate tap, as before.** `finishPending`'s NO EFFECT and a tap without a target node take
+no screenshot today and still don't; Review Focus 5 covers taps with a target.
+
+**For Plan 2:** spec §3's crash lead as a report field (Task 18 kept the string search in one function,
+`Output.withLead`, by the plan's call), and the Done-when proof that a new pass is one file and one entry (no task
+writes that test). `EvidencePass.apply` takes `session:` and `EvidenceCarrier` holds two fields, where the spec sketched
+more. `ActionContext.touchMs` and the `after` that `classify` returns are unused. `Session.network` (the watch) and
+`act(network:)` (a `NetStart`) share a name. `telemetryOverride` is still a test seam on `Session`. `Session.swift` is
+324 lines.
+
+**Live run at the end of Stage 2** (188ccf4, iPhone 17 on iOS 27). `SessionLiveTests.survivesASimulatorReboot` reboots
+the simulator mid-suite, so every test after it ran during a boot (the load reached 200 on 8 cores; Stage 1b's "about 57
+from outside activity" was the same reboot). From now on the suite runs with `--skip survivesASimulatorReboot`, and
+that test runs alone, last. That run (load 8 at start, 1252 s): 546 tests. `TapLiveTests` and `TypeLiveTests` passed.
+`anAppStartedWithTheFlagsOffIsToldToRelaunch` failed as on `main`. `terminatingIsNotACrash` and
+`aFailingAPIExplainsTheNoEffect` failed on `launch` and passed alone. `NetworkLiveTests.aDeadButtonIsPlainAndNotSlower`
+fails every time since this boot: the dead tap reports `127.0.0.1:8765 · sent 451 B, got 341 B`. It fails the same way on
+`main` (ffd9338), byte for byte, so it isn't this stage's; it passed in Stage 1b's run. `survivesASimulatorReboot`
+passed alone. The live ledger's body is unchanged from line 3 on.
