@@ -118,7 +118,7 @@ extension Session {
         guard let target = a.next() else { throw ChauffeurError.usage(a.usage) }
         try a.done()
         let (device, _) = try connect()
-        let network = self.network.start(appPid: app?.pid) { ax?.frontmostPID() }
+        let netStart = network.start(appPid: app?.pid) { ax?.frontmostPID() }
         let clipboard = Background { [udid, shell] in Self.readClipboard(udid: udid, shell: shell) }
         let (before, settled) = try baseline()
         let aimed = try aim(target, in: before)
@@ -127,7 +127,7 @@ extension Session {
         }
         let clipboardBefore = clipboard.result(waitingAtMost: 2000) ?? nil
         let report = try act(
-            "tap \(aimed.label)", target: aimed.node, before: before, baselineSettled: settled, netStart: network,
+            "tap \(aimed.label)", target: aimed.node, before: before, baselineSettled: settled, netStart: netStart,
             passes: [NetworkPass(), ScreenAgainPass()] + (holdMs == 50 ? [SwitchRetryPass()] : [])
                 + [ClipboardPass(before: clipboardBefore)]
         ) { [self] in

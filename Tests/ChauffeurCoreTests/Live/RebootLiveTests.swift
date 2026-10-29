@@ -19,6 +19,7 @@ import Testing
         try SimCtl.run(["bootstatus", udid], timeout: 300)
         try Live.launchFixture()
         #expect(session.run(["wait", "Show alert", "--timeout", "30"]).exit == 0)
+        session.shutdown()  // stop the log streams first; the defer repeats it harmlessly
         #expect(Live.waitForQuietHost() != nil, "the host did not quiet down after the boot")
     }
 }

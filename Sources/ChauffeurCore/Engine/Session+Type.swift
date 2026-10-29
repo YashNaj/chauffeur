@@ -6,7 +6,7 @@ extension Session {
         let submit = a.flag("--submit")
         guard let ref = a.next(), let text = a.text(), !text.isEmpty else { throw ChauffeurError.usage(a.usage) }
         let (device, _) = try connect()
-        let network = self.network.start(appPid: app?.pid) { ax?.frontmostPID() }
+        let netStart = network.start(appPid: app?.pid) { ax?.frontmostPID() }
         let (before, settled) = try baseline()
         let field = try before.resolve(ref: ref, refs: refs)
         guard Perception.textEntry.contains(field.role) else {
@@ -38,7 +38,7 @@ extension Session {
         let keyboard = try inputDeviceReady().keyboard(clock: clock)
         let method: String
         let sent: Bool
-        let typingNet = self.network.atTouch(network)
+        let typingNet = network.atTouch(netStart)
         if Keys.typeable(text) && text.count <= 15 {
             method = "keys"
             sent = keyboard.type(text)
@@ -71,7 +71,7 @@ extension Session {
         if verdict == .ok {
             // Typing's requests: one look after the grace, no window. The field is the proof, so a late request can't
             // make it a false NO EFFECT.
-            report.requests = self.network.sampleOnce(typingNet)
+            report.requests = network.sampleOnce(typingNet)
             report.requestElapsedMs = clock.nowMs() - typingNet.touchMs
         }
         guard submit, verdict == .ok else { return Output(report.render(), exit: report.exitCode, data: report.json) }

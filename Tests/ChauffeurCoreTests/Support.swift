@@ -149,11 +149,11 @@ final class RecordingShell: ShellRunner, @unchecked Sendable {
 
 extension SessionEnvironment {
     /// Tests: scripts the device, accessibility, touch evidence, shell, clock, flows, processes, boot state, the
-    /// crash report, the input device, the launched app's log and the project's telemetry entries. By default the touch log
-    /// is unattached, there are no flows or live processes, the simulator is booted (no boot date), no crash report is
-    /// found, the input device's two transports and keyboard send, the log is empty and attaches, the project names no
-    /// telemetry, and the device is booted at 402×874. It does not fake the
-    /// `StatePaths` files under `$TMPDIR/chauffeur`; the session still uses those.
+    /// crash report, the input device, the launched app's log and the project's telemetry entries. By default the
+    /// touch log is unattached, there are no flows or live processes, the simulator is booted (no boot date), no
+    /// crash report is found, the input device's two transports and keyboard send, the log is empty and attaches, the
+    /// project names no telemetry, and the device is booted at 402×874. It does not fake the `StatePaths` files under
+    /// `$TMPDIR/chauffeur`; the session still uses those.
     @MainActor
     static func scripted(
         ax: ScriptedAX, touches: ScriptedTouches = ScriptedTouches(evidence: [], attached: false),

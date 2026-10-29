@@ -1,5 +1,6 @@
 #!/bin/bash
-# Times this branch against a base ref (default main) on a booted simulator: two rounds each, base first.
+# Times this branch against a base ref (default main) on a booted simulator: one discarded warm-up run per tree, then
+# runs ordered base, branch, branch, base; round 1 pairs the first base with the first branch, round 2 the second pair.
 # Exits 1 when the branch is slower on any metric by more than max(50 ms, 5 %) in both rounds, 2 when the instrument itself failed.
 # Usage: scripts/live-timing.sh <udid> [base-ref]
 set -uo pipefail
@@ -9,7 +10,13 @@ cd "$(dirname "$0")/.."
 tree="${TMPDIR:-/tmp}/chauffeur-timing-$(git rev-parse --short "$base")"
 logs=$(mktemp -d "${TMPDIR:-/tmp}/chauffeur-timing-logs.XXXXXX")
 trap 'git worktree remove --force "$tree" >/dev/null 2>&1; rm -rf "$logs"' EXIT
-quiet() { until [ "$(sysctl -n vm.loadavg | awk '{print int($2)}')" -lt 10 ]; do sleep 5; done; }
+quiet() { # wait up to 15 minutes for the 1-minute load to drop under 10, then give up with exit 2
+  local n=0 load
+  until load=$(sysctl -n vm.loadavg | awk '{print $2}'); [ "${load%%.*}" -lt 10 ]; do
+    [ $((n++)) -ge 180 ] && { echo "live-timing: the host stayed busy (1-minute load $load) for 15 minutes" >&2; exit 2; }
+    sleep 5
+  done
+}
 die() { echo "live-timing: $1" >&2; [ -n "${2:-}" ] && tail -n 30 "$2" >&2; exit 2; }   # exit 2: the instrument failed, not the branch
 git worktree remove --force "$tree" >/dev/null 2>&1
 git worktree add --detach "$tree" "$base" >/dev/null || die "cannot add a worktree for $base"
@@ -26,8 +33,10 @@ run() { # run <dir> -> its timing line plus the 1-minute load; a failing test, e
   [ -n "$line" ] || { echo "live-timing: no timing line from $1" >&2; tail -n 30 "$logs/test.log" >&2; return 2; }
   echo "$line load $(sysctl -n vm.loadavg | awk '{print $2}')"
 }
-b1=$(run "$tree") && h1=$(run .) && b2=$(run "$tree") && h2=$(run .) || exit 2
-printf 'base   %s\nbranch %s\nbase   %s\nbranch %s\n' "$b1" "$h1" "$b2" "$h2"
+run "$tree" >/dev/null && run . >/dev/null || exit 2   # warm-ups: not counted, but a failure still fails the instrument
+b1=$(run "$tree") && h1=$(run .) && h2=$(run .) && b2=$(run "$tree") || exit 2
+printf 'compared base %s with branch %s\n' "$(git rev-parse --short "$base")" "$(git rev-parse --short HEAD)"
+printf 'base   %s\nbranch %s\nbranch %s\nbase   %s\n' "$b1" "$h1" "$h2" "$b2"
 fail=0
 for m in tap dead type; do
   val() { echo "$1" | awk -v k="$m" '{for (i=1;i<NF;i++) if ($i==k) print $(i+1)}'; }
