@@ -155,22 +155,6 @@ import Testing
         #expect(r.hints == Self.noEffect().hints)
     }
 
-    // TypingNetworkPass
-
-    /// One look after the grace, no window.
-    @Test func typingLooksOnceAfterTheGrace() throws {
-        let rig = ActRig(frames: [try Act.form()], flows: [[], [], [Act.done]])
-        _ = try rig.s.observe(minMs: 0, capMs: 1500)  // connected: the app in front is the one watched
-        var report = TypeReport(
-            action: "type e2 \"alice\"", method: "keys", verdict: .ok, value: "alice", settledMs: 150)
-        let net = rig.s.network.atTouch(rig.s.network.start(appPid: rig.s.app?.pid) { rig.s.ax?.frontmostPID() })
-        let t = rig.clock.now
-        TypingNetworkPass().apply(to: &report, net: net, session: rig.s)
-        #expect(rig.clock.now == t + NetJudge.graceMs)
-        #expect(report.requests.count == 1)
-        #expect(report.requestElapsedMs == NetJudge.graceMs)
-    }
-
     // The shot: `capture` calls the shell before it loads the file, so offline the shell call is the evidence.
 
     static func shots(_ rig: ActRig) -> Int {
@@ -220,5 +204,30 @@ import Testing
         #expect(out.exit == ExitCode.noEffect.rawValue, "\(out.text)")
         #expect(rig.inputs.fakes[0].touches.count == 4)
         #expect(Self.shots(rig) == 1)
+    }
+}
+
+// A pass is one file and one entry
+
+/// Spec "Done when": an evidence pass is one file and one entry in a gesture's list.
+struct NextFramePass: EvidencePass {
+    func apply(to report: inout ActionReport, context: ActionContext, session: Session) throws {
+        guard report.outcome == .noEffect else { return }
+        let (after, settle) = try session.observe(minMs: 0, capMs: 1500)
+        guard after.hash != context.before.hash else { return }
+        report.credit(change: after, from: context.before, settledMs: settle.elapsedMs, settled: settle.settled)
+    }
+}
+
+extension PassTests {
+    @Test func aNewPassIsOneFileAndOneEntry() throws {
+        let home = try Act.home()
+        // baseline 4, the act 3, then the pass sees the form (counts are test data)
+        let rig = ActRig(frames: Array(repeating: home, count: 7) + [try Act.form()])
+        let (before, settled) = try rig.s.baseline()
+        let report = try rig.s.act(
+            "tap e1", target: nil, before: before, baselineSettled: settled, passes: [NextFramePass()]
+        ) { _ in true }
+        #expect(report.outcome == .changed && !report.diff.isEmpty)
     }
 }

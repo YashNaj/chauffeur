@@ -1,4 +1,4 @@
-Literals the live tests expect (contains, hasPrefix, hasSuffix, == "…"), one `file: literal` per line, made by scripts/live-expectations.sh at ffeb3da.
+Literals the live tests expect (contains, hasPrefix, hasSuffix, == "…"), one `file: literal` per line, made by scripts/live-expectations.sh at dce494c.
 
 AXLiveTests.swift: == "Fixture"
 AXLiveTests.swift: == "Form"
@@ -81,6 +81,7 @@ OpenLiveTests.swift: contains("Open in "
 OpenLiveTests.swift: contains("→ FAILED: no installed app handles nosuchscheme-xyz: URLs"
 OpenLiveTests.swift: contains("→ UNVERIFIED: no visible change (the URL was delivered"
 OpenLiveTests.swift: hasPrefix("open \"chauffeur-fixture://form\" → changed"
+RebootLiveTests.swift: contains("is not booted"
 RecoverLiveTests.swift: contains("note: relaunched dev.chauffeur.fixture"
 ScreenshotLiveTests.swift: contains(" px/pt: point = ("
 ScreenshotLiveTests.swift: contains("\nscreenshot → /"
@@ -91,7 +92,6 @@ ScrollLiveTests.swift: hasPrefix("reached the end after "
 ScrollLiveTests.swift: hasPrefix("scroll up → changed"
 SessionLiveTests.swift: contains("button \"Show alert\" [e"
 SessionLiveTests.swift: contains("group \"Tab Bar\"\n  tab"
-SessionLiveTests.swift: contains("is not booted"
 SessionLiveTests.swift: hasPrefix("app \"Fixture\""
 SessionLiveTests.swift: hasPrefix("not found after 1s"
 TapLiveTests.swift: == "stale ref \(showAlert) (\"Show alert\") — not on screen; run snapshot"

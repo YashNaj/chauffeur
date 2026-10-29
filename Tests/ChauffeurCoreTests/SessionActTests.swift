@@ -28,6 +28,26 @@ import Testing
         #expect(inputs.fakes.map(\.touches.count) == [2, 2])
     }
 
+    /// The only transport that can move has no touch evidence: `Attempt.isLast` makes the classifier itself say NOT
+    /// DELIVERED, so `act` never changes an outcome and the preferred transport stays.
+    @Test func theLastTransportWithoutEvidenceIsNotDeliveredByTheClassifier() throws {
+        let home = try Act.home()
+        let inputs = FakeInputs(transports: [
+            FakeTransport(name: "digitizer", supportsMove: false), FakeTransport(name: "mouse", supportsMove: true),
+        ])
+        let rig = ActRig(
+            frames: [home], touches: ScriptedTouches(evidence: [.none], attached: true), inputs: inputs)
+        let (before, settled) = try rig.s.baseline()
+        let report = try rig.s.act(
+            "swipe", target: nil, before: before, baselineSettled: settled, needsMove: true
+        ) { $0.touch(Point(x: 0.5, y: 0.5), .down) }
+        #expect(report.outcome == .notDelivered)
+        #expect(report.hints == Verifier.hints(outcome: .notDelivered, target: nil))
+        #expect(report.retriedFrom == nil)
+        #expect(inputs.fakes.map(\.touches.count) == [0, 1])
+        #expect(rig.s.preferred == 0)  // the mover is index 1: a delivery would have made it preferred
+    }
+
     @Test func anUnattachedTouchLogIsUnverified() throws {
         let home = try Act.home()
         let showAlert = try Act.ref(home, "Show alert")
@@ -112,32 +132,5 @@ import Testing
         _ = rig.s.run(["tap", agree])
         #expect(rig.touches.requests.count == 2)
         #expect(rig.inputs.fakes[0].touches.map { $0.1 } == [.down, .up, .down, .up])
-    }
-
-    /// A classifier that asks for `.retry` on the last transport too (`TouchClassifier` never does): the attempt is
-    /// NOT DELIVERED, with `Verifier`'s hints, and the transport is not preferred. One transport: the only one that moves.
-    @Test func aRetryOnTheLastTransportIsNotDelivered() throws {
-        let inputs = FakeInputs(transports: [
-            FakeTransport(name: "mouse", supportsMove: false), FakeTransport(name: "digitizer", supportsMove: true),
-        ])
-        let rig = ActRig(frames: [try Act.home()], inputs: inputs)
-        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
-        let report = try rig.s.act("drag", target: nil, before: before, needsMove: true, classifier: AlwaysRetry()) {
-            _ in true
-        }
-        #expect(report.outcome == .notDelivered)
-        #expect(report.hints == Verifier.hints(outcome: .notDelivered, target: nil))
-        #expect(rig.s.preferred == 0)
-    }
-}
-
-/// Asks for another transport every time.
-private struct AlwaysRetry: Classifier {
-    func classify(context: ActionContext, attempt: Attempt) throws -> (report: ActionReport, after: Snapshot) {
-        let report = ActionReport(
-            action: context.label, outcome: .retry, evidence: .none, settledMs: 0, settled: true,
-            revBefore: context.before.rev, revAfter: context.before.rev, diff: [], transport: attempt.transport,
-            retriedFrom: attempt.retriedFrom, hints: [], capMs: context.capMs)
-        return (report, context.before)
     }
 }

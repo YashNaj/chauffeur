@@ -9,22 +9,25 @@ import Testing
         bundle: "dev.chauffeur.fixture", executable: "Fixture", displayName: "Fixture", pid: 4321,
         launchedAt: Date())
 
-    /// A session whose launched app is `fixture`, with no simulator, no waiting and a fake liveness check: `procs`
-    /// (alive: just the app's pid) is what a test changes between commands.
+    /// A session whose launched app is `fixture`, with a fake clock and a fake liveness check: `procs` (alive: just the
+    /// app's pid) is what a test changes between commands. Without `screen` there is no simulator; with it, a booted one
+    /// showing `screen`, whose `simctl` is `shell`.
     func session(
         alive: Bool, report: CrashReport? = nil, booted: Bool? = true, bootDate: Date? = nil,
-        procs: FakeProcesses? = nil, findReport: ((TrackedApp) -> CrashReport?)? = nil
+        procs: FakeProcesses? = nil, findReport: ((TrackedApp) -> CrashReport?)? = nil, udid: String = Act.udid(),
+        screen: AXElement? = nil, shell: RecordingShell = RecordingShell()
     ) -> Session {
         var env = SessionEnvironment.scripted(
-            ax: ScriptedAX(frames: []), processes: procs ?? FakeProcesses(alive: alive ? [4321] : []),
+            ax: ScriptedAX(frames: screen.map { [$0] } ?? []), shell: shell,
+            processes: procs ?? FakeProcesses(alive: alive ? [4321] : []),
             simulatorBooted: { booted }, simulatorBootDate: { bootDate }, findCrashReport: findReport ?? { _ in report }
         )
-        // The fake udid has no simulator: connecting fails, as it does for the real device.
-        env.device = { FakeDevice(udid: $0, booted: false, size: Size(w: 402, h: 874)) }
-        let s = Session(
-            udid: "ZZ" + String(format: "%06X", UInt32.random(in: 0...0xFFFFFF)) + "-TEST", environment: env)
+        if screen == nil {
+            // The fake udid has no simulator: connecting fails, as it does for the real device.
+            env.device = { FakeDevice(udid: $0, booted: false, size: Size(w: 402, h: 874)) }
+        }
+        let s = Session(udid: udid, environment: env)
         s.app = fixture
-        s.crashReportWaitMs = 0
         s.logTapAttemptMs = s.clock.nowMs()  // no real `log stream` for a fake simulator
         return s
     }
@@ -165,27 +168,39 @@ import Testing
         #expect(SimBoot.parse(ps, udid: "ZZZZ") == nil)
     }
 
+    /// A booted simulator showing the fixture, whose `simctl` answers `launch dev.chauffeur.fixture` up to its last
+    /// step: `simctl launch` fails, after `launch` has stopped following the app and before a new launch would
+    /// supersede the crash.
+    func endingSession() throws -> (Session, RecordingShell) {
+        let udid = Act.udid()
+        var replies = Act.launchReplies(udid: udid)
+        replies[["launch", udid, Act.fixtureBundle]] = [Act.out("", status: 1)]
+        let shell = RecordingShell(replies: replies)
+        return (session(alive: false, udid: udid, screen: try Act.home(), shell: shell), shell)
+    }
+
     /// The next command after a crash must say so, even when it is the one that stops following the app.
     @Test func aCrashBetweenCommandsIsReportedByTheNextCommandThatEndsTheApp() throws {
         for command in [
             ["terminate", "dev.chauffeur.fixture"], ["launch", "dev.chauffeur.fixture"],
             ["install", "/no/such/Fixture.app"], ["permission", "grant", "location", "dev.chauffeur.fixture"],
         ] {
-            let s = session(alive: false)
+            let (s, shell) = try endingSession()
             defer { try? FileManager.default.removeItem(at: StatePaths.artifacts(s.udid)) }
             s.logs.append(LogLine(time: "t", level: "fault", message: "fixture: crashing"))
             // These commands stop following the app (`release`) as soon as they run; that must not hide the crash.
-            s.commandHook = { _ in s.release("dev.chauffeur.fixture") }
             let out = s.run(command)
+            // Each but `install` (there is no such app) got past its `release`, as far as `simctl`.
+            let verb = ["terminate": "terminate", "launch": "launch", "permission": "privacy"][command[0]]
+            #expect(verb.map { verb in shell.calls.contains { $0.first == verb } } ?? true, "\(command)")
             #expect(
                 out.exit == 5 && out.text.contains("APP CRASHED: dev.chauffeur.fixture (pid 4321)"),
                 "\(command): \(out.text)")
             #expect(out.text.contains("[fault] \"fixture: crashing\""), "\(command)")
             #expect(s.crash?.app == fixture, "\(command)")
         }
-        let s = session(alive: false)
+        let (s, _) = try endingSession()
         defer { try? FileManager.default.removeItem(at: StatePaths.artifacts(s.udid)) }
-        s.commandHook = { _ in s.release("dev.chauffeur.fixture") }
         _ = s.run(["terminate", "dev.chauffeur.fixture"])
         // no fault line logged
         #expect(try s.logsCommand([]).text.contains("\nAPP EXITED: dev.chauffeur.fixture (pid 4321)"))

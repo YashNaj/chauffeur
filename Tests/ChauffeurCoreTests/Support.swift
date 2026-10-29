@@ -50,10 +50,13 @@ final class ScriptedAX: AXSource {
     private let frames: [AXElement?]
     private var next = 0
     var scriptedPID: Int32? = 4321
+    /// Runs at each `read()`, before the frame is handed out: for something that happens while the screen is read.
+    var onRead: (() -> Void)?
 
     init(frames: [AXElement?]) { self.frames = frames }
 
     func read() -> AXElement? {
+        onRead?()
         guard !frames.isEmpty else { return nil }
         defer { next = min(next + 1, frames.count - 1) }
         return frames[next]
@@ -88,7 +91,8 @@ final class ScriptedTouches: TouchEvidenceSource {
     private(set) var cursor = 0
     /// Every `evidence(since:waitMs:)` call's arguments, so a test can prove which cursor a caller passed.
     private(set) var requests: [(since: Int, waitMs: Int)] = []
-    let isAttached: Bool
+    /// Settable, so a test can stop the log mid-action, as a reconnect's `drop()` does.
+    var isAttached: Bool
 
     init(evidence: [Evidence], attached: Bool) {
         script = evidence
@@ -145,10 +149,11 @@ final class RecordingShell: ShellRunner, @unchecked Sendable {
 
 extension SessionEnvironment {
     /// Tests: scripts the device, accessibility, touch evidence, shell, clock, flows, processes, boot state, the
-    /// crash report, the input device and the launched app's log. By default the touch log is unattached, there are no flows or live
-    /// processes, the simulator is booted (no boot date), no crash report is found, the input device's two transports
-    /// and keyboard send, the log is empty and attaches, and the device is booted at 402×874. It does not fake the
-    /// `StatePaths` files under `$TMPDIR/chauffeur`; the session still uses those.
+    /// crash report, the input device, the launched app's log and the project's telemetry entries. By default the
+    /// touch log is unattached, there are no flows or live processes, the simulator is booted (no boot date), no
+    /// crash report is found, the input device's two transports and keyboard send, the log is empty and attaches, the
+    /// project names no telemetry, and the device is booted at 402×874. It does not fake the `StatePaths` files under
+    /// `$TMPDIR/chauffeur`; the session still uses those.
     @MainActor
     static func scripted(
         ax: ScriptedAX, touches: ScriptedTouches = ScriptedTouches(evidence: [], attached: false),
@@ -156,7 +161,8 @@ extension SessionEnvironment {
         flows: (any FlowSource)? = nil, processes: FakeProcesses = FakeProcesses(alive: []),
         simulatorBooted: @escaping () -> Bool? = { true }, simulatorBootDate: @escaping () -> Date? = { nil },
         findCrashReport: @escaping (TrackedApp) -> CrashReport? = { _ in nil },
-        inputs: FakeInputs = FakeInputs(), logs: ScriptedLogs = ScriptedLogs()
+        inputs: FakeInputs = FakeInputs(), logs: ScriptedLogs = ScriptedLogs(),
+        telemetry: @escaping (URL) -> [String] = { _ in [] }
     ) -> SessionEnvironment {
         nonisolated(unsafe) let flows = flows  // a test's own object, only ever read on the main actor
         return SessionEnvironment(
@@ -171,7 +177,8 @@ extension SessionEnvironment {
             simulatorBootDate: simulatorBootDate,
             findCrashReport: findCrashReport,
             inputs: { _ in inputs },
-            logs: logs)
+            logs: logs,
+            telemetry: telemetry)
     }
 }
 

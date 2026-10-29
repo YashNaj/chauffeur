@@ -18,8 +18,6 @@ public final class Session {
     var crash: CrashInfo?
     /// The log cursor when the last action started (`logs --since-last`).
     var lastActionLogCursor = 0
-    /// How long a result waits for the crash report (macOS took 17–70 s on the 8 GB Mac; `logs` looks again later).
-    var crashReportWaitMs = 3000
     /// When the log tap was last (re)started for a restored app; retried at most every 30 s.
     var logTapAttemptMs: Int?
     /// Where commands are traced; the daemon sets it, tests and other callers leave it nil.
@@ -30,8 +28,6 @@ public final class Session {
     /// When chauffeur itself ended an app (pid → clock ms): its exit within `endedGraceMs` is not a crash.
     var endedByChauffeur: [Int32: Int] = [:]
     nonisolated static let endedGraceMs = 10_000
-    /// Test seam: runs inside a command, just before it executes (stands in for what it does to the launched app).
-    var commandHook: ((String) -> Void)?
     var refs = RefTable()
     var rev = 0
     var last: Snapshot?
@@ -53,12 +49,8 @@ public final class Session {
     var inBatch = false
     /// Apps relaunched for accessibility this session: at most once each.
     var relaunchedForAccessibility: Set<String> = []
-    /// Seam for unit tests: how an app is relaunched (default: `launchCommand`).
-    var relaunch: ((String) -> Output)?
-    /// The flow source, the watched pids, the telemetry list and the pending tap.
+    /// The flow source, the watched pids, the telemetry entries and the pending tap.
     let network: NetworkWatch
-    /// Test seam: the project's telemetry entries (default: `.chauffeur.json` from the client's directory).
-    var telemetryOverride: [String]?
     /// Where the launched app's log lines start in `logs` (crash evidence is this launch's lines only).
     var appLogCursor: Int?
     /// What the session reaches outside itself: `.live` in the daemon, scripted in tests.
@@ -77,8 +69,7 @@ public final class Session {
         self.environment = environment
         network = NetworkWatch(
             flows: environment.flows, processes: environment.processes, logs: environment.logs,
-            clock: environment.clock)
-        network.telemetry = { [unowned self] in self.telemetryHosts() }
+            clock: environment.clock, telemetry: environment.telemetry)
         // A restarted daemon (upgrade, idle exit) keeps following an app that is still running.
         if let saved = TrackedApp.load(StatePaths.app(udid)) {
             if environment.processes.isAlive(saved.pid) { app = saved } else { TrackedApp.clear(StatePaths.app(udid)) }
@@ -139,65 +130,9 @@ public final class Session {
         inputDeviceLost = true
     }
 
-    /// Polls the raw tree until it settles, completes it (bar sweep) and publishes a snapshot.
-    /// No tree within the cap: reconnect once (SpringBoard restart), then give up.
-    func observe(minMs: Int, capMs: Int) throws -> (snapshot: Snapshot, settle: Settled<AXElement>) {
-        let started = clock.nowMs()
-        var (device, ax) = try connect()
-        var result = poll(ax, minMs: minMs, capMs: capMs)
-        if result.value == nil {
-            drop()
-            (device, ax) = try connect()
-            result = poll(ax, minMs: minMs, capMs: capMs)
-        }
-        if result.value == nil {
-            let now = clock.nowMs()
-            let since = AXHealth.episodeStart(
-                current: noTreeSinceMs, lastFailureMs: lastNoTreeMs,
-                attemptStartedMs: started, nowMs: now)
-            noTreeSinceMs = since
-            lastNoTreeMs = now
-            let plan = heal(noTreeForMs: now - since, ax: ax, screen: device.size)
-            if plan.relaunchApp {
-                let why = AXHealth.message(plan, recovered: false)
-                if let bundle = relaunchCandidate(ax) { throw ChauffeurError.needsRelaunch(bundle: bundle, why: why) }
-                throw ChauffeurError.blind(why)
-            }
-            if plan.restartBridge {
-                result = poll(ax, minMs: minMs, capMs: max(capMs, 3000))
-                if result.value == nil { throw ChauffeurError.blind(AXHealth.message(plan, recovered: false)) }
-                healNote = AXHealth.message(plan, recovered: true)
-            }
-        }
-        guard let root = result.value else { throw ChauffeurError.noTree }
-        noTreeSinceMs = nil
-        guard Geometry.orientation(root: root.frame, screen: device.size) == .portrait else {
-            throw ChauffeurError.landscape
-        }
-        return (publish(ax.complete(root), size: device.size), result)
-    }
-
-    private func poll(_ ax: any AXSource, minMs: Int, capMs: Int) -> Settled<AXElement> {
-        Settle.wait(minMs: minMs, capMs: capMs, clock: clock) { () -> (value: AXElement, hash: Int)? in
-            guard let root = ax.read(), !root.frame.isEmpty else { return nil }  // 0×0 root = not settled (decision 3)
-            return (root, root.hashValue)
-        }
-    }
-
-    /// rev increases only when what the agent can see changed.
-    private func publish(_ root: AXElement, size: Size) -> Snapshot {
-        var snap = Perception.build(root: root, size: size, previous: last?.kind, refs: &refs, rev: rev)
-        if snap.hash != last?.hash {
-            rev += 1
-            lastChangeMs = clock.nowMs()
-        }
-        snap.rev = rev
-        last = snap
-        return snap
-    }
-
     public func run(_ argv: [String], cwd: String? = nil) -> Output {
         self.cwd = cwd
+        network.projectDir = resolvePath(".")
         return runOne(argv)
     }
 
@@ -225,10 +160,7 @@ public final class Session {
         // (launch, install, terminate and permission changes all do) and so hide it.
         let noticed = Self.watched.contains(command) ? detectCrash() : nil
         var output = guarded {
-            try withRelaunch {
-                commandHook?(command)
-                return try dispatch(command, Array(argv.dropFirst()))
-            }
+            try withRelaunch { try dispatch(command, Array(argv.dropFirst())) }
         }
         if Self.watched.contains(command) {
             output = annotate(
