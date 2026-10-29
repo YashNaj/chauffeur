@@ -26,13 +26,7 @@ import Testing
     /// The touch, then `task`'s recorded lines arriving in the log.
     func tap(_ s: Session, task: String) throws -> TapNet {
         let net = TapNet(pids: [4321], earlier: [], atTouch: [], logCursor: s.logs.cursor, touchMs: s.clock.nowMs())
-        let lines = try Fixtures.network("ios27-requests")
-        let url = lines.first { $0.message.contains(task) && $0.message.contains("setting up Connection") }
-        let connection = url.map { line in line.message.split(separator: " ").last.map { "[C\($0) " } ?? "" } ?? ""
-        for line in lines
-        where line.message.contains(task) || (!connection.isEmpty && line.message.hasPrefix(connection)) {
-            s.logs.append(line)
-        }
+        for line in try Act.requestLines(task: task) { s.logs.append(line) }
         return net
     }
 

@@ -82,6 +82,16 @@ enum Act {
     /// The same request, answered and closed.
     static let done = flow(rx: 512, closedMs: 2)
 
+    /// The recorded `ios27-requests` lines for one task id and its connection, in order.
+    static func requestLines(task: String) throws -> [LogLine] {
+        let lines = try Fixtures.network("ios27-requests")
+        let url = lines.first { $0.message.contains(task) && $0.message.contains("setting up Connection") }
+        let connection = url.map { line in line.message.split(separator: " ").last.map { "[C\($0) " } ?? "" } ?? ""
+        return lines.filter { line in
+            line.message.contains(task) || (!connection.isEmpty && line.message.hasPrefix(connection))
+        }
+    }
+
     static func out(_ text: String, status: Int32 = 0) -> ProcessResult {
         ProcessResult(status: status, out: text, timedOut: false)
     }

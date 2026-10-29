@@ -3,6 +3,12 @@ import Testing
 
 @testable import ChauffeurCore
 
+/// The head of a tap on "Show alert" that changed nothing.
+private func noEffect(_ ref: String) -> String {
+    "tap \(ref) \"Show alert\" → NO EFFECT · the accessibility tree did not change in 1.5s "
+        + "(touch reached dev.chauffeur.fixture)"
+}
+
 /// The four places a tap's NO EFFECT is upgraded, and `finishPending`, pinned line by line (Task 12): Stage 2 rewrites
 /// them as evidence passes and must reproduce every line, `settledMs`, the hints and the request lines included.
 /// Frames: see `Act`'s reads per observe.
@@ -93,13 +99,24 @@ import Testing
         let showAlert = try Act.ref(home, "Show alert")
         let rig = ActRig(frames: Array(repeating: home, count: 7) + [try Act.form()])
         let out = rig.s.run(["tap", showAlert])
-        #expect(
-            ActRig.head(out)
-                == "tap \(showAlert) \"Show alert\" → NO EFFECT · the accessibility tree did not change in 1.5s "
-                + "(touch reached dev.chauffeur.fixture)",
-            "\(out.text)")
+        #expect(ActRig.head(out) == noEffect(showAlert), "\(out.text)")
         #expect(rig.touches.requests.count == 1)
         #expect(rig.inputs.fakes[0].touches.count == 2)
+    }
+
+    /// The screen is judged again only after a reply that is not telemetry: here the only reply is telemetry
+    /// (localhost, under the override), so the form behind it is never looked at. The lines come from the log, after
+    /// the touch, as flow items are never telemetry.
+    @Test func aTelemetryOnlyReplyIsNotJudgedAgain() throws {
+        let home = try Act.home()
+        let showAlert = try Act.ref(home, "Show alert")
+        let rig = ActRig(frames: Array(repeating: home, count: 7) + [try Act.form()])
+        rig.s.telemetryOverride = ["localhost"]
+        rig.logs.arriving = try Act.requestLines(task: "A450514C")
+        let out = rig.s.run(["tap", showAlert])
+        #expect(ActRig.head(out) == noEffect(showAlert), "\(out.text)")
+        #expect(out.text.contains("\ntelemetry: 1 request (localhost)"), "\(out.text)")
+        #expect(out.exit == ExitCode.noEffect.rawValue)
     }
 
     @Test func anUnchangedPasteboardStaysNoEffect() throws {
@@ -110,11 +127,7 @@ import Testing
             frames: [home], udid: udid,
             shell: RecordingShell(replies: [["pbpaste", udid]: [Act.out("hello, clipboard")]]))
         let out = rig.s.run(["tap", showAlert])
-        #expect(
-            ActRig.head(out)
-                == "tap \(showAlert) \"Show alert\" → NO EFFECT · the accessibility tree did not change in 1.5s "
-                + "(touch reached dev.chauffeur.fixture)",
-            "\(out.text)")
+        #expect(ActRig.head(out) == noEffect(showAlert), "\(out.text)")
         #expect(rig.shell.calls.filter { $0 == ["pbpaste", udid] }.count == 2)
     }
 

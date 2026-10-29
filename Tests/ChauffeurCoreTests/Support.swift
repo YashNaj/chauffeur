@@ -179,6 +179,9 @@ extension SessionEnvironment {
 /// `log stream` that never came up); tests feed lines with `append`, shaped as `LogTap` stores them.
 final class ScriptedLogs: LogSource {
     private var ring = LogRing(capacity: 2000)
+    /// Lines that land in the ring at the next `since(_:)` call, shaped as `append` shapes them: for a tap, after the
+    /// cursor taken at the touch.
+    var arriving: [LogLine] = []
     private let attaches: Bool
     private(set) var isAttached = false
     private(set) var executable: String?
@@ -189,7 +192,11 @@ final class ScriptedLogs: LogSource {
 
     var cursor: Int { ring.end }
     var all: [LogLine] { ring.lines }
-    func since(_ cursor: Int) -> [LogLine] { ring.since(cursor) }
+    func since(_ cursor: Int) -> [LogLine] {
+        arriving.forEach(append)
+        arriving = []
+        return ring.since(cursor)
+    }
 
     @discardableResult
     func start(executable: String) -> Bool {
