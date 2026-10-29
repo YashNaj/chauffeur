@@ -156,10 +156,11 @@ struct ActRig {
     /// A context over this rig's session, clock and touch log, as `act` builds one; without a gesture by default.
     func context(
         before: Snapshot, target: Node? = nil, net: TapNet? = nil, capMs: Int = 1500, label: String = "act",
-        gesture: ((any TouchTransport) -> Bool)? = nil
+        baselineSettled: Bool = true, gesture: ((any TouchTransport) -> Bool)? = nil
     ) -> ActionContext {
         ActionContext(
-            label: label, before: before, baselineSettled: true, target: target, capMs: capMs, touchMs: clock.now,
+            label: label, before: before, baselineSettled: baselineSettled, target: target, capMs: capMs,
+            touchMs: clock.now,
             net: net, expectedApp: s.expectedApp(on: before), isTouchLogAttached: { [touches] in touches.isAttached },
             clock: clock,
             observe: { [s] in try s.observe(minMs: $0, capMs: $1) },

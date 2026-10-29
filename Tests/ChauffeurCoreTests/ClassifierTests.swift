@@ -22,6 +22,21 @@ import Testing
         #expect(after.hash != before.hash)
     }
 
+    /// A change on a screen that was not settled when the action began cannot be pinned on the action.
+    @Test func noTouchOnAnUnsettledBaselineIsUnattributed() throws {
+        let home = try Act.home()
+        let rig = ActRig(frames: [home, home, try Act.form()])
+        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let (report, after) = try NoTouchClassifier(note: Self.note, hints: Self.hints)
+            .classify(context: rig.context(before: before, capMs: 3000, baselineSettled: false), attempt: .noTouch)
+        #expect(report.outcome == .unattributed)
+        #expect(report.diff.isEmpty)
+        #expect(report.transport == "none")
+        #expect(report.evidence == .unavailable)
+        #expect(report.hints == Verifier.hints(outcome: .unattributed, target: nil))
+        #expect(after.hash != before.hash)
+    }
+
     @Test func noTouchIsUnverifiedOnceTheCapRunsOut() throws {
         let rig = ActRig(frames: [try Act.home()])
         let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot

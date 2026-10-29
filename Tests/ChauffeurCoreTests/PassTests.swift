@@ -108,8 +108,9 @@ import Testing
         #expect(rig.inputs.fakes.allSatisfy { $0.touches.isEmpty })
     }
 
-    /// The switch ignored the first touch: one more tap, through the pipeline without its shot.
-    @Test func anIgnoredSwitchIsTappedOnceMoreWithoutAShot() throws {
+    /// The switch ignored the first touch: one more tap, and the hint that says so. (`aSwitchTappedTwiceTakesOneShot`
+    /// pins that the retry takes no shot of its own.)
+    @Test func anIgnoredSwitchIsTappedOnceMoreWithTheHint() throws {
         let form = try Act.form()
         // `before` 2 reads, the pass's baseline 4 (the screen changed when `before` was published, so the quiet sleep
         // runs), then the pass's act sees on.
@@ -123,7 +124,6 @@ import Testing
         #expect(r.outcome == .changed)
         #expect(r.hints.last == "the first touch reached the app but the switch ignored it; chauffeur tapped once more")
         #expect(rig.inputs.fakes[0].touches.count == 2)
-        #expect(Self.shots(rig) == 0)
     }
 
     // ClipboardPass
