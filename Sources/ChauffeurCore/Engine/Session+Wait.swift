@@ -47,10 +47,11 @@ extension Session {
                 // app still launching; keep waiting
             }
             if Double(clock.nowMs() - start) >= timeout * 1000 {
+                let waiting = network.stillWaiting(sinceLogCursor: lastActionLogCursor)
                 return Output(
                     (gone ? "still present" : "not found") + " after \(Geometry.fmt(timeout))s: "
                         + Perception.quote(query) + "\nscreen: " + lastHeader
-                        + (stillWaiting().map { "\nstill waiting: " + $0 } ?? ""), exit: .notFound,
+                        + (waiting.map { "\nstill waiting: " + $0 } ?? ""), exit: .notFound,
                     data: [gone ? "gone" : "found": false, "screen": .string(lastHeader)])
             }
             clock.sleep(ms: 100)
@@ -59,30 +60,20 @@ extension Session {
 
     /// Waits for the PENDING tap's replies, then judges the tap again with the screen as it is now (spec §9).
     func finishPending(timeoutMs: Int) throws -> Output {
-        guard let pending = pendingTap else {
+        guard let pending = network.pending else {
             return Output(
                 "nothing to wait for: no tap came back PENDING since the last action. To wait for something on the "
                     + "screen: chauffeur wait \"<text>\"", exit: .error)
         }
-        let start = clock.nowMs()
-        var previous: [FlowActivity] = []
-        var verdict = RequestEvidence.verdict(netItems(pending.net, previous: &previous))
-        while case .pending = verdict, clock.nowMs() - start < timeoutMs {
-            clock.sleep(ms: 200)
-            verdict = RequestEvidence.verdict(netItems(pending.net, previous: &previous))
-        }
+        let verdict = network.finish(pending.net, timeoutMs: timeoutMs)
         let (after, settle) = try observe(minMs: 150, capMs: 1500)
         var report = pending.report
         report.requests = verdict.items
         report.requestElapsedMs = clock.nowMs() - pending.net.touchMs
         report.evidenceShot = nil
         if after.hash != pending.before.hash {
-            report.outcome = .changed
-            report.revAfter = after.rev
-            report.diff = Diff.lines(from: pending.before, to: after)
-            report.settledMs = settle.elapsedMs
-            report.settled = settle.settled
-            report.hints = []
+            // The wait's own observe gives the settle (convention 3).
+            report.credit(change: after, from: pending.before, settledMs: settle.elapsedMs, settled: settle.settled)
         } else if case .pending = verdict {
             report.outcome = .pending
             report.hints = Verifier.hints(outcome: .pending, target: pending.target)
@@ -92,21 +83,7 @@ extension Session {
                 ActionReport.lead(verdict.items, pending: false).flatMap(RequestText.hint).map { [$0] }
                 ?? Verifier.hints(outcome: .noEffect, target: pending.target)
         }
-        if report.outcome == .pending { pendingTap?.report = report } else { pendingTap = nil }
+        if report.outcome == .pending { network.pending?.report = report } else { network.pending = nil }
         return Output(report.render(), exit: report.exitCode, data: report.json)
-    }
-
-    /// `api.example.com/feed (9.8 s)` for each reply the last action is still waiting for; nil when none is.
-    func stillWaiting() -> String? {
-        if let pending = pendingTap {
-            var previous: [FlowActivity] = []
-            let elapsed = RequestText.duration(clock.nowMs() - pending.net.touchMs)
-            let open = netItems(pending.net, previous: &previous).filter { $0.waiting && !$0.telemetry }
-            return open.isEmpty ? nil : open.map { RequestText.target($0) + " (\(elapsed))" }.joined(separator: ", ")
-        }
-        let open = RequestLog.parse(logs.since(lastActionLogCursor)).filter { !$0.finished && $0.host != nil }
-        let items = RequestEvidence.merge(records: open, activity: [], streaming: [], telemetryExtra: telemetryHosts())
-            .filter { !$0.telemetry }
-        return items.isEmpty ? nil : items.map(RequestText.target).joined(separator: ", ")
     }
 }

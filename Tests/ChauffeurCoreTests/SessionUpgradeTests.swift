@@ -3,11 +3,17 @@ import Testing
 
 @testable import ChauffeurCore
 
+/// The head of a tap on "Show alert" that changed nothing.
+private func noEffect(_ ref: String) -> String {
+    "tap \(ref) \"Show alert\" → NO EFFECT · the accessibility tree did not change in 1.5s "
+        + "(touch reached dev.chauffeur.fixture)"
+}
+
 /// The four places a tap's NO EFFECT is upgraded, and `finishPending`, pinned line by line (Task 12): Stage 2 rewrites
 /// them as evidence passes and must reproduce every line, `settledMs`, the hints and the request lines included.
 /// Frames: see `Act`'s reads per observe.
 @Suite @MainActor struct SessionUpgradeTests {
-    /// `judgeScreenAgain`: a reply arrived inside the window, so the screen is judged again and the change is the tap's.
+    /// `ScreenAgainPass`: a reply arrived inside the window, so the screen is judged again and the change is the tap's.
     @Test func aReplyThenAChangeIsJudgedAgain() throws {
         let home = try Act.home()
         let showAlert = try Act.ref(home, "Show alert")
@@ -61,8 +67,8 @@ import Testing
         Golden.check("sessions/tap-clipboard-with-requests.txt", out.text)
     }
 
-    /// A PENDING tap, then a bare `wait`: the wait's own observe gives the settle, not the time since the touch.
-    @Test func waitFinishesThePendingTap() throws {
+    /// A tap on "Show alert" that came back PENDING, with the form behind it for the wait.
+    func pendingTapOnShowAlert() throws -> ActRig {
         let home = try Act.home()
         let showAlert = try Act.ref(home, "Show alert")
         let form = try Act.form()
@@ -77,10 +83,31 @@ import Testing
             ActRig.head(tapped).hasPrefix(
                 "tap \(showAlert) \"Show alert\" → PENDING · 127.0.0.1:8765 · sent 58 B, no reply after 2."),
             "\(tapped.text)")
+        return rig
+    }
+
+    /// A PENDING tap, then a bare `wait`: the wait's own observe gives the settle, not the time since the touch.
+    @Test func waitFinishesThePendingTap() throws {
+        let rig = try pendingTapOnShowAlert()
         rig.flows.samples = [[Act.done]]
         let out = rig.s.run(["wait"])
         #expect(out.exit == 0, "\(out.text)")
-        #expect(rig.s.pendingTap == nil)
+        #expect(rig.s.network.pending == nil)
+        Golden.check("sessions/wait-finishes-pending.txt", out.text)
+    }
+
+    /// A slow reply: the wait samples every 200 ms until it arrives (12 polls, 13 samples), then looks at the screen
+    /// once. The request line prints no elapsed time, so the golden is the same as for a reply at once.
+    @Test func waitPollsUntilTheReplyArrives() throws {
+        let rig = try pendingTapOnShowAlert()
+        rig.flows.samples = Array(repeating: [Act.waiting], count: 12) + [[Act.done]]
+        let started = rig.clock.now
+        let out = rig.s.run(["wait"])
+        #expect(out.exit == 0, "\(out.text)")
+        #expect(rig.flows.samples == [[Act.done]])
+        // 2400 ms of polls, then the wait's observe settles on the form in 150 ms.
+        #expect(rig.clock.now - started == 2400 + 150)
+        #expect(rig.s.network.pending == nil)
         Golden.check("sessions/wait-finishes-pending.txt", out.text)
     }
 
@@ -93,13 +120,24 @@ import Testing
         let showAlert = try Act.ref(home, "Show alert")
         let rig = ActRig(frames: Array(repeating: home, count: 7) + [try Act.form()])
         let out = rig.s.run(["tap", showAlert])
-        #expect(
-            ActRig.head(out)
-                == "tap \(showAlert) \"Show alert\" → NO EFFECT · the accessibility tree did not change in 1.5s "
-                + "(touch reached dev.chauffeur.fixture)",
-            "\(out.text)")
+        #expect(ActRig.head(out) == noEffect(showAlert), "\(out.text)")
         #expect(rig.touches.requests.count == 1)
         #expect(rig.inputs.fakes[0].touches.count == 2)
+    }
+
+    /// The screen is judged again only after a reply that is not telemetry: here the only reply is telemetry
+    /// (localhost, under the override), so the form behind it is never looked at. The lines come from the log, after
+    /// the touch, as flow items are never telemetry.
+    @Test func aTelemetryOnlyReplyIsNotJudgedAgain() throws {
+        let home = try Act.home()
+        let showAlert = try Act.ref(home, "Show alert")
+        let rig = ActRig(frames: Array(repeating: home, count: 7) + [try Act.form()])
+        rig.s.telemetryOverride = ["localhost"]
+        rig.logs.arriving = try Act.requestLines(task: "A450514C")
+        let out = rig.s.run(["tap", showAlert])
+        #expect(ActRig.head(out) == noEffect(showAlert), "\(out.text)")
+        #expect(out.text.contains("\ntelemetry: 1 request (localhost)"), "\(out.text)")
+        #expect(out.exit == ExitCode.noEffect.rawValue)
     }
 
     @Test func anUnchangedPasteboardStaysNoEffect() throws {
@@ -110,11 +148,7 @@ import Testing
             frames: [home], udid: udid,
             shell: RecordingShell(replies: [["pbpaste", udid]: [Act.out("hello, clipboard")]]))
         let out = rig.s.run(["tap", showAlert])
-        #expect(
-            ActRig.head(out)
-                == "tap \(showAlert) \"Show alert\" → NO EFFECT · the accessibility tree did not change in 1.5s "
-                + "(touch reached dev.chauffeur.fixture)",
-            "\(out.text)")
+        #expect(ActRig.head(out) == noEffect(showAlert), "\(out.text)")
         #expect(rig.shell.calls.filter { $0 == ["pbpaste", udid] }.count == 2)
     }
 

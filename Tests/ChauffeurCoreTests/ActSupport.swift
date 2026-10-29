@@ -82,6 +82,16 @@ enum Act {
     /// The same request, answered and closed.
     static let done = flow(rx: 512, closedMs: 2)
 
+    /// The recorded `ios27-requests` lines for one task id and its connection, in order.
+    static func requestLines(task: String) throws -> [LogLine] {
+        let lines = try Fixtures.network("ios27-requests")
+        let url = lines.first { $0.message.contains(task) && $0.message.contains("setting up Connection") }
+        let connection = url.map { line in line.message.split(separator: " ").last.map { "[C\($0) " } ?? "" } ?? ""
+        return lines.filter { line in
+            line.message.contains(task) || (!connection.isEmpty && line.message.hasPrefix(connection))
+        }
+    }
+
     static func out(_ text: String, status: Int32 = 0) -> ProcessResult {
         ProcessResult(status: status, out: text, timedOut: false)
     }
@@ -105,8 +115,8 @@ enum Act {
 
 /// A session over scripted seams, and the fakes behind it, so a test can read what the session did to them.
 ///
-/// The flow source is always there (empty by default), as production's `netStart()` builds NetworkStatistics on the
-/// first tap: without one, `applyNetwork` would add "network statistics unavailable" to every NO EFFECT.
+/// The flow source is always there (empty by default), as production's `network.start` builds NetworkStatistics on the
+/// first tap: without one, `NetworkPass` would add "network statistics unavailable" to every NO EFFECT.
 @MainActor
 struct ActRig {
     let s: Session
@@ -142,4 +152,18 @@ struct ActRig {
 
     /// The output's first line.
     static func head(_ out: Output) -> String { String(out.text.prefix { $0 != "\n" }) }
+
+    /// A context over this rig's session, clock and touch log, as `act` builds one; without a gesture by default.
+    func context(
+        before: Snapshot, target: Node? = nil, net: TapNet? = nil, capMs: Int = 1500, label: String = "act",
+        baselineSettled: Bool = true, gesture: ((any TouchTransport) -> Bool)? = nil
+    ) -> ActionContext {
+        ActionContext(
+            label: label, before: before, baselineSettled: baselineSettled, target: target, capMs: capMs,
+            touchMs: clock.now,
+            net: net, expectedApp: s.expectedApp(on: before), isTouchLogAttached: { [touches] in touches.isAttached },
+            clock: clock,
+            observe: { [s] in try s.observe(minMs: $0, capMs: $1) },
+            touchEvidence: { [touches] in touches.evidence(since: $0, waitMs: 200) }, gesture: gesture)
+    }
 }

@@ -59,4 +59,20 @@ import Testing
         let plain = FakeClock()
         #expect(NetJudge.judge(clock: plain, touchMs: 0) { plain.now < 320 ? [] : [open] } == .none([]))
     }
+
+    // `finish`: a bare `wait` (M4b spec §9).
+
+    /// It samples every 200 ms until the reply arrives, and returns then: no grace, no confirm look.
+    @Test func finishReturnsWhenTheReplyArrivesAndNeverConfirms() {
+        let clock = FakeClock()
+        let verdict = NetJudge.finish(clock: clock, timeoutMs: 30_000) { clock.now < 1000 ? [open] : [done] }
+        #expect(verdict == .settled([done]))
+        #expect(clock.now <= 1200)
+    }
+
+    @Test func finishStopsAtTheTimeout() {
+        let clock = FakeClock()
+        #expect(NetJudge.finish(clock: clock, timeoutMs: 30_000) { [open] } == .pending([open]))
+        #expect(clock.now == 30_000)
+    }
 }

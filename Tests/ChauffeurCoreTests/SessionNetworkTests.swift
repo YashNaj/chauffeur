@@ -11,8 +11,8 @@ import Testing
             ax: ScriptedAX(frames: []), clock: clock, flows: ScriptedFlows(flows))
         let s = Session(udid: udid, environment: environment)
         s.telemetryOverride = []
-        // Build the flow source as production's `netStart()` has by the time a tap is judged (no pids: no sample).
-        _ = s.flows([])
+        // Build the flow source as production's `network.start` has by the time a tap is judged (no pids: no sample).
+        _ = s.network.start(appPid: nil) { nil }
         return s
     }
 
@@ -23,23 +23,27 @@ import Testing
             retriedFrom: nil, hints: Verifier.hints(outcome: outcome, target: nil), capMs: 1500)
     }
 
+    /// What `NetworkPass` reads of a tap on no element: `net` and the session. The screen is never read.
+    func context(_ s: Session, net: TapNet) throws -> ActionContext {
+        var refs = RefTable()
+        let before = Perception.build(root: try Act.home(), size: Act.screen, previous: nil, refs: &refs, rev: 3)
+        return ActionContext(
+            label: "tap e4 \"Login\"", before: before, baselineSettled: true, target: nil, capMs: 1500,
+            touchMs: net.touchMs, net: net, expectedApp: nil, isTouchLogAttached: { false }, clock: s.clock,
+            observe: { [s] in try s.observe(minMs: $0, capMs: $1) }, touchEvidence: { _ in .unavailable }, gesture: nil)
+    }
+
     /// The touch, then `task`'s recorded lines arriving in the log.
     func tap(_ s: Session, task: String) throws -> TapNet {
         let net = TapNet(pids: [4321], earlier: [], atTouch: [], logCursor: s.logs.cursor, touchMs: s.clock.nowMs())
-        let lines = try Fixtures.network("ios27-requests")
-        let url = lines.first { $0.message.contains(task) && $0.message.contains("setting up Connection") }
-        let connection = url.map { line in line.message.split(separator: " ").last.map { "[C\($0) " } ?? "" } ?? ""
-        for line in lines
-        where line.message.contains(task) || (!connection.isEmpty && line.message.hasPrefix(connection)) {
-            s.logs.append(line)
-        }
+        for line in try Act.requestLines(task: task) { s.logs.append(line) }
         return net
     }
 
     @Test func aFailedRequestLeadsTheNoEffect() throws {
         let s = session()
         var r = report(.noEffect)
-        s.applyNetwork(&r, net: try tap(s, task: "A450514C"), target: nil)
+        try NetworkPass().apply(to: &r, context: context(s, net: try tap(s, task: "A450514C")), session: s)
         #expect(r.outcome == .noEffect)
         #expect(r.render().hasPrefix("tap e4 \"Login\" → NO EFFECT · localhost:8765/fail → 500 Internal Server Error"))
         #expect(r.hints == [RequestText.hint(r.requests[0]) ?? ""])
@@ -48,7 +52,7 @@ import Testing
     @Test func aChangeGetsItsRequestLines() throws {
         let s = session()
         var r = report(.changed)
-        s.applyNetwork(&r, net: try tap(s, task: "F8F70ACA"), target: nil)
+        try NetworkPass().apply(to: &r, context: context(s, net: try tap(s, task: "F8F70ACA")), session: s)
         #expect(r.outcome == .changed && r.requests.map(\.status) == [201])
     }
 
@@ -56,42 +60,32 @@ import Testing
         let s = session()
         s.telemetryOverride = ["localhost"]
         var r = report(.noEffect)
-        s.applyNetwork(&r, net: try tap(s, task: "A450514C"), target: nil)
+        try NetworkPass().apply(to: &r, context: context(s, net: try tap(s, task: "A450514C")), session: s)
         #expect(r.outcome == .noEffect && r.requests.allSatisfy(\.telemetry))
         #expect(r.render().contains("\ntelemetry: 1 request (localhost)"))
         #expect(r.hints == Verifier.hints(outcome: .noEffect, target: nil))
     }
 
-    @Test func aDeadTapStaysPlain() {
+    @Test func aDeadTapStaysPlain() throws {
         let s = session()
         var r = report(.noEffect)
         let net = TapNet(pids: [4321], earlier: [], atTouch: [], logCursor: s.logs.cursor, touchMs: s.clock.nowMs())
         let started = s.clock.nowMs()
-        s.applyNetwork(&r, net: net, target: nil)
+        try NetworkPass().apply(to: &r, context: context(s, net: net), session: s)
         #expect(r.outcome == .noEffect && r.requests.isEmpty)
         #expect(s.clock.nowMs() - started < 200)
     }
 
-    @Test func noProcessMeansNotWatched() {
+    @Test func noProcessMeansNotWatched() throws {
         let s = session()
         var r = report(.noEffect)
-        s.applyNetwork(&r, net: TapNet(pids: [], earlier: [], atTouch: [], logCursor: 0, touchMs: 0), target: nil)
+        try NetworkPass().apply(
+            to: &r, context: context(s, net: TapNet(pids: [], earlier: [], atTouch: [], logCursor: 0, touchMs: 0)),
+            session: s)
         #expect(r.networkNote == "no app process to watch")
     }
 
-    @Test func aRawSocketWaitingIsPending() {
-        let waiting = Flow(
-            id: 1, pid: 4321, process: "Fixture", proto: "tcp", remote: "127.0.0.1:8765", tx: 58,
-            rx: 0, openedMs: 1, closedMs: nil)
-        let s = session(flows: [[waiting]])
-        var r = report(.noEffect)
-        let net = TapNet(pids: [4321], earlier: [], atTouch: [], logCursor: s.logs.cursor, touchMs: s.clock.nowMs())
-        s.applyNetwork(&r, net: net, target: nil)
-        #expect(r.outcome == .pending && r.exitCode == .pending)
-        #expect(r.render().hasPrefix("tap e4 \"Login\" → PENDING · 127.0.0.1:8765 · sent 58 B, no reply after 2."))
-    }
-
-    @Test func theWindowIsPaidOnTheFakeClockNotTheWall() {
+    @Test func theWindowIsPaidOnTheFakeClockNotTheWall() throws {
         let waiting = Flow(
             id: 1, pid: 4321, process: "Fixture", proto: "tcp", remote: "127.0.0.1:8765", tx: 58,
             rx: 0, openedMs: 1, closedMs: nil)
@@ -100,7 +94,7 @@ import Testing
         var r = report(.noEffect)
         let started = Date()
         let net = TapNet(pids: [4321], earlier: [], atTouch: [], logCursor: s.logs.cursor, touchMs: s.clock.nowMs())
-        s.applyNetwork(&r, net: net, target: nil)
+        try NetworkPass().apply(to: &r, context: context(s, net: net), session: s)
         #expect(r.outcome == .pending)
         #expect(clock.now >= NetJudge.requestWindowMs)
         #expect(Date().timeIntervalSince(started) < 1.0)

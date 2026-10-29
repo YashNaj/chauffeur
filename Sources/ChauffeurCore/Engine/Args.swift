@@ -122,6 +122,19 @@ public struct Output: Codable, Equatable, Sendable {
     }
 }
 
+extension Output {
+    /// The crash lead contract every action renderer follows: the first line keeps what precedes its first " → " and
+    /// takes `lead` after it; the other lines go (an action's diff after a crash would only show the home screen).
+    /// Nil when the first line has no " → ": the caller keeps that line alone and shows the lead on its own line.
+    public func withLead(_ lead: String) -> Output? {
+        let first = text.prefix { $0 != "\n" }
+        guard let arrow = first.range(of: " → ") else { return nil }
+        var led = self
+        led.text = String(first[..<arrow.lowerBound]) + " → " + lead
+        return led
+    }
+}
+
 public enum Usage {
     public static let text = """
         usage: chauffeur <command> [--udid <udid>]

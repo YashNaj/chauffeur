@@ -239,4 +239,12 @@ import Testing
         s.logs.append(LogLine(time: "t", level: "fault", message: "UIKit fault", sender: "UIKitCore"))
         #expect(s.annotate(Output("ok"), since: 0, logs: false).text.contains("APP EXITED"))
     }
+
+    /// Task 18: the crash lead is placed by one function on `Output`: what precedes the first " → " stays, the rest of the
+    /// result goes, and `exit` and `data` are kept; a first line with no arrow cannot take a lead.
+    @Test func theCrashLeadReplacesTheVerdictAndTheRest() {
+        let led = Output("tap e4 \"Pay\" → NO EFFECT · x\nhint: y", exit: 3, data: ["a": 1]).withLead("APP CRASHED: z")
+        #expect(led == Output("tap e4 \"Pay\" → APP CRASHED: z", exit: 3, data: ["a": 1]), "\(String(describing: led))")
+        #expect(Output("nothing to wait for\nmore").withLead("APP CRASHED: z") == nil)
+    }
 }

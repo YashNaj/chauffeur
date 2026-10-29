@@ -1,0 +1,87 @@
+import Foundation
+import Testing
+
+@testable import ChauffeurCore
+
+/// The classify step on its own (Task 15): what an action without a touch and a touch are called, from the screen and
+/// the touch log, over a context built from a scripted session. Frames: see `Act`'s reads per observe.
+@Suite @MainActor struct ClassifierTests {
+    static let note = "the URL was delivered; nothing visible changed in 3s"
+    static let hints = ["the app may handle this link without a visible change; run snapshot to check"]
+
+    @Test func noTouchCreditsATreeThatChanges() throws {
+        let home = try Act.home()
+        let rig = ActRig(frames: [home, home, try Act.form()])
+        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let (report, after) = try NoTouchClassifier(note: Self.note, hints: Self.hints)
+            .classify(context: rig.context(before: before, capMs: 3000), attempt: .noTouch)
+        #expect(report.outcome == .changed)
+        #expect(!report.diff.isEmpty)
+        #expect(report.transport == "none")
+        #expect(report.evidence == .unavailable)
+        #expect(after.hash != before.hash)
+    }
+
+    /// A change on a screen that was not settled when the action began cannot be pinned on the action.
+    @Test func noTouchOnAnUnsettledBaselineIsUnattributed() throws {
+        let home = try Act.home()
+        let rig = ActRig(frames: [home, home, try Act.form()])
+        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let (report, after) = try NoTouchClassifier(note: Self.note, hints: Self.hints)
+            .classify(context: rig.context(before: before, capMs: 3000, baselineSettled: false), attempt: .noTouch)
+        #expect(report.outcome == .unattributed)
+        #expect(report.diff.isEmpty)
+        #expect(report.transport == "none")
+        #expect(report.evidence == .unavailable)
+        #expect(report.hints == Verifier.hints(outcome: .unattributed, target: nil))
+        #expect(after.hash != before.hash)
+    }
+
+    @Test func noTouchIsUnverifiedOnceTheCapRunsOut() throws {
+        let rig = ActRig(frames: [try Act.home()])
+        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let started = rig.clock.now
+        let (report, _) = try NoTouchClassifier(note: Self.note, hints: Self.hints)
+            .classify(context: rig.context(before: before, capMs: 3000), attempt: .noTouch)
+        #expect(report.outcome == .unverified)
+        #expect(rig.clock.now - started >= 3000)
+        #expect(report.note == Self.note)
+        #expect(report.hints == Self.hints)
+    }
+
+    static func sent(isLast: Bool) -> Attempt {
+        Attempt(sent: true, touchCursor: 0, transport: "digitizer", retriedFrom: nil, isLast: isLast)
+    }
+
+    @Test func aTouchTheAppGotWithNoChangeIsNoEffect() throws {
+        let home = try Act.home()
+        let rig = ActRig(frames: [home])
+        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let (report, _) = try TouchClassifier().classify(
+            context: rig.context(before: before), attempt: Self.sent(isLast: false))
+        #expect(report.outcome == .noEffect)
+        #expect(report.transport == "digitizer")
+    }
+
+    @Test func noTouchEvidenceIsRetryWhileATransportIsLeftThenNotDelivered() throws {
+        let home = try Act.home()
+        let rig = ActRig(frames: [home], touches: ScriptedTouches(evidence: [], attached: true))
+        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let context = rig.context(before: before)
+        let (retry, _) = try TouchClassifier().classify(context: context, attempt: Self.sent(isLast: false))
+        #expect(retry.outcome == .retry)
+        let (last, _) = try TouchClassifier().classify(context: context, attempt: Self.sent(isLast: true))
+        #expect(last.outcome == .notDelivered)
+        #expect(last.hints == ["input transport unhealthy — run `chauffeur doctor --live`"])
+    }
+
+    @Test func anUnattachedTouchLogIsUnverifiedWithoutAsking() throws {
+        let home = try Act.home()
+        let rig = ActRig(frames: [home], touches: ScriptedTouches(evidence: [], attached: false))
+        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let (report, _) = try TouchClassifier().classify(
+            context: rig.context(before: before), attempt: Self.sent(isLast: false))
+        #expect(report.outcome == .unverified)
+        #expect(rig.touches.requests.isEmpty)
+    }
+}

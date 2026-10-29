@@ -6,7 +6,7 @@ extension Session {
         let submit = a.flag("--submit")
         guard let ref = a.next(), let text = a.text(), !text.isEmpty else { throw ChauffeurError.usage(a.usage) }
         let (device, _) = try connect()
-        let network = netStart()
+        let network = self.network.start(appPid: app?.pid) { ax?.frontmostPID() }
         let (before, settled) = try baseline()
         let field = try before.resolve(ref: ref, refs: refs)
         guard Perception.textEntry.contains(field.role) else {
@@ -21,7 +21,7 @@ extension Session {
 
         let aimed = try aim(ref, in: before)
         inputDeviceLost = false
-        let focus = try act("tap \(aimed.label)", target: field, before: before, baselineSettled: settled) {
+        let focus = try act("tap \(aimed.label)", target: field, before: before, baselineSettled: settled) { [self] in
             Gestures.tap($0, at: aimed.point, screen: device.size, clock: clock)
         }
         switch focus.outcome {
@@ -38,7 +38,7 @@ extension Session {
         let keyboard = try inputDeviceReady().keyboard(clock: clock)
         let method: String
         let sent: Bool
-        let typingNet = tapNet(network)
+        let typingNet = self.network.atTouch(network)
         if Keys.typeable(text) && text.count <= 15 {
             method = "keys"
             sent = keyboard.type(text)
@@ -68,13 +68,7 @@ extension Session {
             after: now, submitted: false)
         var report = TypeReport(
             action: label, method: method, verdict: verdict, value: now?.value, settledMs: settle.elapsedMs)
-        if verdict == .ok {
-            // One look, no window: typing is verified by the field, so a late request can't make it a false NO EFFECT.
-            clock.sleep(ms: NetJudge.graceMs)
-            var previous: [FlowActivity] = []
-            report.requests = netItems(typingNet, previous: &previous)
-            report.requestElapsedMs = clock.nowMs() - typingNet.touchMs
-        }
+        if verdict == .ok { TypingNetworkPass().apply(to: &report, net: typingNet, session: self) }
         guard submit, verdict == .ok else { return Output(report.render(), exit: report.exitCode, data: report.json) }
 
         guard keyboard.press(Keys.returnKey) else {
