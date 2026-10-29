@@ -207,23 +207,9 @@ extension Session {
     ) throws -> Output {
         let (before, settled) = try baseline()
         if let failure = try perform() { return Output("\(label) → FAILED: \(failure)", exit: .error) }
-        // The accessibility tree can lag the screen (SpringBoard after `button home` took over a second to show up), so
-        // a tree that is merely stable is not "no change": keep looking until it differs or `capMs` has passed.
-        let started = clock.nowMs()
-        var (after, settle) = try observe(minMs: 150, capMs: min(capMs, 600))
-        while after.hash == before.hash, clock.nowMs() - started < capMs {
-            (after, settle) = try observe(minMs: 150, capMs: min(capMs, 600))
-        }
-        if after.hash != before.hash { (after, settle) = try observe(minMs: 150, capMs: 1500) }
-        let outcome: Outcome = after.hash == before.hash ? .unverified : settled ? .changed : .unattributed
-        var report = ActionReport(
-            action: label, outcome: outcome, evidence: .unavailable, settledMs: settle.elapsedMs,
-            settled: settle.settled,
-            revBefore: before.rev, revAfter: after.rev,
-            diff: outcome == .changed ? Diff.lines(from: before, to: after) : [],
-            transport: "none", retriedFrom: nil,
-            hints: outcome == .unverified ? hints : Verifier.hints(outcome: outcome, target: nil), capMs: capMs)
-        report.note = note
+        let report = try act(
+            label, target: nil, before: before, baselineSettled: settled, capMs: capMs,
+            classifier: NoTouchClassifier(note: note, hints: hints), gesture: nil)
         return Output(report.render(), exit: report.exitCode, data: report.json)
     }
 

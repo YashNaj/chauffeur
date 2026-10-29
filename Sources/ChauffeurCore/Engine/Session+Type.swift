@@ -21,7 +21,7 @@ extension Session {
 
         let aimed = try aim(ref, in: before)
         inputDeviceLost = false
-        let focus = try act("tap \(aimed.label)", target: field, before: before, baselineSettled: settled) {
+        let focus = try act("tap \(aimed.label)", target: field, before: before, baselineSettled: settled) { [self] in
             Gestures.tap($0, at: aimed.point, screen: device.size, clock: clock)
         }
         switch focus.outcome {

@@ -35,53 +35,57 @@ extension Session {
         return transports
     }
 
-    /// Sends a gesture and reports what really happened (spec §6.2).
+    /// Sends a gesture and reports what really happened (spec §6.2): the classifier reads the screen and the evidence,
+    /// then each pass may upgrade the report. Without a gesture, one attempt and no transport.
     func act(
         _ label: String, target: Node?, before: Snapshot, baselineSettled: Bool = true, capMs: Int = 1500,
-        needsMove: Bool = false, network: NetStart? = nil, gesture: (any TouchTransport) -> Bool
+        needsMove: Bool = false, network: NetStart? = nil, classifier: any Classifier = TouchClassifier(),
+        passes: [any EvidencePass] = [], shot: Bool = true, gesture: ((any TouchTransport) -> Bool)?
     ) throws -> ActionReport {
-        let all = try transportsReady()
-        let order = (all[preferred...] + all[..<preferred]).filter { !needsMove || $0.supportsMove }
-        guard !order.isEmpty else { throw ChauffeurError.bridge("no input transport supports this gesture") }
+        let all = try gesture == nil ? [] : transportsReady()
+        let order = all.isEmpty ? [] : (all[preferred...] + all[..<preferred]).filter { !needsMove || $0.supportsMove }
+        guard gesture == nil || !order.isEmpty else {
+            throw ChauffeurError.bridge("no input transport supports this gesture")
+        }
         var index = 0
         var retriedFrom: String?
         while true {
-            let transport = order[index]
+            let transport = gesture == nil ? nil : order[index]
             let cursor = touchLog.cursor
             let net = network.map { tapNet($0) }
-            let sent = gesture(transport)
-            let (after, settle) = try observe(minMs: 150, capMs: capMs)
-            let evidence: Evidence =
-                !touchLog.isAttached
-                ? .unavailable
-                : sent ? touchLog.evidence(since: cursor, waitMs: 200) : .none
-            var outcome = Verifier.classify(
-                treeChanged: after.hash != before.hash, evidence: evidence,
-                expectedApp: expectedApp(on: before),
-                systemFrontmost: before.kind.isSystem, retried: retriedFrom != nil,
-                baselineSettled: baselineSettled)
-            if outcome == .retry {
-                if index + 1 < order.count {
+            let touchMs = net?.touchMs ?? clock.nowMs()
+            let attempt =
+                if let gesture, let transport {
+                    Attempt(
+                        sent: gesture(transport), touchCursor: cursor, transport: transport.name,
+                        retriedFrom: retriedFrom, isLast: index + 1 == order.count)
+                } else {
+                    Attempt.noTouch
+                }
+            let context = ActionContext(
+                label: label, before: before, baselineSettled: baselineSettled, target: target, capMs: capMs,
+                touchMs: touchMs, net: net, expectedApp: expectedApp(on: before),
+                isTouchLogAttached: { [self] in touchLog.isAttached }, clock: clock,
+                observe: { [self] in try observe(minMs: $0, capMs: $1) },
+                touchEvidence: { [self] in touchLog.evidence(since: $0, waitMs: 200) }, gesture: gesture)
+            var (report, _) = try classifier.classify(context: context, attempt: attempt)
+            if let transport {
+                if report.outcome == .retry {
                     retriedFrom = transport.name
                     index += 1
                     continue
                 }
-                outcome = .notDelivered
+                if report.outcome != .notDelivered, let i = all.firstIndex(where: { $0 === transport }) {
+                    preferred = i
+                }
+                if !attempt.sent {
+                    // The device rebuilds its client on the next action, which starts again on the first transport.
+                    inputDevice?.reset()
+                    inputDeviceLost = true
+                    preferred = 0
+                }
             }
-            if outcome != .notDelivered, let i = all.firstIndex(where: { $0 === transport }) { preferred = i }
-            if !sent {
-                // The device rebuilds its client on the next action, which starts again on the first transport.
-                inputDevice?.reset()
-                inputDeviceLost = true
-                preferred = 0
-            }
-            var report = ActionReport(
-                action: label, outcome: outcome, evidence: evidence, settledMs: settle.elapsedMs,
-                settled: settle.settled,
-                revBefore: before.rev, revAfter: after.rev,
-                diff: outcome == .changed ? Diff.lines(from: before, to: after) : [],
-                transport: transport.name, retriedFrom: retriedFrom,
-                hints: Verifier.hints(outcome: outcome, target: target), capMs: capMs)
+            for pass in passes { try pass.apply(to: &report, context: context, session: self) }
             if let net {
                 applyNetwork(&report, net: net, target: target)
                 if report.outcome == .pending {
@@ -139,7 +143,7 @@ extension Session {
         let clipboardBefore = clipboard.result(waitingAtMost: 2000) ?? nil
         var report = try act(
             "tap \(aimed.label)", target: aimed.node, before: before, baselineSettled: settled, network: network
-        ) {
+        ) { [self] in
             Gestures.tap($0, at: aimed.point, screen: device.size, holdMs: holdMs, clock: clock)
         }
         // Right after typing, a switch can ignore the first touch that reaches the app (F1, M2 dogfood; reproduced in
@@ -158,7 +162,7 @@ extension Session {
             var second = try act(
                 "tap \(aimed.label)", target: aimed.node, before: again, baselineSettled: settledAgain,
                 network: netStart()
-            ) {
+            ) { [self] in
                 Gestures.tap($0, at: aimed.point, screen: device.size, holdMs: holdMs, clock: clock)
             }
             if second.outcome == .changed {
@@ -243,7 +247,7 @@ extension Session {
         for n in 1...(until == nil ? 1 : 15) {
             var report = try act(
                 "scroll \(direction)", target: nil, before: snap, baselineSettled: settled, needsMove: true
-            ) {
+            ) { [self] in
                 Gestures.drag($0, from: drag.from, to: drag.to, screen: device.size, clock: clock)
             }
             if report.outcome == .noEffect { report.hints = ["nothing moved: already at the end in that direction"] }

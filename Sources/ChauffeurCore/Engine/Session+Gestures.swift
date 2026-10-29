@@ -27,7 +27,7 @@ extension Session {
         let (before, settled) = try baseline()
         let label =
             "swipe (\(Geometry.fmt(from.x)),\(Geometry.fmt(from.y)))→(\(Geometry.fmt(to.x)),\(Geometry.fmt(to.y)))"
-        var report = try act(label, target: nil, before: before, baselineSettled: settled, needsMove: true) {
+        var report = try act(label, target: nil, before: before, baselineSettled: settled, needsMove: true) { [self] in
             Gestures.drag($0, from: from, to: to, screen: device.size, clock: clock)
         }
         if report.outcome == .noEffect {
