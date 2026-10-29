@@ -130,6 +130,12 @@ Each is a divergence from the spec's words, with its reason; the spec wins unles
 7. **Staging: the order above, and the stage split (3a/3b/3c, 4a/4b).**
 8. **§6, exit 75 (`Daemon.versionMismatchExit`) stays out of `ExitCode` and the glossary.** It is the daemon-to-client
    restart signal; the client retries and the second answer is an ordinary `Output`; an agent never sees it.
+9. **§3 and Staging row 2, `EvidenceCarrier` and `TypingNetworkPass`: deleted (Task 23).** The protocol carried two
+   fields for one generic caller, and `type` assigns the two fields in one line; both reports keep `requests` and
+   `requestElapsedMs` as their own properties, so the JSON and the goldens are unchanged.
+
+Accepted by the owner on 2026-10-29: amendment 6, amendment 9, and Task 24's reversals (`ActionContext` as data,
+`act`'s `.retry` fallback and its pin removed). Amendments 1-5, 7 and 8 wait for the Fable review of Plan 2.
 
 ---
 
