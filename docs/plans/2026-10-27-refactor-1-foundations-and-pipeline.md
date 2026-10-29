@@ -1039,3 +1039,54 @@ session would have been a second seam style; `processes` is then the only answer
 environment's `simulatorBooted` the only one to "is the simulator booted", beside `device.booted` for the connected
 device). Stage 5's `Sweep` should also lift `complete` off `AXSource`, so the bar sweep runs on top of any source
 (spec §2) and can be tested offline.
+
+### Stage 1b (branch `refactor-1b-inputs`)
+
+**The plan was amended before execution** (commit 0106398), from the Fable review of Stage 1a: Task 10 split into 10a and
+10b, the closures moved into the environment, and Task 12 gained the upgrade-path pins. That supersedes two Stage 1a
+lines above: Task 7's "the closure seams stay as they are in this plan" and the "Two seams for one fact, until Plan 2"
+paragraph. After 10a, `processes` is the only liveness seam, and `.live`'s `inputs` holds the `Device` cast that
+`transportsReady` used to make.
+
+**HID owns the client.** `CHHIDClient` appears only in `Device/HID.swift` (lint `hid-owner`); `HID.open()` returns
+nothing, so no other file can get hold of the client without naming it. `Input.swift` has no `usleep`: taps, drags and
+the keyboard wait on the session's clock. A failed send now does explicitly what the rebuild used to do implicitly:
+`inputDevice.reset()`, `preferred = 0`, and `inputDeviceLost`, which keeps `type`'s "HID client lost after focusing"
+error. The plan's `try inputDevice().keyboard(...)` would have removed that error on two reachable paths (a focus tap
+whose send failed with the touch log unattached, and a reconnect inside `observe`), so it was kept by ruling. The method
+is `inputDeviceReady()`, since Swift won't allow a method and a property both named `inputDevice`.
+
+**Task 11's protocol was wrong in the plan** (a `start(bundle:pid:)` that doesn't exist); `LogSource` lists what
+`Session` reads from `LogTap`, and `LogTap.append` is public. `SessionNetworkTests` runs on `.scripted` (0.05 s) with
+its flow source built up front, as `netStart()` builds it in production.
+
+**Task 12: what the recorded goldens showed against the table.** Diff lines are `-`/`+` only (the table's `~ … off → on`
+was notation). A text node gets no ref, so a scroll's found line is `found text "Label 69" after …`, as the live
+`ScrollLiveTests` expects; "Row 48" isn't in `fixture-longlist`, so the scroll uses `long-scrollview`. The screen-again
+`settledMs` (770 ms) counts from the touch and so includes the 50 ms hold. The `wait` pin needs a tap that settles later
+than the wait (225 ms against 150 ms), or deleting `Session+Wait.swift:83` changes nothing. Offline, a NO EFFECT has no
+`screen:` line, because `capture` finds no file. The live ledger's unit-twin column comes from `scripts/live-twins.tsv`;
+only the twinned lines changed.
+
+**Not pinned yet, and needed before Stage 2 Task 16:** `judgeScreenAgain` skips replies that are telemetry only
+(`Session+Network.swift`, the `!$0.telemetry` guard). Nothing pins that it doesn't fire for them, and it guards against
+a false `changed`. A pin needs `ScriptedLogs` to release log lines after the touch, because flow-only items are never
+telemetry. **Task 16 writes that pin first.** Also unpinned: the drop-inside-`observe` path of `inputDeviceLost`.
+
+**Task 13: Doctor's wording, by ruling.** The relaunch and no-tree findings are `AXHealth.message(plan, recovered:
+false)`. The relaunch line has no flags clause, because Doctor only reads the flags. The poisoned-bridge line keeps
+Doctor's own text, because every `AXHealth` bridge message says chauffeur restarted the bridge, and Doctor never does.
+The flags-off warning keeps its text, because no plan covers flags off with a tree. One finding changed, not only
+its wording: with no tree and the flags off, Doctor says to relaunch, as `Session` decides, where it used to point at
+the bridge or say "no tree". The old bridge text's "chauffeur does this itself after 4 s" was false in that case.
+This is in the CHANGELOG. For Plan 2's glossary: the two `AXHealth` lines drop Doctor's `accessibility:` prefix, and
+the no-tree line says "run: chauffeur doctor" inside doctor's own output.
+
+**For Plan 2:** `AXProvider` has two public inits (`init(sim:)` for `.live` and the live tests, `init(device:)` for
+Doctor); `button` and `selftest` have no offline test (`FakeInputs.pressed` is ready for one); `Session.swift` is 323
+lines, over the 300 aim.
+
+**Live run at the end of Stage 1b** (ab24da8, iPhone 17 on iOS 27, load 5 at start and about 57 by the end from
+activity outside the session, 881 s): 515 tests; only the pre-existing `anAppStartedWithTheFlagsOffIsToldToRelaunch`
+failed (2 issues, fails on `main` too). `NetworkLiveTests` passed, the dead button included. The live ledger's body is
+unchanged from line 3 on; against `main`, only the nine twinned lines gained their twin column.
