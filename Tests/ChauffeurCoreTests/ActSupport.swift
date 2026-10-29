@@ -120,6 +120,7 @@ enum Act {
 @MainActor
 struct ActRig {
     let s: Session
+    let ax: ScriptedAX
     let touches: ScriptedTouches
     let shell: RecordingShell
     let clock: FakeClock
@@ -142,10 +143,11 @@ struct ActRig {
         self.processes = processes
         self.inputs = inputs
         self.logs = logs
+        ax = ScriptedAX(frames: frames)
         s = Session(
             udid: udid,
             environment: .scripted(
-                ax: ScriptedAX(frames: frames), touches: touches, shell: shell, clock: clock, flows: self.flows,
+                ax: ax, touches: touches, shell: shell, clock: clock, flows: self.flows,
                 processes: processes, inputs: inputs, logs: logs))
         s.telemetryOverride = []
     }
@@ -153,17 +155,13 @@ struct ActRig {
     /// The output's first line.
     static func head(_ out: Output) -> String { String(out.text.prefix { $0 != "\n" }) }
 
-    /// A context over this rig's session, clock and touch log, as `act` builds one; without a gesture by default.
+    /// A context for this rig's session, as `act` builds one; without a gesture by default.
     func context(
         before: Snapshot, target: Node? = nil, net: TapNet? = nil, capMs: Int = 1500, label: String = "act",
         baselineSettled: Bool = true, gesture: ((any TouchTransport) -> Bool)? = nil
     ) -> ActionContext {
         ActionContext(
-            label: label, before: before, baselineSettled: baselineSettled, target: target, capMs: capMs,
-            touchMs: clock.now,
-            net: net, expectedApp: s.expectedApp(on: before), isTouchLogAttached: { [touches] in touches.isAttached },
-            clock: clock,
-            observe: { [s] in try s.observe(minMs: $0, capMs: $1) },
-            touchEvidence: { [touches] in touches.evidence(since: $0, waitMs: 200) }, gesture: gesture)
+            label: label, before: before, baselineSettled: baselineSettled, target: target, capMs: capMs, net: net,
+            expectedApp: s.expectedApp(on: before), gesture: gesture)
     }
 }

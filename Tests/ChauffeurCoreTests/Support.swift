@@ -50,10 +50,13 @@ final class ScriptedAX: AXSource {
     private let frames: [AXElement?]
     private var next = 0
     var scriptedPID: Int32? = 4321
+    /// Runs at each `read()`, before the frame is handed out: for something that happens while the screen is read.
+    var onRead: (() -> Void)?
 
     init(frames: [AXElement?]) { self.frames = frames }
 
     func read() -> AXElement? {
+        onRead?()
         guard !frames.isEmpty else { return nil }
         defer { next = min(next + 1, frames.count - 1) }
         return frames[next]
@@ -88,7 +91,8 @@ final class ScriptedTouches: TouchEvidenceSource {
     private(set) var cursor = 0
     /// Every `evidence(since:waitMs:)` call's arguments, so a test can prove which cursor a caller passed.
     private(set) var requests: [(since: Int, waitMs: Int)] = []
-    let isAttached: Bool
+    /// Settable, so a test can stop the log mid-action, as a reconnect's `drop()` does.
+    var isAttached: Bool
 
     init(evidence: [Evidence], attached: Bool) {
         script = evidence

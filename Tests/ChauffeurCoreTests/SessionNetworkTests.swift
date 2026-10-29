@@ -28,9 +28,8 @@ import Testing
         var refs = RefTable()
         let before = Perception.build(root: try Act.home(), size: Act.screen, previous: nil, refs: &refs, rev: 3)
         return ActionContext(
-            label: "tap e4 \"Login\"", before: before, baselineSettled: true, target: nil, capMs: 1500,
-            touchMs: net.touchMs, net: net, expectedApp: nil, isTouchLogAttached: { false }, clock: s.clock,
-            observe: { [s] in try s.observe(minMs: $0, capMs: $1) }, touchEvidence: { _ in .unavailable }, gesture: nil)
+            label: "tap e4 \"Login\"", before: before, baselineSettled: true, target: nil, capMs: 1500, net: net,
+            expectedApp: nil, gesture: nil)
     }
 
     /// The touch, then `task`'s recorded lines arriving in the log.

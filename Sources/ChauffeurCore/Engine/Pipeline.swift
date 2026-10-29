@@ -1,26 +1,14 @@
 import Foundation
 
-/// What one action's classifier and passes may read. `act` builds it; a test builds one over a scripted session.
+/// What one action's classifier and passes may read: plain data, built by `act`.
 struct ActionContext {
-    /// The report's `action`.
     var label: String
     var before: Snapshot
     var baselineSettled: Bool
     var target: Node?
     var capMs: Int
-    /// `clock.nowMs()` right before the gesture (equal to `net?.touchMs`).
-    var touchMs: Int
     var net: TapNet?
-    /// `expectedApp(on: before)`: the launched app while it is in front.
     var expectedApp: String?
-    /// `touchLog.isAttached`, read when asked: an observe that reconnects (`drop()`) stops the touch log, so it is
-    /// read after the screen, as before.
-    var isTouchLogAttached: () -> Bool
-    var touchLogAttached: Bool { isTouchLogAttached() }
-    var clock: any SettleClock
-    var observe: (_ minMs: Int, _ capMs: Int) throws -> (snapshot: Snapshot, settle: Settled<AXElement>)
-    /// `touchLog.evidence(since:waitMs: 200)`.
-    var touchEvidence: (_ since: Int) -> Evidence
     /// The gesture, for a pass that sends it once more; nil for an action without a touch.
     var gesture: ((any TouchTransport) -> Bool)?
 }
@@ -41,29 +29,28 @@ struct Attempt {
 @MainActor
 protocol Classifier {
     /// Observes, reads the evidence and classifies the action.
-    func classify(context: ActionContext, attempt: Attempt) throws -> (report: ActionReport, after: Snapshot)
+    func classify(context: ActionContext, attempt: Attempt, session: Session) throws -> ActionReport
 }
 
 /// A touch: the screen after 150 ms or more, then the touch log's evidence since the send (spec §6.2).
 struct TouchClassifier: Classifier {
-    func classify(context: ActionContext, attempt: Attempt) throws -> (report: ActionReport, after: Snapshot) {
-        let before = context.before
-        let (after, settle) = try context.observe(150, context.capMs)
+    func classify(context: ActionContext, attempt: Attempt, session: Session) throws -> ActionReport {
+        let (after, settle) = try session.observe(minMs: 150, capMs: context.capMs)
+        // Read after the screen: an observe that reconnects (`drop()`) stops the touch log.
         let evidence: Evidence =
-            !context.touchLogAttached
+            !session.touchLog.isAttached
             ? .unavailable
-            : attempt.sent ? context.touchEvidence(attempt.touchCursor) : .none
+            : attempt.sent ? session.touchLog.evidence(since: attempt.touchCursor, waitMs: 200) : .none
         let outcome = Verifier.classify(
-            treeChanged: after.hash != before.hash, evidence: evidence, expectedApp: context.expectedApp,
-            systemFrontmost: before.kind.isSystem, retried: attempt.retriedFrom != nil || attempt.isLast,
+            treeChanged: after.hash != context.before.hash, evidence: evidence, expectedApp: context.expectedApp,
+            systemFrontmost: context.before.kind.isSystem, retried: attempt.retriedFrom != nil || attempt.isLast,
             baselineSettled: context.baselineSettled)
-        let report = ActionReport(
+        return ActionReport(
             action: context.label, outcome: outcome, evidence: evidence, settledMs: settle.elapsedMs,
-            settled: settle.settled, revBefore: before.rev, revAfter: after.rev,
-            diff: outcome == .changed ? Diff.lines(from: before, to: after) : [],
+            settled: settle.settled, revBefore: context.before.rev, revAfter: after.rev,
+            diff: outcome == .changed ? Diff.lines(from: context.before, to: after) : [],
             transport: attempt.transport, retriedFrom: attempt.retriedFrom,
             hints: Verifier.hints(outcome: outcome, target: context.target), capMs: context.capMs)
-        return (report, after)
     }
 }
 
@@ -73,27 +60,25 @@ struct NoTouchClassifier: Classifier {
     let note: String
     let hints: [String]
 
-    func classify(context: ActionContext, attempt: Attempt) throws -> (report: ActionReport, after: Snapshot) {
-        let before = context.before
-        let capMs = context.capMs
+    func classify(context: ActionContext, attempt: Attempt, session: Session) throws -> ActionReport {
         // The accessibility tree can lag the screen (SpringBoard after `button home` took over a second to show up), so
         // a tree that is merely stable is not "no change": keep looking until it differs or `capMs` has passed.
-        let started = context.clock.nowMs()
-        var (after, settle) = try context.observe(150, min(capMs, 600))
-        while after.hash == before.hash, context.clock.nowMs() - started < capMs {
-            (after, settle) = try context.observe(150, min(capMs, 600))
+        let started = session.clock.nowMs()
+        var (after, settle) = try session.observe(minMs: 150, capMs: min(context.capMs, 600))
+        while after.hash == context.before.hash, session.clock.nowMs() - started < context.capMs {
+            (after, settle) = try session.observe(minMs: 150, capMs: min(context.capMs, 600))
         }
-        if after.hash != before.hash { (after, settle) = try context.observe(150, 1500) }
+        if after.hash != context.before.hash { (after, settle) = try session.observe(minMs: 150, capMs: 1500) }
         let outcome: Outcome =
-            after.hash == before.hash ? .unverified : context.baselineSettled ? .changed : .unattributed
+            after.hash == context.before.hash ? .unverified : context.baselineSettled ? .changed : .unattributed
         var report = ActionReport(
             action: context.label, outcome: outcome, evidence: .unavailable, settledMs: settle.elapsedMs,
-            settled: settle.settled, revBefore: before.rev, revAfter: after.rev,
-            diff: outcome == .changed ? Diff.lines(from: before, to: after) : [],
+            settled: settle.settled, revBefore: context.before.rev, revAfter: after.rev,
+            diff: outcome == .changed ? Diff.lines(from: context.before, to: after) : [],
             transport: attempt.transport, retriedFrom: nil,
-            hints: outcome == .unverified ? hints : Verifier.hints(outcome: outcome, target: nil), capMs: capMs)
+            hints: outcome == .unverified ? hints : Verifier.hints(outcome: outcome, target: nil), capMs: context.capMs)
         report.note = note
-        return (report, after)
+        return report
     }
 }
 

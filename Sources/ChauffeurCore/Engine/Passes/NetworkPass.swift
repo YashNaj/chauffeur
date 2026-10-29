@@ -15,7 +15,7 @@ struct NetworkPass: EvidencePass {
             verdict = session.network.judge(afterTouch: net, textField: textField)
         }
         report.requests = verdict.items
-        report.requestElapsedMs = context.clock.nowMs() - net.touchMs
+        report.requestElapsedMs = session.clock.nowMs() - net.touchMs
         guard report.outcome == .noEffect else { return }
         switch verdict {
         case .none:

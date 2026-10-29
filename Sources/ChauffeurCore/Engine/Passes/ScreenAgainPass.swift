@@ -7,10 +7,10 @@ struct ScreenAgainPass: EvidencePass {
     func apply(to report: inout ActionReport, context: ActionContext, session: Session) throws {
         guard let net = context.net, report.outcome == .noEffect, report.requests.contains(where: { !$0.telemetry })
         else { return }
-        let (again, settle) = try context.observe(150, context.capMs)
+        let (again, settle) = try session.observe(minMs: 150, capMs: context.capMs)
         guard again.hash != context.before.hash else { return }
         report.credit(
-            change: again, from: context.before, settledMs: context.clock.nowMs() - net.touchMs,
+            change: again, from: context.before, settledMs: session.clock.nowMs() - net.touchMs,
             settled: settle.settled)
     }
 }
