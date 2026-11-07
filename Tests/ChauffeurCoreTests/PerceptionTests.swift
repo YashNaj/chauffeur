@@ -108,6 +108,14 @@ import Testing
         #expect(build(root).hash != build(changed).hash)
     }
 
+    @Test func aFrameHashesItsRootAndItsFingerprint() throws {
+        let root = try Fixtures.ax("fixture-form")
+        let frame = Frame(root: root, fingerprint: 1)
+        #expect(frame == Frame(root: root, fingerprint: 1))
+        #expect(frame.hashValue == Frame(root: root, fingerprint: 1).hashValue)
+        #expect(frame != Frame(root: root, fingerprint: 2))
+    }
+
     @Test func tabBarItemsAreTappableTabs() {
         // Live sweep on iOS 26.2: tab items are AXRadioButton with value 1 (selected) or 0.
         let bar = AXElement(
