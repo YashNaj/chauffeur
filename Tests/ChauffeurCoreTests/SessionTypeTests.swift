@@ -26,6 +26,26 @@ import Testing
         #expect(rig.inputs.keyboard.typed.isEmpty)
     }
 
+    /// Typing looks once after the grace and takes no window: the field is the proof, so a late request can't make it a
+    /// false NO EFFECT, and a request in flight costs `type` no wait.
+    @Test func typingLooksOnceAfterTheGrace() throws {
+        let email = try Act.ref(try Act.form(), "email")
+        let rig = ActRig(frames: try typedFrames([try Act.formTyped()]), flows: [[], [], [Act.done]])
+        let out = rig.s.run(["type", email, "alice"])
+        #expect(out.exit == 0 && out.text.contains("typed via keys"), "\(out.text)")
+        #expect(out.data?["requests"]?.array?.count == 1, "\(out.text)")
+        #expect(rig.clock.now < NetJudge.requestWindowMs, "\(rig.clock.now) ms")
+    }
+
+    /// `requestElapsedMs` is not in the JSON; it shows as the wait in a request still pending: the touch to the look,
+    /// which is the settle's 150 ms minimum and the grace.
+    @Test func typingStatesTheTimeSinceTheTouch() throws {
+        let email = try Act.ref(try Act.form(), "email")
+        let rig = ActRig(frames: try typedFrames([try Act.formTyped()]), flows: [[], [], [Act.waiting]])
+        let out = rig.s.run(["type", email, "alice"])
+        #expect(out.text.contains("no reply after \(150 + NetJudge.graceMs) ms"), "\(out.text)")
+    }
+
     @Test func submitThatChangesTheScreen() throws {
         let email = try Act.ref(try Act.form(), "email")
         let typed = try Act.formTyped()

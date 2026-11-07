@@ -11,7 +11,8 @@ import Testing
 
     func watch(flows: [[Flow]] = [[]]) -> NetworkWatch {
         let source = ScriptedFlows(flows)
-        return NetworkWatch(flows: { source }, processes: FakeProcesses(alive: []), logs: logs, clock: clock)
+        return NetworkWatch(
+            flows: { source }, processes: FakeProcesses(alive: []), logs: logs, clock: clock, telemetry: { _ in [] })
     }
 
     /// The touch on the app (pid 4321), before any connection of its was seen.

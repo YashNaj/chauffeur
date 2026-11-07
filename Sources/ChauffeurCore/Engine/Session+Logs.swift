@@ -1,6 +1,9 @@
 import Foundation
 
 extension Session {
+    /// How long a result waits for the crash report (macOS took 17–70 s on the 8 GB Mac; `logs` looks again later).
+    nonisolated static let crashReportWaitMs = 3000
+
     /// After a daemon restart the launched app is known but its log is not followed yet; retried every 30 s at most.
     func followLaunchedApp() {
         guard let app, logs.executable != app.executable else { return }
@@ -26,7 +29,7 @@ extension Session {
         if let endedAt = endedByChauffeur[gone.pid], clock.nowMs() - endedAt < Self.endedGraceMs { return nil }
         // wall clock: `detectedAt` is a Date, not a duration (nothing reads it yet)
         var info = CrashInfo(app: gone, detectedAt: Date(), report: nil)
-        let deadline = clock.nowMs() + crashReportWaitMs
+        let deadline = clock.nowMs() + Self.crashReportWaitMs
         while true {
             info.report = environment.findCrashReport(gone)
             if info.report != nil || clock.nowMs() >= deadline { break }

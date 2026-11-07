@@ -33,7 +33,6 @@ import Testing
             bundle: "dev.chauffeur.fixture", executable: "Fixture", displayName: "Fixture", pid: 4321,
             launchedAt: Date())
         s.app = app
-        s.crashReportWaitMs = 0
         s.logTapAttemptMs = s.clock.nowMs()  // no real `log stream` for a fake simulator
         return (s, app)
     }
@@ -53,5 +52,30 @@ import Testing
         defer { TrackedApp.clear(StatePaths.app(s.udid)) }
         procs.alive = []
         #expect(s.annotate(Output("snapshot"), since: 0, logs: false).exit == 0 && s.app == nil)
+    }
+
+    @Test func aRebootedSimulatorForgetsTheAppAndReconnects() throws {
+        let device = FakeDevice(udid: "ZZ000000-TEST", booted: true, size: Size(w: 402, h: 874))
+        let procs = FakeProcesses(alive: [4321])
+        var bootDate: Date?
+        var env = SessionEnvironment.scripted(
+            ax: ScriptedAX(frames: [try Act.home()]), processes: procs,
+            simulatorBooted: { device.booted }, simulatorBootDate: { bootDate })
+        env.device = { _ in device }
+        let s = Session(udid: "ZZ000000-TEST", environment: env)
+        defer { TrackedApp.clear(StatePaths.app(s.udid)) }
+        s.app = TrackedApp(
+            bundle: "dev.chauffeur.fixture", executable: "Fixture", displayName: "Fixture", pid: 4321,
+            launchedAt: Date())
+        s.logTapAttemptMs = s.clock.nowMs()
+        #expect(s.run(["snapshot"]).exit == 0)
+        device.booted = false
+        procs.alive = []
+        let down = s.run(["snapshot"])
+        #expect(down.exit == 1 && down.text.contains("is not booted") && !down.text.contains("APP"), "\(down.text)")
+        #expect(s.app == nil)
+        device.booted = true
+        bootDate = Date()
+        #expect(s.run(["snapshot"]).exit == 0)
     }
 }

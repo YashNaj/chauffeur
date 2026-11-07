@@ -383,3 +383,10 @@ three sites, written down before `credit` is introduced.
 Approved by the owner on 2026-10-27 with §9 as written, including one wording for agent-facing instruction text.
 The eleven other calls the builder check raised are marked "my call" in §2, §3, §4, §5 and §8 and stand unless the
 owner objects. Next: the plan, staged as in the table above, written with the plan skill.
+
+### Amendments accepted
+
+2026-10-29, Plan 2 Stage 2b: amendment 6 (`relaunch` and `commandHook` deleted, not moved into the environment),
+amendment 9 (`EvidenceCarrier` and `TypingNetworkPass` deleted; both reports keep `requests` and `requestElapsedMs`),
+and Task 24's reversal (`ActionContext` is plain data; the classifier reads the session) — see
+docs/plans/2026-10-29-refactor-2-registry-bridge-perception.md, "Spec amendments proposed".

@@ -30,22 +30,25 @@ final class NetworkWatch {
     private let processes: any ProcessTable
     private let logs: any LogSource
     private let clock: any SettleClock
+    private let telemetry: (URL) -> [String]
     /// The activity layer (M4b spec §2), built on the first sample; nil when NetworkStatistics is unavailable.
     private var flowSource: (any FlowSource)?
     private var flowSourceTried = false
-    /// The project's telemetry entries. `Session.init` sets it once its stored properties exist (`[unowned self]`).
-    var telemetry: () -> [String] = { [] }
+    /// The client's project directory, whose telemetry entries count: the session sets it for each command
+    /// (`Session.run`). Until then, the daemon's own directory, as a command without a client directory resolves it.
+    var projectDir = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
     /// The last tap that came back PENDING, for a bare `wait` (M4b spec §9); any logged command forgets it (`runOne`).
     var pending: PendingTap?
 
     init(
         flows: @escaping @MainActor () -> (any FlowSource)?, processes: any ProcessTable, logs: any LogSource,
-        clock: any SettleClock
+        clock: any SettleClock, telemetry: @escaping (URL) -> [String]
     ) {
         flowsSource = flows
         self.processes = processes
         self.logs = logs
         self.clock = clock
+        self.telemetry = telemetry
     }
 
     /// The watched pids and the first sample.
@@ -110,8 +113,10 @@ final class NetworkWatch {
             return open.isEmpty ? nil : open.map { RequestText.target($0) + " (\(elapsed))" }.joined(separator: ", ")
         }
         let open = RequestLog.parse(logs.since(cursor)).filter { !$0.finished && $0.host != nil }
-        let items = RequestEvidence.merge(records: open, activity: [], streaming: [], telemetryExtra: telemetry())
-            .filter { !$0.telemetry }
+        let items = RequestEvidence.merge(
+            records: open, activity: [], streaming: [], telemetryExtra: telemetry(projectDir)
+        )
+        .filter { !$0.telemetry }
         return items.isEmpty ? nil : items.map(RequestText.target).joined(separator: ", ")
     }
 
@@ -132,6 +137,6 @@ final class NetworkWatch {
         previous = activity
         return RequestEvidence.merge(
             records: RequestLog.parse(logs.since(net.logCursor)), activity: activity, streaming: streaming,
-            telemetryExtra: telemetry())
+            telemetryExtra: telemetry(projectDir))
     }
 }

@@ -29,24 +29,34 @@ import Testing
         #expect(SimApps.runningApp(pid: 7777, in: list) == nil)
     }
 
-    func session() -> Session {
-        Session(udid: "ZZ" + String(format: "%06X", UInt32.random(in: 0...0xFFFFFF)) + "-TEST")
+    /// A session over a scripted simulator showing the fixture, whose shell answers an offline `launch` of `bundle`
+    /// (`launch`: its `simctl launch` reply instead): the relaunch is the real `launch` command; the shell records it.
+    func session(bundle: String = Act.fixtureBundle, launch: ProcessResult? = nil) throws -> (Session, RecordingShell) {
+        let udid = Act.udid()
+        var replies = Act.launchReplies(udid: udid, bundle: bundle)
+        if let launch { replies[["launch", udid, bundle]] = [launch] }
+        let shell = RecordingShell(replies: replies)
+        let s = Session(
+            udid: udid,
+            environment: .scripted(
+                ax: ScriptedAX(frames: [try Act.home()]), shell: shell, processes: FakeProcesses(alive: [4321])))
+        return (s, shell)
+    }
+
+    func launches(_ shell: RecordingShell, _ udid: String) -> Int {
+        shell.calls.filter { $0 == ["launch", udid, Act.fixtureBundle] }.count
     }
 
     @Test func aBlindAppIsRelaunchedOnceAndTheCommandRetried() throws {
-        let s = session()
-        var launched: [String] = []
-        s.relaunch = {
-            launched.append($0)
-            return Output("launch \($0) → ok")
-        }
+        let (s, shell) = try session()
+        defer { TrackedApp.clear(StatePaths.app(s.udid)) }
         var calls = 0
         let out = try s.withRelaunch {
             calls += 1
             if calls == 1 { throw ChauffeurError.needsRelaunch(bundle: "dev.chauffeur.fixture", why: "blind") }
             return Output("app \"Fixture\" · rev 1")
         }
-        #expect(launched == ["dev.chauffeur.fixture"] && calls == 2)
+        #expect(shell.calls.contains(["launch", s.udid, "dev.chauffeur.fixture"]) && calls == 2)
         #expect(
             out.text == "app \"Fixture\" · rev 1\nnote: relaunched dev.chauffeur.fixture — it was opened from its "
                 + "icon without accessibility; its in-app state was reset")
@@ -54,29 +64,24 @@ import Testing
         #expect(throws: ChauffeurError.blind("blind")) {
             try s.withRelaunch { throw ChauffeurError.needsRelaunch(bundle: "dev.chauffeur.fixture", why: "blind") }
         }
-        #expect(launched.count == 1)
+        #expect(launches(shell, s.udid) == 1)
     }
 
-    @Test func neverInsideABatch() {
-        let s = session()
+    @Test func neverInsideABatch() throws {
+        let (s, shell) = try session()
         s.inBatch = true
-        var launched = 0
-        s.relaunch = { _ in
-            launched += 1
-            return Output("ok")
-        }
         #expect(throws: ChauffeurError.blind("blind")) {
             try s.withRelaunch { throw ChauffeurError.needsRelaunch(bundle: "x.y", why: "blind") }
         }
-        #expect(launched == 0)
+        #expect(!shell.calls.contains { $0.first == "launch" })
     }
 
-    @Test func aFailedRelaunchGivesTodaysMessage() {
-        let s = session()
-        s.relaunch = { _ in Output("launch x.y → FAILED: nope", exit: 1) }
+    @Test func aFailedRelaunchGivesTodaysMessage() throws {
+        let (s, shell) = try session(bundle: "x.y", launch: Act.out("", status: 1))
         #expect(throws: ChauffeurError.blind("blind")) {
             try s.withRelaunch { throw ChauffeurError.needsRelaunch(bundle: "x.y", why: "blind") }
         }
+        #expect(shell.calls.contains(["launch", s.udid, "x.y"]))  // it failed at `simctl launch`
     }
 
     @Test func needsRelaunchReadsAsItsReason() {
@@ -103,8 +108,8 @@ import Testing
 
     /// The agent learns its app was reset even when the retried command then fails (final review, item 3).
     @Test func aFailedRetryStillReportsTheRelaunch() throws {
-        let s = session()
-        s.relaunch = { _ in Output("ok") }
+        let (s, _) = try session(bundle: "x.y")
+        defer { TrackedApp.clear(StatePaths.app(s.udid)) }
         var calls = 0
         let out = try s.withRelaunch {
             calls += 1

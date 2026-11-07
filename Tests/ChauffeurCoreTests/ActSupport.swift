@@ -96,8 +96,9 @@ enum Act {
         ProcessResult(status: status, out: text, timedOut: false)
     }
 
-    /// The shell replies an offline `launch dev.chauffeur.fixture` needs: its Info.plist and its pid, 4321.
-    static func launchReplies(udid: String) -> [[String]: [ProcessResult]] {
+    /// The shell replies an offline `launch dev.chauffeur.fixture` (or `bundle`, the same app under another id) needs:
+    /// its Info.plist and its pid, 4321.
+    static func launchReplies(udid: String, bundle: String = fixtureBundle) -> [[String]: [ProcessResult]] {
         let plist = """
             <?xml version="1.0" encoding="UTF-8"?>
             <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -107,8 +108,8 @@ enum Act {
             </dict></plist>
             """
         return [
-            ["appinfo", udid, fixtureBundle]: [out(plist)],
-            ["launch", udid, fixtureBundle]: [out("\(fixtureBundle): 4321")],
+            ["appinfo", udid, bundle]: [out(plist)],
+            ["launch", udid, bundle]: [out("\(bundle): 4321")],
         ]
     }
 }
@@ -120,6 +121,7 @@ enum Act {
 @MainActor
 struct ActRig {
     let s: Session
+    let ax: ScriptedAX
     let touches: ScriptedTouches
     let shell: RecordingShell
     let clock: FakeClock
@@ -133,7 +135,7 @@ struct ActRig {
         touches: ScriptedTouches = ScriptedTouches(evidence: [.app(Act.fixtureBundle)], attached: true),
         shell: RecordingShell = RecordingShell(), flows: [[Flow]] = [[]],
         processes: FakeProcesses = FakeProcesses(alive: []), inputs: FakeInputs = FakeInputs(),
-        logs: ScriptedLogs = ScriptedLogs()
+        logs: ScriptedLogs = ScriptedLogs(), telemetry: @escaping (URL) -> [String] = { _ in [] }
     ) {
         self.touches = touches
         self.shell = shell
@@ -142,28 +144,24 @@ struct ActRig {
         self.processes = processes
         self.inputs = inputs
         self.logs = logs
+        ax = ScriptedAX(frames: frames)
         s = Session(
             udid: udid,
             environment: .scripted(
-                ax: ScriptedAX(frames: frames), touches: touches, shell: shell, clock: clock, flows: self.flows,
-                processes: processes, inputs: inputs, logs: logs))
-        s.telemetryOverride = []
+                ax: ax, touches: touches, shell: shell, clock: clock, flows: self.flows,
+                processes: processes, inputs: inputs, logs: logs, telemetry: telemetry))
     }
 
     /// The output's first line.
     static func head(_ out: Output) -> String { String(out.text.prefix { $0 != "\n" }) }
 
-    /// A context over this rig's session, clock and touch log, as `act` builds one; without a gesture by default.
+    /// A context for this rig's session, as `act` builds one; without a gesture by default.
     func context(
         before: Snapshot, target: Node? = nil, net: TapNet? = nil, capMs: Int = 1500, label: String = "act",
         baselineSettled: Bool = true, gesture: ((any TouchTransport) -> Bool)? = nil
     ) -> ActionContext {
         ActionContext(
-            label: label, before: before, baselineSettled: baselineSettled, target: target, capMs: capMs,
-            touchMs: clock.now,
-            net: net, expectedApp: s.expectedApp(on: before), isTouchLogAttached: { [touches] in touches.isAttached },
-            clock: clock,
-            observe: { [s] in try s.observe(minMs: $0, capMs: $1) },
-            touchEvidence: { [touches] in touches.evidence(since: $0, waitMs: 200) }, gesture: gesture)
+            label: label, before: before, baselineSettled: baselineSettled, target: target, capMs: capMs, net: net,
+            expectedApp: s.expectedApp(on: before), gesture: gesture)
     }
 }

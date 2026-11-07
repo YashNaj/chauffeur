@@ -20,11 +20,12 @@ scripts/install-hooks.sh                                               # leak ch
 ```
 scripts/check.sh                                               # format, lint, build, tests: what CI runs
 scripts/format.sh                                              # formats everything (agents format as they edit)
-CHAUFFEUR_LIVE_UDID=<udid> swift test --no-parallel            # live tests on a booted simulator
+scripts/live.sh <udid>                                         # live tests on a booted simulator
 ```
 
 Run the live tests after any change under `Engine`, `Device`, `Perception`, `Screen` or `ChauffeurBridge`. They
-build and install the small test app in `Tests/FixtureApp` themselves. Boot one simulator at a time;
+build and install the small test app in `Tests/FixtureApp` themselves. `scripts/live.sh` is the one way to run them:
+it waits for a quiet host, runs every suite, then runs the reboot test alone, last. Boot one simulator at a time;
 `xcrun simctl list devices booted` gives you its UDID. After any change to MCP mode, run `scripts/mcp-smoke.sh`: it
 checks that a real client (Claude Code) accepts the tool list.
 

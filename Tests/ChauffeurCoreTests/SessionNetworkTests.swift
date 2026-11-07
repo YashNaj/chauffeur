@@ -5,12 +5,13 @@ import Testing
 
 /// M4b spec §3 through the session's glue, with recorded log lines and scripted connections.
 @Suite @MainActor struct SessionNetworkTests {
-    func session(flows: [[Flow]] = [[]], clock: FakeClock = FakeClock()) -> Session {
+    func session(
+        flows: [[Flow]] = [[]], clock: FakeClock = FakeClock(), telemetry: @escaping (URL) -> [String] = { _ in [] }
+    ) -> Session {
         let udid = "ZZ" + String(format: "%06X", UInt32.random(in: 0...0xFFFFFF)) + "-TEST"
         let environment = SessionEnvironment.scripted(
-            ax: ScriptedAX(frames: []), clock: clock, flows: ScriptedFlows(flows))
+            ax: ScriptedAX(frames: []), clock: clock, flows: ScriptedFlows(flows), telemetry: telemetry)
         let s = Session(udid: udid, environment: environment)
-        s.telemetryOverride = []
         // Build the flow source as production's `network.start` has by the time a tap is judged (no pids: no sample).
         _ = s.network.start(appPid: nil) { nil }
         return s
@@ -28,9 +29,8 @@ import Testing
         var refs = RefTable()
         let before = Perception.build(root: try Act.home(), size: Act.screen, previous: nil, refs: &refs, rev: 3)
         return ActionContext(
-            label: "tap e4 \"Login\"", before: before, baselineSettled: true, target: nil, capMs: 1500,
-            touchMs: net.touchMs, net: net, expectedApp: nil, isTouchLogAttached: { false }, clock: s.clock,
-            observe: { [s] in try s.observe(minMs: $0, capMs: $1) }, touchEvidence: { _ in .unavailable }, gesture: nil)
+            label: "tap e4 \"Login\"", before: before, baselineSettled: true, target: nil, capMs: 1500, net: net,
+            expectedApp: nil, gesture: nil)
     }
 
     /// The touch, then `task`'s recorded lines arriving in the log.
@@ -57,13 +57,29 @@ import Testing
     }
 
     @Test func telemetryOnlyStaysNoEffect() throws {
-        let s = session()
-        s.telemetryOverride = ["localhost"]
+        let s = session(telemetry: { _ in ["localhost"] })
         var r = report(.noEffect)
         try NetworkPass().apply(to: &r, context: context(s, net: try tap(s, task: "A450514C")), session: s)
         #expect(r.outcome == .noEffect && r.requests.allSatisfy(\.telemetry))
         #expect(r.render().contains("\ntelemetry: 1 request (localhost)"))
         #expect(r.hints == Verifier.hints(outcome: .noEffect, target: nil))
+    }
+
+    /// The project's telemetry entries are read for the directory of the client whose command is running.
+    @Test func telemetryIsReadForTheRunningCommandsDirectory() throws {
+        var dirs: [String] = []
+        let s = session(telemetry: { dir in
+            dirs.append(dir.path)
+            return ["localhost"]
+        })
+        for project in ["/tmp/project-a", "/tmp/project-b"] {
+            dirs = []
+            _ = s.run(["find"], cwd: project)  // a usage error: only the directory is kept
+            var r = report(.noEffect)
+            try NetworkPass().apply(to: &r, context: context(s, net: try tap(s, task: "A450514C")), session: s)
+            #expect(!dirs.isEmpty && dirs.allSatisfy { $0 == project }, "\(dirs)")
+            #expect(!r.requests.isEmpty && r.requests.allSatisfy(\.telemetry))
+        }
     }
 
     @Test func aDeadTapStaysPlain() throws {

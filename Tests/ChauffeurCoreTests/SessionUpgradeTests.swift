@@ -126,13 +126,13 @@ private func noEffect(_ ref: String) -> String {
     }
 
     /// The screen is judged again only after a reply that is not telemetry: here the only reply is telemetry
-    /// (localhost, under the override), so the form behind it is never looked at. The lines come from the log, after
-    /// the touch, as flow items are never telemetry.
+    /// (localhost, the project's telemetry entry), so the form behind it is never looked at. The lines come from the
+    /// log, after the touch, as flow items are never telemetry.
     @Test func aTelemetryOnlyReplyIsNotJudgedAgain() throws {
         let home = try Act.home()
         let showAlert = try Act.ref(home, "Show alert")
-        let rig = ActRig(frames: Array(repeating: home, count: 7) + [try Act.form()])
-        rig.s.telemetryOverride = ["localhost"]
+        let rig = ActRig(
+            frames: Array(repeating: home, count: 7) + [try Act.form()], telemetry: { _ in ["localhost"] })
         rig.logs.arriving = try Act.requestLines(task: "A450514C")
         let out = rig.s.run(["tap", showAlert])
         #expect(ActRig.head(out) == noEffect(showAlert), "\(out.text)")

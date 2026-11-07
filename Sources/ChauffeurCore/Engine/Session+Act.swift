@@ -39,7 +39,7 @@ extension Session {
     /// then each pass may upgrade the report. Without a gesture, one attempt and no transport.
     func act(
         _ label: String, target: Node?, before: Snapshot, baselineSettled: Bool = true, capMs: Int = 1500,
-        needsMove: Bool = false, network: NetStart? = nil, classifier: any Classifier = TouchClassifier(),
+        needsMove: Bool = false, netStart: NetStart? = nil, classifier: any Classifier = TouchClassifier(),
         passes: [any EvidencePass] = [], shot: Bool = true, gesture: ((any TouchTransport) -> Bool)?
     ) throws -> ActionReport {
         let all = try gesture == nil ? [] : transportsReady()
@@ -52,8 +52,7 @@ extension Session {
         while true {
             let transport = gesture == nil ? nil : order[index]
             let cursor = touchLog.cursor
-            let net = network.map { self.network.atTouch($0) }
-            let touchMs = net?.touchMs ?? clock.nowMs()
+            let net = netStart.map { network.atTouch($0) }
             let attempt =
                 if let gesture, let transport {
                     Attempt(
@@ -63,24 +62,18 @@ extension Session {
                     Attempt.noTouch
                 }
             let context = ActionContext(
-                label: label, before: before, baselineSettled: baselineSettled, target: target, capMs: capMs,
-                touchMs: touchMs, net: net, expectedApp: expectedApp(on: before),
-                isTouchLogAttached: { [self] in touchLog.isAttached }, clock: clock,
-                observe: { [self] in try observe(minMs: $0, capMs: $1) },
-                touchEvidence: { [self] in touchLog.evidence(since: $0, waitMs: 200) }, gesture: gesture)
-            var (report, _) = try classifier.classify(context: context, attempt: attempt)
+                label: label, before: before, baselineSettled: baselineSettled, target: target, capMs: capMs, net: net,
+                expectedApp: expectedApp(on: before), gesture: gesture)
+            var report = try classifier.classify(context: context, attempt: attempt, session: self)
             if let transport {
-                if report.outcome == .retry {
-                    if index + 1 < order.count {
-                        retriedFrom = transport.name
-                        index += 1
-                        continue
-                    }
-                    // A classifier classifies `.retry` on the last transport itself (`Attempt.isLast`); one that
-                    // returns it there anyway has run out of transports: NOT DELIVERED, as `Verifier` would say.
-                    report.outcome = .notDelivered
-                    report.hints = Verifier.hints(outcome: .notDelivered, target: target)
-                } else if report.outcome != .notDelivered, let i = all.firstIndex(where: { $0 === transport }) {
+                // `.retry` only comes back while a transport is left: on the last one (`Attempt.isLast`) the
+                // classifier says NOT DELIVERED itself, so `act` never changes an outcome.
+                if report.outcome == .retry, index + 1 < order.count {
+                    retriedFrom = transport.name
+                    index += 1
+                    continue
+                }
+                if report.outcome != .notDelivered, let i = all.firstIndex(where: { $0 === transport }) {
                     preferred = i
                 }
                 if !attempt.sent {
@@ -125,7 +118,7 @@ extension Session {
         guard let target = a.next() else { throw ChauffeurError.usage(a.usage) }
         try a.done()
         let (device, _) = try connect()
-        let network = self.network.start(appPid: app?.pid) { ax?.frontmostPID() }
+        let netStart = network.start(appPid: app?.pid) { ax?.frontmostPID() }
         let clipboard = Background { [udid, shell] in Self.readClipboard(udid: udid, shell: shell) }
         let (before, settled) = try baseline()
         let aimed = try aim(target, in: before)
@@ -134,7 +127,7 @@ extension Session {
         }
         let clipboardBefore = clipboard.result(waitingAtMost: 2000) ?? nil
         let report = try act(
-            "tap \(aimed.label)", target: aimed.node, before: before, baselineSettled: settled, network: network,
+            "tap \(aimed.label)", target: aimed.node, before: before, baselineSettled: settled, netStart: netStart,
             passes: [NetworkPass(), ScreenAgainPass()] + (holdMs == 50 ? [SwitchRetryPass()] : [])
                 + [ClipboardPass(before: clipboardBefore)]
         ) { [self] in
