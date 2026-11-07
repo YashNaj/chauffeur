@@ -12,7 +12,7 @@ import Testing
     @Test func noTouchCreditsATreeThatChanges() throws {
         let home = try Act.home()
         let rig = ActRig(frames: [home, home, try Act.form()])
-        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let before = try rig.s.observe(.snapshot, minMs: 0, capMs: 1500).snapshot
         let report = try NoTouchClassifier(note: Self.note, hints: Self.hints)
             .classify(context: rig.context(before: before, capMs: 3000), attempt: .noTouch, session: rig.s)
         #expect(report.outcome == .changed)
@@ -26,7 +26,7 @@ import Testing
     @Test func noTouchOnAnUnsettledBaselineIsUnattributed() throws {
         let home = try Act.home()
         let rig = ActRig(frames: [home, home, try Act.form()])
-        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let before = try rig.s.observe(.snapshot, minMs: 0, capMs: 1500).snapshot
         let report = try NoTouchClassifier(note: Self.note, hints: Self.hints)
             .classify(
                 context: rig.context(before: before, capMs: 3000, baselineSettled: false), attempt: .noTouch,
@@ -41,7 +41,7 @@ import Testing
 
     @Test func noTouchIsUnverifiedOnceTheCapRunsOut() throws {
         let rig = ActRig(frames: [try Act.home()])
-        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let before = try rig.s.observe(.snapshot, minMs: 0, capMs: 1500).snapshot
         let started = rig.clock.now
         let report = try NoTouchClassifier(note: Self.note, hints: Self.hints)
             .classify(context: rig.context(before: before, capMs: 3000), attempt: .noTouch, session: rig.s)
@@ -58,7 +58,7 @@ import Testing
     @Test func aTouchTheAppGotWithNoChangeIsNoEffect() throws {
         let home = try Act.home()
         let rig = ActRig(frames: [home])
-        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let before = try rig.s.observe(.snapshot, minMs: 0, capMs: 1500).snapshot
         let report = try TouchClassifier().classify(
             context: rig.context(before: before), attempt: Self.sent(isLast: false), session: rig.s)
         #expect(report.outcome == .noEffect)
@@ -68,7 +68,7 @@ import Testing
     @Test func noTouchEvidenceIsRetryWhileATransportIsLeftThenNotDelivered() throws {
         let home = try Act.home()
         let rig = ActRig(frames: [home], touches: ScriptedTouches(evidence: [], attached: true))
-        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let before = try rig.s.observe(.snapshot, minMs: 0, capMs: 1500).snapshot
         let context = rig.context(before: before)
         let retry = try TouchClassifier().classify(context: context, attempt: Self.sent(isLast: false), session: rig.s)
         #expect(retry.outcome == .retry)
@@ -80,7 +80,7 @@ import Testing
     @Test func anUnattachedTouchLogIsUnverifiedWithoutAsking() throws {
         let home = try Act.home()
         let rig = ActRig(frames: [home], touches: ScriptedTouches(evidence: [], attached: false))
-        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let before = try rig.s.observe(.snapshot, minMs: 0, capMs: 1500).snapshot
         let report = try TouchClassifier().classify(
             context: rig.context(before: before), attempt: Self.sent(isLast: false), session: rig.s)
         #expect(report.outcome == .unverified)
@@ -92,7 +92,7 @@ import Testing
     @Test func aTouchLogThatStopsDuringTheObserveIsUnverified() throws {
         let home = try Act.home()
         let rig = ActRig(frames: [home], touches: ScriptedTouches(evidence: [], attached: true))
-        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let before = try rig.s.observe(.snapshot, minMs: 0, capMs: 1500).snapshot
         rig.ax.onRead = { [touches = rig.touches] in touches.isAttached = false }
         let report = try TouchClassifier().classify(
             context: rig.context(before: before), attempt: Self.sent(isLast: true, sent: false), session: rig.s)

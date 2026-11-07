@@ -61,7 +61,7 @@ extension Session {
         }
 
         // Verify the text before Return, so a submit that navigates away can't hide a failed entry (I2).
-        let (typed, settle) = try observe(minMs: 150, capMs: 1500)
+        let (typed, settle) = try observe(.verdict, minMs: 150, capMs: 1500)
         let now = typed.node(identity: field.identity)
         let verdict = TypeCheck.verify(
             typed: text, before: focused.node(identity: field.identity) ?? field,
@@ -81,7 +81,7 @@ extension Session {
                 report.render() + "\nsubmit → NOT DELIVERED: Return failed to send", exit: .noEffect,
                 data: report.json.merging(["submit": "notDelivered"]))
         }
-        let after = try observe(minMs: 150, capMs: 1500).snapshot
+        let after = try observe(.verdict, minMs: 150, capMs: 1500).snapshot
         let changed = after.hash != typed.hash
         let submitted =
             changed

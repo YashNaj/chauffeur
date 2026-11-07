@@ -35,7 +35,7 @@ protocol Classifier {
 /// A touch: the screen after 150 ms or more, then the touch log's evidence since the send (spec §6.2).
 struct TouchClassifier: Classifier {
     func classify(context: ActionContext, attempt: Attempt, session: Session) throws -> ActionReport {
-        let (after, settle) = try session.observe(minMs: 150, capMs: context.capMs)
+        let (after, settle) = try session.observe(.verdict, minMs: 150, capMs: context.capMs)
         // Read after the screen: an observe that reconnects (`drop()`) stops the touch log.
         let evidence: Evidence =
             !session.touchLog.isAttached
@@ -64,11 +64,13 @@ struct NoTouchClassifier: Classifier {
         // The accessibility tree can lag the screen (SpringBoard after `button home` took over a second to show up), so
         // a tree that is merely stable is not "no change": keep looking until it differs or `capMs` has passed.
         let started = session.clock.nowMs()
-        var (after, settle) = try session.observe(minMs: 150, capMs: min(context.capMs, 600))
+        var (after, settle) = try session.observe(.verdict, minMs: 150, capMs: min(context.capMs, 600))
         while after.hash == context.before.hash, session.clock.nowMs() - started < context.capMs {
-            (after, settle) = try session.observe(minMs: 150, capMs: min(context.capMs, 600))
+            (after, settle) = try session.observe(.verdict, minMs: 150, capMs: min(context.capMs, 600))
         }
-        if after.hash != context.before.hash { (after, settle) = try session.observe(minMs: 150, capMs: 1500) }
+        if after.hash != context.before.hash {
+            (after, settle) = try session.observe(.verdict, minMs: 150, capMs: 1500)
+        }
         let outcome: Outcome =
             after.hash == context.before.hash ? .unverified : context.baselineSettled ? .changed : .unattributed
         var report = ActionReport(

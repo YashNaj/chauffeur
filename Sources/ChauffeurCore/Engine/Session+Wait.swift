@@ -26,7 +26,7 @@ extension Session {
         var lastHeader = "no tree yet"
         while true {
             do {
-                let snap = try observe(minMs: 0, capMs: 500).snapshot
+                let snap = try observe(.verdict, minMs: 0, capMs: 500).snapshot
                 lastHeader = snap.header
                 let hits = snap.find(query)
                 let elapsed = clock.nowMs() - start
@@ -66,7 +66,7 @@ extension Session {
                     + "screen: chauffeur wait \"<text>\"", exit: .error)
         }
         let verdict = network.finish(pending.net, timeoutMs: timeoutMs)
-        let (after, settle) = try observe(minMs: 150, capMs: 1500)
+        let (after, settle) = try observe(.verdict, minMs: 150, capMs: 1500)
         var report = pending.report
         report.requests = verdict.items
         report.requestElapsedMs = clock.nowMs() - pending.net.touchMs

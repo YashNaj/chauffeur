@@ -1,9 +1,15 @@
 import Foundation
 
+/// What an observe serves: a snapshot the agent reads, or a verdict compared against another frame.
+enum ObservePurpose { case snapshot, verdict }
+
 extension Session {
     /// Polls the raw tree until it settles, completes it (bar sweep) and publishes a snapshot.
     /// No tree within the cap: reconnect once (SpringBoard restart), then give up.
-    func observe(minMs: Int, capMs: Int) throws -> (snapshot: Snapshot, settle: Settled<Frame>) {
+    func observe(_ purpose: ObservePurpose, minMs: Int, capMs: Int) throws
+        -> (snapshot: Snapshot, settle: Settled<Frame>)
+    {
+        _ = purpose
         let started = clock.nowMs()
         var (device, ax) = try connect()
         var result = poll(ax, minMs: minMs, capMs: capMs)

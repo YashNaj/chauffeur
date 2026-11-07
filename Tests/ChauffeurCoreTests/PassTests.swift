@@ -27,7 +27,7 @@ import Testing
     /// A raw socket sent and not answered within the window: the NO EFFECT becomes PENDING, and is kept for `wait`.
     @Test func aRawSocketWaitingIsPending() throws {
         let rig = ActRig(frames: [try Act.home()], flows: [[], [], [Act.waiting]])
-        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let before = try rig.s.observe(.snapshot, minMs: 0, capMs: 1500).snapshot
         let net = rig.s.network.atTouch(rig.s.network.start(appPid: rig.s.app?.pid) { rig.s.ax?.frontmostPID() })
         var r = Self.noEffect()
         try NetworkPass().apply(to: &r, context: rig.context(before: before, net: net), session: rig.s)
@@ -38,7 +38,7 @@ import Testing
 
     @Test func withoutANetworkThePassDoesNothing() throws {
         let rig = ActRig(frames: [try Act.home()], flows: [[Act.waiting]])
-        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let before = try rig.s.observe(.snapshot, minMs: 0, capMs: 1500).snapshot
         var r = Self.noEffect()
         let started = rig.clock.now
         try NetworkPass().apply(to: &r, context: rig.context(before: before), session: rig.s)
@@ -53,7 +53,7 @@ import Testing
     @Test func aReplyThenAChangeIsCreditedFromTheTouch() throws {
         let home = try Act.home()
         let rig = ActRig(frames: [home, home, try Act.form()])
-        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let before = try rig.s.observe(.snapshot, minMs: 0, capMs: 1500).snapshot
         let net = Self.net(rig, touchedAgo: 600)
         var r = Self.noEffect(requests: [ReportFixtures.fail])
         try ScreenAgainPass().apply(to: &r, context: rig.context(before: before, net: net), session: rig.s)
@@ -71,7 +71,7 @@ import Testing
     @Test func aTelemetryReplyIsNotJudgedAgain() throws {
         let home = try Act.home()
         let rig = ActRig(frames: [home, home, try Act.form()])
-        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let before = try rig.s.observe(.snapshot, minMs: 0, capMs: 1500).snapshot
         let rev = rig.s.rev
         var r = Self.noEffect(requests: [ReportFixtures.ping])
         try ScreenAgainPass().apply(
@@ -92,7 +92,7 @@ import Testing
     @Test func aLateSwitchIsCreditedWithTheActsSettle() throws {
         let form = try Act.form()
         let rig = ActRig(frames: [form, form, try Act.formOn()])
-        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let before = try rig.s.observe(.snapshot, minMs: 0, capMs: 1500).snapshot
         let agree = try #require(before.find("Agree to terms").first)
         var r = Self.noEffect()
         r.settledMs = 420
@@ -115,7 +115,7 @@ import Testing
         // `before` 2 reads, the pass's baseline 4 (the screen changed when `before` was published, so the quiet sleep
         // runs), then the pass's act sees on.
         let rig = ActRig(frames: Array(repeating: form, count: 6) + [try Act.formOn()])
-        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let before = try rig.s.observe(.snapshot, minMs: 0, capMs: 1500).snapshot
         let agree = try #require(before.find("Agree to terms").first)
         var r = Self.noEffect()
         try SwitchRetryPass().apply(
@@ -133,7 +133,7 @@ import Testing
         let rig = ActRig(
             frames: [try Act.home()], udid: udid,
             shell: RecordingShell(replies: [["pbpaste", udid]: [Act.out("hello, clipboard")]]))
-        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let before = try rig.s.observe(.snapshot, minMs: 0, capMs: 1500).snapshot
         var r = Self.noEffect()
         try ClipboardPass(before: ClipboardMark("")).apply(to: &r, context: rig.context(before: before), session: rig.s)
         #expect(r.outcome == .changed)
@@ -146,7 +146,7 @@ import Testing
         let rig = ActRig(
             frames: [try Act.home()], udid: udid,
             shell: RecordingShell(replies: [["pbpaste", udid]: [Act.out("hello, clipboard")]]))
-        let before = try rig.s.observe(minMs: 0, capMs: 1500).snapshot
+        let before = try rig.s.observe(.snapshot, minMs: 0, capMs: 1500).snapshot
         var r = Self.noEffect()
         try ClipboardPass(before: ClipboardMark("hello, clipboard")).apply(
             to: &r, context: rig.context(before: before), session: rig.s)
@@ -213,7 +213,7 @@ import Testing
 struct NextFramePass: EvidencePass {
     func apply(to report: inout ActionReport, context: ActionContext, session: Session) throws {
         guard report.outcome == .noEffect else { return }
-        let (after, settle) = try session.observe(minMs: 0, capMs: 1500)
+        let (after, settle) = try session.observe(.verdict, minMs: 0, capMs: 1500)
         guard after.hash != context.before.hash else { return }
         report.credit(change: after, from: context.before, settledMs: settle.elapsedMs, settled: settle.settled)
     }

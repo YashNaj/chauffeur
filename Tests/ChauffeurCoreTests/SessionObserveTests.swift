@@ -6,7 +6,7 @@ import Testing
 /// `observe`, `baseline` and `wait` offline: regression pins for the revision counter, the wait loop and the quiet
 /// wait, all driven by `ScriptedAX` frames and a `FakeClock`.
 ///
-/// How many frames a read costs: `snapshot` is `observe(minMs: 0, capMs: 1500)`, and `Settle.wait` settles once two
+/// How many frames a read costs: `snapshot` is `observe(.snapshot, minMs: 0, capMs: 1500)`, and `Settle.wait` settles once two
 /// consecutive reads hash the same. A stable screen costs 2 reads (and 75 fake ms); a change in the middle of a read
 /// costs one more, because the second read differs from the first and a third must agree with it. `connect()` reads
 /// nothing from the tree, so every frame below is spent by `observe` alone.
@@ -25,6 +25,17 @@ import Testing
         #expect(s.run(["snapshot"]).text.contains("rev 1"))
         #expect(s.run(["snapshot"]).text.contains("rev 1"))
         #expect(s.run(["snapshot"]).text.contains("rev 2"))
+    }
+
+    @Test func aSecondSnapshotObserveOfTheSameRootMakesNoHitTest() throws {
+        let home = try Fixtures.ax("fixture-home")
+        let ax = ScriptedAX(frames: [home, home, home, home])
+        let s = Session(udid: udid, environment: .scripted(ax: ax))
+        _ = try s.observe(.snapshot, minMs: 0, capMs: 1500)
+        let swept = ax.elementCalls
+        _ = try s.observe(.snapshot, minMs: 0, capMs: 1500)
+        #expect(swept > 0)
+        #expect(ax.elementCalls == swept)
     }
 
     @Test func aReconnectSweepsAfresh() throws {

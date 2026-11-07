@@ -19,7 +19,7 @@ extension Session {
         var subject = ""
         if let z = a.option("--zoom") {
             if z.wholeMatch(of: /e\d+/) != nil {
-                zoom = try observe(minMs: 0, capMs: 1500).snapshot.resolve(ref: z, refs: refs).frame
+                zoom = try observe(.snapshot, minMs: 0, capMs: 1500).snapshot.resolve(ref: z, refs: refs).frame
                 subject = " " + z
             } else if let r = Self.rect(z) {
                 zoom = r

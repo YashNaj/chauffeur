@@ -231,7 +231,7 @@ public final class Session {
         let a = try Args(
             argv, flags: ["--all", "--screenshot"], usage: "usage: chauffeur snapshot [--all] [--screenshot]")
         try a.done()
-        let snap = try observe(minMs: 0, capMs: 1500).snapshot
+        let snap = try observe(.snapshot, minMs: 0, capMs: 1500).snapshot
         let text = snap.render(all: a.flag("--all"))
         guard a.flag("--screenshot"), let device else { return Output(text, data: snap.json(all: a.flag("--all"))) }
         let shot = try capture(screen: device.size, zoom: nil)
@@ -243,7 +243,7 @@ public final class Session {
     func findCommand(_ argv: [String]) throws -> Output {
         var a = try Args(argv, usage: "usage: chauffeur find \"<text>|<role>:<text>\"")
         guard let query = a.text() else { throw ChauffeurError.usage(a.usage) }
-        let snap = try observe(minMs: 0, capMs: 1500).snapshot
+        let snap = try observe(.snapshot, minMs: 0, capMs: 1500).snapshot
         let hits = snap.find(query)
         guard !hits.isEmpty else {
             return Output(
