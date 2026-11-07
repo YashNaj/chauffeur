@@ -1,4 +1,4 @@
-Literals the live tests expect (contains, hasPrefix, hasSuffix, == "…"), one `file: literal` per line, made by scripts/live-expectations.sh at dce494c.
+Literals the live tests expect (contains, hasPrefix, hasSuffix, == "…"), one `file: literal` per line, made by scripts/live-expectations.sh at 81a3ead.
 
 AXLiveTests.swift: == "Fixture"
 AXLiveTests.swift: == "Form"
@@ -72,7 +72,7 @@ NetworkLiveTests.swift: contains("telemetry: 1 request (127.0.0.1)"
 NetworkLiveTests.swift: contains("→ NO EFFECT · 127.0.0.1:8765/fail → 500 Internal Server Error"
 NetworkLiveTests.swift: contains("→ PENDING · 127.0.0.1:8765 · sent" — unit twin: SessionUpgradeTests.waitFinishesThePendingTap
 NetworkLiveTests.swift: contains("→ PENDING · 127.0.0.1:8765/slow still running after"
-NetworkLiveTests.swift: contains("→ PENDING"
+NetworkLiveTests.swift: contains("→ PENDING · web view · 127.0.0.1:8765"
 NetworkLiveTests.swift: contains("→ PENDING"
 NetworkLiveTests.swift: contains("→ changed"
 NetworkLiveTests.swift: contains("→ changed"
