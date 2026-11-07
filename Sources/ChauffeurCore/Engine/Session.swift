@@ -6,6 +6,7 @@ public final class Session {
     public let udid: String
     var device: (any SimDevice)?
     var ax: (any AXSource)?
+    let sweep = Sweep.bars()
     /// Touches, keys and buttons, built on first use (`inputDeviceReady()`); `drop()` forgets it.
     var inputDevice: (any InputDevice)?
     /// Set when the input device is reset (a failed send) or dropped; `type` clears it before focusing the field.
@@ -126,6 +127,7 @@ public final class Session {
         touchLog.stop()
         device = nil
         ax = nil
+        sweep.forget()
         inputDevice = nil
         inputDeviceLost = true
     }

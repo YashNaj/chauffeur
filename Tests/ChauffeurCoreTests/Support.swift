@@ -52,6 +52,9 @@ final class ScriptedAX: AXSource {
     var scriptedPID: Int32? = 4321
     /// Runs at each `read()`, before the frame is handed out: for something that happens while the screen is read.
     var onRead: (() -> Void)?
+    /// What a hit test at a point answers; a point not listed answers nothing.
+    var hits: [Point: AXElement] = [:]
+    private(set) var elementCalls = 0
 
     init(frames: [AXElement?]) { self.frames = frames }
 
@@ -63,9 +66,11 @@ final class ScriptedAX: AXSource {
     }
     func read(pid: Int32) -> AXElement? { nil }
     func frontmostPID() -> Int32? { scriptedPID }
-    func element(at point: Point) -> AXElement? { nil }
+    func element(at point: Point) -> AXElement? {
+        elementCalls += 1
+        return hits[point]
+    }
     func probe(center: Point) -> (frontmostIsEmptyApp: Bool, screenAnswers: Bool) { (false, true) }
-    func complete(_ root: AXElement) -> AXElement { root }
 }
 
 /// A `SimDevice` with fixed answers.

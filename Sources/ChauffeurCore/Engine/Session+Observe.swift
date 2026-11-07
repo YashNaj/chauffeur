@@ -36,7 +36,7 @@ extension Session {
         guard Geometry.orientation(root: frame.root.frame, screen: device.size) == .portrait else {
             throw ChauffeurError.landscape
         }
-        return (publish(ax.complete(frame.root), size: device.size), result)
+        return (publish(sweep.complete(frame) { ax.element(at: $0) }, size: device.size), result)
     }
 
     private func poll(_ ax: any AXSource, minMs: Int, capMs: Int) -> Settled<Frame> {

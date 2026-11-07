@@ -27,6 +27,17 @@ import Testing
         #expect(s.run(["snapshot"]).text.contains("rev 2"))
     }
 
+    @Test func aReconnectSweepsAfresh() throws {
+        let home = try Fixtures.ax("fixture-home")
+        let ax = ScriptedAX(frames: [home, home, home, home])
+        let s = Session(udid: udid, environment: .scripted(ax: ax))
+        #expect(!s.run(["snapshot"]).text.contains("button \"Home\""))
+        s.drop()
+        ax.hits[Point(x: 48, y: 807)] = AXElement(
+            role: "AXButton", label: "Home", frame: Rect(x: 40, y: 795, w: 90, h: 50))
+        #expect(s.run(["snapshot"]).text.contains("button \"Home\""))
+    }
+
     @Test func waitFindsTextOnALaterFrame() throws {
         let home = try Fixtures.ax("fixture-home")
         let form = try Fixtures.ax("fixture-form")

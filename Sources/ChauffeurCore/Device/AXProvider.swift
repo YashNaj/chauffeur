@@ -16,11 +16,10 @@ extension AXElement {
     }
 }
 
-/// Reads the frontmost tree and fills the bars the walk leaves empty (decision 1).
+/// Reads the frontmost tree from the bridge.
 @MainActor
 public final class AXProvider: AXSource {
     private let reader: CHAXReader
-    private var cache: (key: Int, result: AXElement)?
 
     public init(sim: CHSimulator) throws {
         do { reader = try CHAXReader(simulator: sim) } catch { throw ChauffeurError.bridge(error.localizedDescription) }
@@ -55,58 +54,5 @@ public final class AXProvider: AXSource {
         let front = reader.frontmostTree()
         let empty = front.map { (($0["children"] as? [Any]) ?? []).isEmpty } ?? false
         return (empty, reader.element(at: CGPoint(x: center.x, y: center.y)) != nil)
-    }
-
-    /// The walk plus hit-test results inside childless bars, cached per raw tree.
-    public func complete(_ root: AXElement) -> AXElement {
-        let key = root.hashValue
-        if let cache, cache.key == key { return cache.result }
-        let result = Self.fillBars(root) { frame in
-            Self.points(in: frame).compactMap { p in
-                self.reader.element(at: CGPoint(x: p.x, y: p.y)).flatMap { AXElement(dictionary: $0) }
-            }
-        }
-        cache = (key, result)
-        return result
-    }
-
-    nonisolated static func isSweepTarget(_ e: AXElement) -> Bool {
-        e.role == "AXGroup" && e.children.isEmpty && !e.frame.isEmpty && e.frame.h <= 140
-    }
-
-    nonisolated static func points(in frame: Rect, step: Double = 32) -> [Point] {
-        var points: [Point] = []
-        var y = frame.y + step / 2
-        while y < frame.maxY {
-            var x = frame.x + step / 2
-            while x < frame.maxX {
-                points.append(Point(x: x, y: y))
-                x += step
-            }
-            y += step
-        }
-        return points
-    }
-
-    nonisolated static func merge(_ hits: [AXElement], into container: AXElement) -> AXElement {
-        var kids: [AXElement] = []
-        for h in hits
-        where container.frame.contains(h.frame.center) && h.frame != container.frame
-            && h.role != "AXApplication" && !(h.role == "AXGroup" && h.label == nil)
-        {
-            if !kids.contains(where: { $0.role == h.role && $0.label == h.label && $0.frame == h.frame }) {
-                kids.append(h)
-            }
-        }
-        var filled = container
-        filled.children = kids.sorted { ($0.frame.y, $0.frame.x) < ($1.frame.y, $1.frame.x) }
-        return filled
-    }
-
-    nonisolated static func fillBars(_ e: AXElement, sweep: (Rect) -> [AXElement]) -> AXElement {
-        if isSweepTarget(e) { return merge(sweep(e.frame), into: e) }
-        var copy = e
-        copy.children = e.children.map { fillBars($0, sweep: sweep) }
-        return copy
     }
 }
