@@ -203,7 +203,7 @@ Pass count over 3 runs · median cost · median turns.
   341 B, but nothing changed on screen`. The verdict was right; the evidence line was wrong, and the agent concluded
   "the button works, but it gives no feedback". The automatic check passed the answer (it says "nothing you can
   see"); the hand review overruled it to a failure. The fix is to name the web view as the source of such a line, so
-  an agent can discount it. Fixed: the line now names its source, `request: web view · 127.0.0.1:8765 · …`.
+  an agent can discount it. Fixed: the headline now names its source, `NO EFFECT · web view · 127.0.0.1:8765 · …`.
 - **N1 and N5, both tools.** The screen eventually shows the result, so both arms pass; the difference is the path.
   chauffeur's agent went snapshot, tap, tap, `wait`, answer. Xcode's agent took 11 to 17 turns of tap, capture, read
   and re-capture, and once admitted it "read this from the screenshot only".
