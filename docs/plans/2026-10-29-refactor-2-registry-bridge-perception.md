@@ -955,10 +955,10 @@ untrusted-text rule". No live run; `scripts/mcp-smoke.sh`.
 ## Stage 4a: one way to write the bridge
 
 Branch `refactor-4a-bridge`. PR title: "Refactor 4a: one way to load, read, wait and fail in the bridge; shared keys".
-The bridge line numbers below are from `main` 81541c7's committed files. The working tree carries an uncommitted
-`swift-format`-style reformat of `CHAXReader.m` and `ChauffeurBridge.h` (+51 lines) that is not part of this plan;
-before 4a is dispatched the controller either commits it as 4a's first commit or drops it, and the implementer
-re-takes every bridge line from the code either way.
+The bridge line numbers below are from `main` 81541c7's committed files (a stray reformat of two bridge files was
+dropped on 2026-11-07). Last in 4a, ruled by the owner on 2026-11-07: clang-format for the bridge: a `.clang-format`
+at swift-format's 100 columns, one commit formatting all six files, and a `clang-format --dry-run --Werror` step in
+`scripts/check.sh`; first confirm Xcode 26's toolchain ships `clang-format` (`xcrun --find`), as CI builds on 26.
 
 ### Task 40: `CHInternal`: one error, guarded KVC, one loader, one wait; the lint
 
