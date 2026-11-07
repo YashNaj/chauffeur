@@ -67,6 +67,22 @@ private func noEffect(_ ref: String) -> String {
         Golden.check("sessions/tap-clipboard-with-requests.txt", out.text)
     }
 
+    /// The page a dead tap left loading: the web view's networking process made the request, and the line says so.
+    @Test func aPageLoadUnderADeadTapNamesTheWebView() throws {
+        let home = try Act.home()
+        let showAlert = try Act.ref(home, "Show alert")
+        let page = Flow(
+            id: 9, pid: 4400, process: "com.apple.WebKit", proto: "tcp", remote: "127.0.0.1:8765", tx: 451, rx: 341,
+            openedMs: 1, closedMs: 2)
+        let rig = ActRig(
+            frames: [home], flows: [[], [], [page]],
+            processes: FakeProcesses(
+                alive: [4321], parent: [4321: 1], children: [1: ["com.apple.WebKit.Networking": [4400]]]))
+        let out = rig.s.run(["tap", showAlert])
+        #expect(out.exit == 3, "\(out.text)")
+        Golden.check("sessions/tap-web-view-load.txt", out.text)
+    }
+
     /// A tap on "Show alert" that came back PENDING, with the form behind it for the wait.
     func pendingTapOnShowAlert() throws -> ActRig {
         let home = try Act.home()

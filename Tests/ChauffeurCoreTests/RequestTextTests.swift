@@ -30,6 +30,19 @@ import Testing
             RequestText.hint(refused) == "nothing accepted the connection at localhost:8765; is the server running?")
     }
 
+    @Test func aHelpersRequestNamesItsSource() {
+        let webView = RequestItem(
+            host: "127.0.0.1", port: 8765, sent: 451, received: 341, proto: "tcp", hostKnown: false,
+            process: "com.apple.WebKit.Networking")
+        var other = webView
+        other.process = "Other"
+        #expect(RequestText.target(webView) == "web view · 127.0.0.1:8765")
+        #expect(RequestText.target(other) == "Other · 127.0.0.1:8765")
+        #expect(RequestText.target(fail) == "localhost:8765/fail")
+        #expect(RequestText.json(webView)["process"]?.string == "com.apple.WebKit.Networking")
+        #expect(RequestText.json(fail)["process"] == nil)
+    }
+
     @Test func stillRunning() {
         let open = RequestItem(host: "api.example.com", port: 443, path: "/login", waiting: true)
         #expect(RequestText.outcome(open, elapsedMs: 2200) == "api.example.com/login still running after 2.2 s")

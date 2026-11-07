@@ -163,7 +163,7 @@ webview [e14]
 | Row | Expected |
 |---|---|
 | `snapshot` on the Network tab | a `webview` node with the heading, input, button and link, each with a ref |
-| `tap` the link to the slow page | `PENDING`, then `wait` → `changed` with `+ text "ok"` and the request line |
+| `tap` the link to the slow page | `PENDING`, then `wait` → `changed` with `+ text "ok"` and the request line, which names the web view as its source |
 | `tap` the button that changes text | `changed` with the diff, no request line |
 | `type` into the input | `changed`, verified by the field's value |
 | `find "Sign in"` / `wait "ok"` on web text | found / finishes when the text appears |

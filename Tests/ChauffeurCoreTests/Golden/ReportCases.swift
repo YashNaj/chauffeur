@@ -18,6 +18,9 @@ enum ReportFixtures {
         proto: "http/1.1", bodyBytes: 0)
     static let ping = RequestItem(host: "app-measurement.com", port: 443, path: "/a", status: 204, telemetry: true)
     static let open = RequestItem(host: "api.example.com", port: 443, path: "/login", waiting: true)
+    static let webView = RequestItem(
+        host: "127.0.0.1", port: 8765, sent: 451, received: 341, proto: "tcp", hostKnown: false,
+        process: "com.apple.WebKit.Networking")
 }
 
 /// One report per shape the renderers have, built from fixed values so the goldens never move on their own.
@@ -75,6 +78,7 @@ enum ReportCases {
             "noeffect-failed-request",
             action(.noEffect, extraHints: [RequestText.hint(F.fail) ?? ""], requests: [F.ping, F.fail])
         ),
+        ("noeffect-web-view-request", action(.noEffect, requests: [F.webView])),
         ("noeffect-success-no-change", action(.noEffect, requests: [okWithStatus])),
         ("noeffect-telemetry", action(.noEffect, requests: [F.ping])),
         ("pending", action(.pending, requests: [F.open])),

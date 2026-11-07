@@ -30,6 +30,25 @@ import Testing
             ])
     }
 
+    @Test func aRecordDoesNotClaimAHelpersConnection() {
+        let webKit = "com.apple.WebKit.Networking"
+        let helper = FlowActivity(
+            flow: Flow(
+                id: 1, pid: 2, process: "com.apple.WebKit", proto: "tcp", remote: "93.184.215.14:443", tx: 900, rx: 0,
+                openedMs: 1, closedMs: nil), sent: 900, received: 0, isNew: true)
+        let items = RequestEvidence.merge(
+            records: [api], activity: [helper], streaming: [], telemetryExtra: [], helpers: [2: webKit])
+        #expect(
+            items == [
+                RequestItem(host: "api.example.com", port: 443, path: "/login", waiting: true),
+                RequestItem(
+                    host: "93.184.215.14", port: 443, sent: 900, received: 0, proto: "tcp", waiting: true,
+                    hostKnown: false, process: webKit),
+            ])
+        let alone = RequestEvidence.merge(records: [api], activity: [helper], streaming: [], telemetryExtra: [])
+        #expect(alone == [RequestItem(host: "api.example.com", port: 443, path: "/login", waiting: true)])
+    }
+
     @Test func oneConnectionPerRecord() {
         let items = RequestEvidence.merge(
             records: [api],

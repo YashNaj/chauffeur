@@ -223,12 +223,19 @@ final class ScriptedLogs: LogSource {
 }
 
 /// A `ProcessTable` whose live pids a test changes between commands (a reference, so the session sees the change).
-/// Nobody has relatives.
+/// Relatives only where a test gives them: `parent` maps a pid to its parent, `children` a parent to the pids of each
+/// process name under it.
 final class FakeProcesses: ProcessTable, @unchecked Sendable {
     private let lock = NSLock()
     private var pids: Set<Int32>
+    private let parents: [Int32: Int32]
+    private let kin: [Int32: [String: [Int32]]]
 
-    init(alive: Set<Int32>) { pids = alive }
+    init(alive: Set<Int32>, parent: [Int32: Int32] = [:], children: [Int32: [String: [Int32]]] = [:]) {
+        pids = alive
+        parents = parent
+        kin = children
+    }
 
     var alive: Set<Int32> {
         get { lock.withLock { pids } }
@@ -236,8 +243,8 @@ final class FakeProcesses: ProcessTable, @unchecked Sendable {
     }
 
     func isAlive(_ pid: Int32) -> Bool { alive.contains(pid) }
-    func parent(of pid: Int32) -> Int32? { nil }
-    func children(of parent: Int32, named: String) -> [Int32] { [] }
+    func parent(of pid: Int32) -> Int32? { parents[pid] }
+    func children(of parent: Int32, named: String) -> [Int32] { kin[parent]?[named] ?? [] }
 }
 
 /// A `TouchTransport` that records every touch and answers `sends`.
