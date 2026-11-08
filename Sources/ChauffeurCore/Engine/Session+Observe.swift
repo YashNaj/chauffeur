@@ -1,9 +1,14 @@
 import Foundation
 
+/// What an observe serves: a snapshot the agent reads, or a verdict compared against another frame.
+enum ObservePurpose { case snapshot, verdict }
+
 extension Session {
     /// Polls the raw tree until it settles, completes it (bar sweep) and publishes a snapshot.
     /// No tree within the cap: reconnect once (SpringBoard restart), then give up.
-    func observe(minMs: Int, capMs: Int) throws -> (snapshot: Snapshot, settle: Settled<AXElement>) {
+    func observe(_ purpose: ObservePurpose, minMs: Int, capMs: Int) throws
+        -> (snapshot: Snapshot, settle: Settled<Frame>)
+    {
         let started = clock.nowMs()
         var (device, ax) = try connect()
         var result = poll(ax, minMs: minMs, capMs: capMs)
@@ -31,18 +36,19 @@ extension Session {
                 healNote = AXHealth.message(plan, recovered: true)
             }
         }
-        guard let root = result.value else { throw ChauffeurError.noTree }
+        guard let frame = result.value else { throw ChauffeurError.noTree }
         noTreeSinceMs = nil
-        guard Geometry.orientation(root: root.frame, screen: device.size) == .portrait else {
+        guard Geometry.orientation(root: frame.root.frame, screen: device.size) == .portrait else {
             throw ChauffeurError.landscape
         }
-        return (publish(ax.complete(root), size: device.size), result)
+        return (publish(sweep.complete(frame) { ax.element(at: $0) }, size: device.size), result)
     }
 
-    private func poll(_ ax: any AXSource, minMs: Int, capMs: Int) -> Settled<AXElement> {
-        Settle.wait(minMs: minMs, capMs: capMs, clock: clock) { () -> (value: AXElement, hash: Int)? in
+    private func poll(_ ax: any AXSource, minMs: Int, capMs: Int) -> Settled<Frame> {
+        Settle.wait(minMs: minMs, capMs: capMs, clock: clock) { () -> (value: Frame, hash: Int)? in
             guard let root = ax.read(), !root.frame.isEmpty else { return nil }  // 0×0 root = not settled (decision 3)
-            return (root, root.hashValue)
+            let frame = Frame(root: root)
+            return (frame, frame.hashValue)
         }
     }
 

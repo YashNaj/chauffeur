@@ -1,0 +1,3 @@
+tap e1 "Show alert" → NO EFFECT · web view · 127.0.0.1:8765 · sent 451 B, got 341 B, but nothing changed on screen
+request: telemetry filter unavailable for 127.0.0.1
+hint: the app received the touch but its accessibility tree did not change; e1 may need a long press (--long 1), or the change is not exposed to accessibility (run snapshot)

@@ -78,7 +78,7 @@ extension Session {
                 exit: .error)
         }
         // What was in front before: until it is replaced, the launch has not shown anything yet.
-        let previous = try? observe(minMs: 0, capMs: 500).snapshot.kind
+        let previous = try? observe(.snapshot, minMs: 0, capMs: 500).snapshot.kind
         let relaunching = app?.bundle == bundle ? app : nil
         // `simctl launch` on a running app just brings it forward with its old state (M1): end it first.
         release(bundle)
@@ -164,10 +164,10 @@ extension Session {
         var latest: Snapshot?
         while clock.nowMs() - start < capMs {
             do {
-                let snap = try observe(minMs: 0, capMs: 500).snapshot
+                let snap = try observe(.snapshot, minMs: 0, capMs: 500).snapshot
                 latest = snap
                 if Self.showsLaunchedApp(snap.kind, stale: stale) {
-                    let settled = try observe(minMs: 150, capMs: 1500).snapshot
+                    let settled = try observe(.snapshot, minMs: 150, capMs: 1500).snapshot
                     return (settled, clock.nowMs() - start)
                 }
             } catch let error as ChauffeurError where error.appNotUpYet {
@@ -224,7 +224,7 @@ extension Session {
             if let tracked { track(tracked) }
             return Output("terminate \(bundle) → FAILED: \(SimCtl.message(r))", exit: .error)
         }
-        let snap = try observe(minMs: 150, capMs: 1500).snapshot
+        let snap = try observe(.snapshot, minMs: 150, capMs: 1500).snapshot
         return Output("terminate \(bundle) → stopped" + (tracked.map { " (pid \($0.pid))" } ?? "") + "\n" + snap.header)
     }
 }

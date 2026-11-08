@@ -52,6 +52,9 @@ final class ScriptedAX: AXSource {
     var scriptedPID: Int32? = 4321
     /// Runs at each `read()`, before the frame is handed out: for something that happens while the screen is read.
     var onRead: (() -> Void)?
+    /// What a hit test at a point answers; a point not listed answers nothing.
+    var hits: [Point: AXElement] = [:]
+    private(set) var elementCalls = 0
 
     init(frames: [AXElement?]) { self.frames = frames }
 
@@ -63,9 +66,11 @@ final class ScriptedAX: AXSource {
     }
     func read(pid: Int32) -> AXElement? { nil }
     func frontmostPID() -> Int32? { scriptedPID }
-    func element(at point: Point) -> AXElement? { nil }
+    func element(at point: Point) -> AXElement? {
+        elementCalls += 1
+        return hits[point]
+    }
     func probe(center: Point) -> (frontmostIsEmptyApp: Bool, screenAnswers: Bool) { (false, true) }
-    func complete(_ root: AXElement) -> AXElement { root }
 }
 
 /// A `SimDevice` with fixed answers.
@@ -218,12 +223,19 @@ final class ScriptedLogs: LogSource {
 }
 
 /// A `ProcessTable` whose live pids a test changes between commands (a reference, so the session sees the change).
-/// Nobody has relatives.
+/// Relatives only where a test gives them: `parent` maps a pid to its parent, `children` a parent to the pids of each
+/// process name under it.
 final class FakeProcesses: ProcessTable, @unchecked Sendable {
     private let lock = NSLock()
     private var pids: Set<Int32>
+    private let parents: [Int32: Int32]
+    private let kin: [Int32: [String: [Int32]]]
 
-    init(alive: Set<Int32>) { pids = alive }
+    init(alive: Set<Int32>, parent: [Int32: Int32] = [:], children: [Int32: [String: [Int32]]] = [:]) {
+        pids = alive
+        parents = parent
+        kin = children
+    }
 
     var alive: Set<Int32> {
         get { lock.withLock { pids } }
@@ -231,8 +243,8 @@ final class FakeProcesses: ProcessTable, @unchecked Sendable {
     }
 
     func isAlive(_ pid: Int32) -> Bool { alive.contains(pid) }
-    func parent(of pid: Int32) -> Int32? { nil }
-    func children(of parent: Int32, named: String) -> [Int32] { [] }
+    func parent(of pid: Int32) -> Int32? { parents[pid] }
+    func children(of parent: Int32, named: String) -> [Int32] { kin[parent]?[named] ?? [] }
 }
 
 /// A `TouchTransport` that records every touch and answers `sends`.

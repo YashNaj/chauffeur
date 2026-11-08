@@ -390,3 +390,5 @@ owner objects. Next: the plan, staged as in the table above, written with the pl
 amendment 9 (`EvidenceCarrier` and `TypingNetworkPass` deleted; both reports keep `requests` and `requestElapsedMs`),
 and Task 24's reversal (`ActionContext` is plain data; the classifier reads the session) — see
 docs/plans/2026-10-29-refactor-2-registry-bridge-perception.md, "Spec amendments proposed".
+
+2026-11-07, Plan 2 Stage 5's refresh: amendments 1-5; amendment 7 with its two changes (3a is dispatched straight after 5, before any web-views PR; 3b and 3c may be one PR with two §9 commits); amendment 8 (exit 75 stays out of `ExitCode` and the glossary); amendment 10 (`Frame` is built by `Session.poll`; `AXSource.read()` stays `AXElement?`); and amendment 11 (`Sweep.complete` takes a `Frame` and caches by its hash; `Session.drop()` forgets the cache). See docs/plans/2026-10-29-refactor-2-registry-bridge-perception.md, "Spec amendments proposed".

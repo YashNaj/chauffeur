@@ -4,12 +4,12 @@ extension Session {
     /// The pre-action snapshot, taken once the screen has been quiet for 500 ms: freshly presented UI drops
     /// touches (Task 11), and a baseline captured before that wait would credit later changes to the action (I1).
     func baseline() throws -> (snapshot: Snapshot, settled: Bool) {
-        var result = try observe(minMs: 0, capMs: 1500)
+        var result = try observe(.verdict, minMs: 0, capMs: 1500)
         for _ in 0..<4 {
             let quietMs = clock.nowMs() - lastChangeMs
             if quietMs >= 500 { break }
             clock.sleep(ms: 500 - quietMs)
-            result = try observe(minMs: 0, capMs: 1500)
+            result = try observe(.verdict, minMs: 0, capMs: 1500)
         }
         return (result.snapshot, result.settle.settled)
     }

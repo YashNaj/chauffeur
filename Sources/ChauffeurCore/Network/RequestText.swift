@@ -6,7 +6,13 @@ public enum RequestText {
     /// `localhost:8765/fail`, `api.example.com/login`: the port only when it isn't the scheme's usual one, and always
     /// for a bare IP.
     public static func target(_ i: RequestItem) -> String {
-        hostPort(i) + Perception.escape(i.path ?? "", limit: 120)
+        source(i) + hostPort(i) + Perception.escape(i.path ?? "", limit: 120)
+    }
+
+    /// "web view · " for the WebKit networking process, "<name> · " (escaped) for any other helper, "" for the app.
+    static func source(_ i: RequestItem) -> String {
+        guard let process = i.process else { return "" }
+        return (process == "com.apple.WebKit.Networking" ? "web view" : Perception.escape(process, limit: 80)) + " · "
     }
 
     static func hostPort(_ i: RequestItem) -> String {
@@ -118,6 +124,7 @@ public enum RequestText {
         if let v = i.received { o["received"] = JSON(v) }
         if let v = i.proto { o["protocol"] = .string(v) }
         if let v = i.bodyBytes { o["body"] = JSON(v) }
+        if let v = i.process { o["process"] = .string(v) }
         return .object(o)
     }
 

@@ -3,12 +3,14 @@ import Foundation
 /// A tap's first network sample, taken before the baseline: a connection already moving bytes then isn't the tap's.
 struct NetStart {
     var pids: [Int32]
+    var helpers: [Int32: String] = [:]
     var earlier: [Flow]
 }
 
 /// A tap's network state at the touch: enough to judge it now and again from a bare `wait`.
 struct TapNet {
     var pids: [Int32]
+    var helpers: [Int32: String] = [:]
     var earlier: [Flow]
     var atTouch: [Flow]
     var logCursor: Int
@@ -53,24 +55,25 @@ final class NetworkWatch {
 
     /// The watched pids and the first sample.
     func start(appPid: Int32?, frontmost: () -> Int32?) -> NetStart {
-        let pids = watchedPids(appPid: appPid, frontmost: frontmost)
-        return NetStart(pids: pids, earlier: flows(pids))
+        let (pids, helpers) = watchedPids(appPid: appPid, frontmost: frontmost)
+        return NetStart(pids: pids, helpers: helpers, earlier: flows(pids))
     }
 
     /// The processes whose traffic is the app's: the launched app (else the app in front, asked only without one) and
     /// the simulator's WebKit networking process, its sibling under the device's launchd_sim, for web views
-    /// (Findings §2).
-    private func watchedPids(appPid: Int32?, frontmost: () -> Int32?) -> [Int32] {
-        guard let pid = appPid ?? frontmost() else { return [] }
-        let webKit =
-            processes.parent(of: pid).map { processes.children(of: $0, named: "com.apple.WebKit.Networking") } ?? []
-        return [pid] + webKit
+    /// (Findings §2), the helpers by name.
+    private func watchedPids(appPid: Int32?, frontmost: () -> Int32?) -> (pids: [Int32], helpers: [Int32: String]) {
+        guard let pid = appPid ?? frontmost() else { return ([], [:]) }
+        let name = "com.apple.WebKit.Networking"
+        let webKit = processes.parent(of: pid).map { processes.children(of: $0, named: name) } ?? []
+        return ([pid] + webKit, Dictionary(uniqueKeysWithValues: webKit.map { ($0, name) }))
     }
 
     /// Right before the touch.
     func atTouch(_ start: NetStart) -> TapNet {
         TapNet(
-            pids: start.pids, earlier: start.earlier, atTouch: flows(start.pids), logCursor: logs.cursor,
+            pids: start.pids, helpers: start.helpers, earlier: start.earlier, atTouch: flows(start.pids),
+            logCursor: logs.cursor,
             touchMs: clock.nowMs())
     }
 
@@ -137,6 +140,7 @@ final class NetworkWatch {
         previous = activity
         return RequestEvidence.merge(
             records: RequestLog.parse(logs.since(net.logCursor)), activity: activity, streaming: streaming,
-            telemetryExtra: telemetry(projectDir))
+            telemetryExtra: telemetry(projectDir),
+            helpers: net.helpers)
     }
 }

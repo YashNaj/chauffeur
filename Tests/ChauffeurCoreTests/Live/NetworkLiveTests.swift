@@ -104,7 +104,7 @@ import Testing
         _ = try ref(s, "Search")
         let field = try #require(s.last?.find("Search").first?.frame)
         let out = s.run(["tap", "\(Int(field.x + 30)),\(Int(field.maxY + 40))"])
-        #expect(out.exit == 6 && out.text.contains("→ PENDING"), "\(out.text)")
+        #expect(out.exit == 6 && out.text.contains("→ PENDING · web view · 127.0.0.1:8765"), "\(out.text)")
     }
 
     @Test func aCopyIsAChange() throws {

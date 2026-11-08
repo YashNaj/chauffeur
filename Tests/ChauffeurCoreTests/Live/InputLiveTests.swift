@@ -44,7 +44,8 @@ import Testing
         let digitizer = try hid.transports()[0]
         let root = try #require(waitForTree(ax) { element($0, "Show alert") != nil })
         // Ruling (Task 10): tab items are AXRadioButton, not AXButton.
-        let formTab = try #require(ax.complete(root).all.first { $0.label == "Form" && $0.role == "AXRadioButton" })
+        let full = Sweep.bars().complete(Frame(root: root)) { ax.element(at: $0) }
+        let formTab = try #require(full.all.first { $0.label == "Form" && $0.role == "AXRadioButton" })
         #expect(Gestures.tap(digitizer, at: formTab.frame.center, screen: device.size, clock: SystemClock()))
         let form = try #require(waitForTree(ax) { $0.all.contains { $0.identifier == "email" } })
         let email = try #require(form.all.first { $0.identifier == "email" })

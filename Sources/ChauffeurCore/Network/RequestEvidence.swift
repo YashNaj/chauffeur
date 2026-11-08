@@ -21,6 +21,9 @@ public struct RequestItem: Equatable, Sendable {
     public var telemetry = false
     /// False when only the activity layer saw it: its host is an IP, so the telemetry filter couldn't run.
     public var hostKnown = true
+    /// The process that made it, when it is not the app's own: `com.apple.WebKit.Networking` for a web view's
+    /// traffic. Nil for the app's requests, whose text and JSON are as before.
+    public var process: String? = nil
 
     public var failed: Bool { errorCode != nil || (status ?? 0) >= 400 }
 }
@@ -44,9 +47,12 @@ public enum NetVerdict: Equatable, Sendable {
 public enum RequestEvidence {
     /// Joins the two layers. Every log record is an item; it explains one connection to its port (the earliest
     /// unexplained one), whose streaming it takes on. Every connection no record explains is an item of its own (a
-    /// non-Apple stack). Telemetry is marked here, never dropped: it gets its own line.
+    /// non-Apple stack). Telemetry is marked here, never dropped: it gets its own line. `helpers` maps a watched
+    /// helper's pid to its process name: a record explains only a connection of the app (not in `helpers`); a
+    /// helper's connection is its own item with `process` set.
     public static func merge(
-        records: [RequestRecord], activity: [FlowActivity], streaming: [FlowActivity], telemetryExtra: [String]
+        records: [RequestRecord], activity: [FlowActivity], streaming: [FlowActivity], telemetryExtra: [String],
+        helpers: [Int32: String] = [:]
     ) -> [RequestItem] {
         let streams = Set(streaming.map(\.flow.id))
         var unexplained = activity.sorted { $0.flow.openedMs < $1.flow.openedMs }
@@ -56,7 +62,11 @@ public enum RequestEvidence {
                 host: r.host ?? "", port: r.port, path: r.path, status: r.status, errorCode: r.errorCode, ms: r.ms,
                 serverMs: r.serverMs, sent: r.sent, received: r.received, proto: r.proto, bodyBytes: r.bodyBytes,
                 waiting: !r.finished)
-            if let port = r.port, let i = unexplained.firstIndex(where: { $0.flow.remotePort == port }) {
+            if let port = r.port,
+                let i = unexplained.firstIndex(where: {
+                    $0.flow.remotePort == port && helpers[$0.flow.pid] == nil
+                })
+            {
                 if streams.contains(unexplained.remove(at: i).flow.id) {
                     item.streaming = true
                     item.waiting = false
@@ -71,7 +81,8 @@ public enum RequestEvidence {
             items.append(
                 RequestItem(
                     host: a.flow.remoteHost, port: a.flow.remotePort, sent: a.sent, received: a.received,
-                    proto: a.flow.proto, waiting: a.waiting && !streaming, streaming: streaming, hostKnown: false))
+                    proto: a.flow.proto, waiting: a.waiting && !streaming, streaming: streaming, hostKnown: false,
+                    process: helpers[a.flow.pid]))
         }
         return items
     }

@@ -4,6 +4,9 @@
 
 - Internal: one evidence pipeline for taps; no result changes.
 - Internal: the evidence pipeline's scaffolding from the refactor's second stage is collapsed; no result changes.
+- A request made by a process other than the app names it: `NO EFFECT · web view · 127.0.0.1:8765 · …` in a
+  headline, `request: web view · …` on a request line (a web view's traffic).
+- A request logged by the app no longer claims a web view's connection to the same port.
 - `doctor` describes accessibility problems in the same words as a result's note. With no accessibility tree and
   app accessibility off, it now says to relaunch the app (as a result's note does) instead of pointing at the
   accessibility bridge.

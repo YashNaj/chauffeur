@@ -21,8 +21,9 @@ func waitForTree(_ ax: AXProvider, timeout: Double = 15, _ condition: (AXElement
         let ax = try AXProvider(sim: device.sim)
         let root = try #require(waitForTree(ax) { element($0, "Show alert") != nil })
         #expect(root.label == "Fixture")
+        let sweep = Sweep.bars()
         let start = Date()
-        let full = ax.complete(root)
+        let full = sweep.complete(Frame(root: root)) { ax.element(at: $0) }
         let ms = Date().timeIntervalSince(start) * 1000
         print("sweep took \(Int(ms)) ms")
         #expect(ms < 1500)
@@ -30,7 +31,7 @@ func waitForTree(_ ax: AXProvider, timeout: Double = 15, _ condition: (AXElement
         print("tab bar children: \(bar.children.map { "\($0.role) \($0.label ?? "-") \($0.value ?? "-")" })")
         #expect(bar.children.contains { $0.label == "Home" })
         #expect(bar.children.contains { $0.label == "Form" })
-        #expect(ax.complete(root) == full)  // cached
+        #expect(sweep.complete(Frame(root: root)) { ax.element(at: $0) } == full)  // cached
     }
 
     /// Restarting the simulator's accessibility bridge (the cure for a poisoned one) must not break a running session.

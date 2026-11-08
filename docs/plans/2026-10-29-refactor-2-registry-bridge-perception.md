@@ -8,7 +8,7 @@ render agent-facing text from one glossary, and give the bridge one way to load,
 changes; the only output changes are the nine rulings in the spec's §9, each with its golden re-recorded in its own
 commit and a changelog line.
 
-**Architecture:** Seven pull requests, one per stage, each leaving `main` green. Stage 2b first: the reboot test
+**Architecture:** One pull request per stage (3b and 3c may share one), each leaving `main` green. Stage 2b first: the reboot test
 stops poisoning live runs, two measuring instruments are added (the one-way counts, the timing suite), and the Plan 1
 seams the Fable review called ceremony are collapsed. Stage 5 next: `Frame`, `Sweep`, the observe purpose and the
 request's source, so the web-views plan can start and interleave with the rest. Stage 3 in three parts: the registry
@@ -21,7 +21,10 @@ tests on a booted iOS 27 simulator through `scripts/live.sh` (Task 20).
 **Spec:** `docs/specs/2026-10-27-refactor-one-way-design.md` (§4 bridge side, §5, §6, §7, §8, §9, Staging, Done when).
 Plan 1 (`docs/plans/2026-10-27-refactor-1-foundations-and-pipeline.md`) and its Findings are inputs; the Fable review
 of Stage 2 (`.superpowers/sdd/2026-10-27-refactor-1-foundations-and-pipeline/fable-review-2-report.md`) is weighed
-in "Order" and "Measure" below. Every file:line here is from branch `refactor-2-pipeline` at 5b609fc (PR #17).
+in "Order" and "Measure" below. Stage 2b's file:lines are from `refactor-2-pipeline` at 5b609fc (PR #17, merged);
+Stages 5, 3 and 4 were refreshed against `main` 81541c7 on 2026-11-07 from the Fable review of Plan 2
+(`.superpowers/sdd/2026-10-29-refactor-2-registry-bridge-perception/fable-review-plan-2-report.md`) and the owner's
+rulings of that day. The implementer still reads the code: a line number is a pointer, not a contract.
 
 ## Global Constraints
 
@@ -60,35 +63,33 @@ in "Order" and "Measure" below. Every file:line here is from branch `refactor-2-
 
 ## Measure: what each stage is for, and how it is checked
 
-The owner's goal is "agents write, the owner reads PRs". The controller proposed a net-negative line count per stage;
-the review proposed places-touched, files-opened and the Done-when greps, with lines reported, not budgeted. Ruling:
-**both, with lines as a ceiling per stage, not a target per stage**, because two stages must add structure the spec
-asks for (the registry's declarations in 3a, `Frame`, `Sweep` and the request's source in 5) and would fail a
-per-stage net-negative rule while doing exactly their job; and because a per-plan rule alone would let one stage
-hide another's growth. The counts come from one script, `scripts/one-way.sh` (Task 21), pasted in every PR body
-before and after:
+The owner's goal is "agents write, the owner reads PRs". Ruling (2026-11-07, replacing the per-stage ceilings the
+plan carried until then): **there is no line budget; the rule is that no line is added that isn't necessary.** Every
+stage reports L before and after (`scripts/one-way.sh`, Task 21, pasted in the PR body), and a reviewer may reject
+any added line that does not remove a way of doing something, make a class of bug impossible, or carry a behavior
+the spec asks for. A stage merges on the counts it owns (P, T, the greps, `over-300`, the timing threshold), never
+on L. The same rule applies to the plan: a task that builds something with no reader is cut, and the cut is named in
+one line where it stood.
 
 | Measure | How it is measured | At 5b609fc | After this plan |
 |---|---|---|---|
-| L: `Sources` lines | `find Sources -name '*.swift' -o -name '*.[hm]' \| xargs cat \| wc -l` | 9,312 (94 files; 8,750 and 78 at the audit's 76cfdf3) | ≤ 9,222 (ceilings below sum to −90) |
+| L: `Sources` lines | `find Sources -name '*.swift' -o -name '*.[hm]' \| xargs cat \| wc -l` | 9,312 (94 files; 8,750 and 78 at the audit's 76cfdf3) | reported in every PR, not gated |
 | Files over 300 lines in `Sources` | `one-way.sh` | 3 | 0 |
 | P: places touched to add a command | the throwaway-command test (Tasks 32, 35, 36) | 8 | 2 |
 | T: files opened to follow one tap from `tapCommand` to its text | the list in Task 23 | 11 (`Session+Act`, `Pipeline`, `Verifier`, `NetworkPass`, `NetworkWatch`, `NetJudge`, `ScreenAgainPass`, `SwitchRetryPass`, `ClipboardPass`, `EvidenceShot`, `EvidenceCarrier`) | 10 after 2b; never more |
 | Closure seams on `Session` | `one-way.sh` (`commandHook`, `relaunch`, `telemetryOverride`, `crashReportWaitMs`) | 4 | 0 after 2b |
-| `usage:` literals outside the registry | `grep -rn '"usage: chauffeur' Sources` outside `Engine/Commands.swift` | 24 | 0 after 3a (a lint rule) |
-| The outcome list and the exit-code line | files that spell them | 4 and 2 | 1 and 1 after 3c |
-| Bridge: `dlopen`, `dlsym`, `dispatch_semaphore_create`, `errorWithDomain`, bare `valueForKey:` | `grep -c` over `Sources/ChauffeurBridge` outside `CHInternal.{h,m}` | 4, 17, 3, 1, 12 | 0, 0, 0, 0, 0 after 4a (lint rules) |
+| `usage:` literals outside the registry | `grep -rn '"usage: chauffeur' Sources` outside `Engine/Commands.swift` | 25 (24 handlers and `Sources/chauffeur/main.swift:8`, the daemon's own argv check) | 0 after 3a (a lint rule; `main.swift:8` carries an allow and `one-way.sh` stops counting `Sources/chauffeur`) |
+| The outcome list and the exit-code line | files that spell them | 3 and 2 | 1 and 1 after 3c |
+| Bridge: `dlopen`, `dlsym`, `dispatch_semaphore_create`, `errorWithDomain`, bare `valueForKey:` | `grep -c` over `Sources/ChauffeurBridge` outside `CHInternal.{h,m}` | 4, 17, 3, 0, 12 | 0, 0, 0, 0, 0 after 4a (lint rules) |
 | `CHHIDClient` owners, bare `exit:` literals, `outcome = .changed` sites | lint, lint, grep | 1, 0, 1 | 1, 0, 1 |
 | Timing: medians of plain taps, dead taps and a `type` on the fixture | `scripts/live-timing.sh <udid> main` (Task 21) | recorded in 2b | branch never slower than `main` by more than max(50 ms, 5 %) on any metric, in both rounds |
 
-Ceilings on L per stage (a PR over its ceiling says why in its body; the stage still merges if the counts it owns
-are met): 2b ≤ −60 · 5 ≤ +90 · 3a ≤ +40 · 3b ≤ −40 · 3c ≤ +10 · 4a ≤ +30 · 4b ≤ −60.
-
-**Plainly:** the plan ends about 90 lines below where Plan 1 left the tree and about 470 above where the refactor
-started. The 8,750 of 76cfdf3 is not reachable by this spec: Plan 1's seams and goldens (what makes change safe) and
-this plan's declarations (the specs, the bridge's keys and guards, the perception seams) are the price of "one place
-per thing", and every stage's own measure (P, T, the greps) goes to its number. If the owner weighs lines above the
-other measures, the items to drop are named in the report (`.superpowers/sdd/…/plan-2-report.md`).
+**Plainly:** the plan adds declarations (the registry's 27 specs, the tool table, the glossary, the bridge's keys) and
+removes copies (the handler literals, the second MCP switch, the five wordings, the semaphore boxes, the KVC and
+loader sites). The review's honest estimate is that it ends several hundred lines above Plan 1's 9,312, nearly all of
+it declarations, and well above the audit's 8,750, which this spec does not reach: Plan 1's seams and goldens are what
+makes change safe. That number is reported, not aimed at. What is held to is the rule above, line by line, and every
+stage's own measure (P, T, the greps) going to its number; a PR whose growth is not declarations says why in its body.
 
 ## Order, and why
 
@@ -99,10 +100,15 @@ Spec staging says 3 → 4 → 5. This plan runs **2b → 5 → 3a → 3b → 3c 
   stages after it should build on the pipeline's final shape, not carry its scaffolding.
 - **5 before 3** (the review's argument, accepted): it is the smallest stage, it depends on nothing in 3 or 4, and it
   is what the web-views plan waits for; the spec itself allows 3 to 5 to interleave with web views as long as 5 lands
-  before the sweep. With 5 merged, the web-views plan can start while 3 and 4 run (they touch Agent, CLI and the
-  bridge, not Perception).
-- **3 in three PRs**: 3a is a day (every handler changes), 3b is a day (the MCP derivation is the riskiest text
-  surface), 3c is half a day of pure text rulings. 3b and 3c touch only `Agent` and need no live run.
+  before the sweep.
+- **3a straight after 5, before the web-views plan opens a PR** (amendment 7, 2026-11-07): 3a edits the head of every
+  handler in every `Session+*.swift` and `CLI.swift`, the worst thing to rebase a perception branch across. 3b, 3c,
+  4a and 4b touch `Agent`, the bridge and the helpers, not `Perception`, and may interleave with web views; the
+  web-views plan's own text changes (skill, MCP instructions, the `snapshot` tool's description) land after 3c,
+  through the glossary and the tool table, so those goldens are re-recorded once.
+- **3 in three stages, two or three PRs**: 3a is a day (every handler changes); 3b (the MCP derivation, the riskiest
+  text surface) and 3c (pure text rulings) touch the same two files, run the same smoke test and re-record the same
+  goldens, so they may be one PR with two §9 commits (amendment 7). Neither needs a live run.
 - **4 last and in two**: lowest value to "agents write, owner reads", highest to "an Xcode update doesn't take the
   daemon down"; 4a (the bridge) needs a live run for its own sake, 4b (helpers) is a tree-wide rename and should land
   when no other branch is open.
@@ -116,8 +122,9 @@ Each is a divergence from the spec's words, with its reason; the spec wins unles
    one crash-lead function. The review's rule "types with one conformer or one caller: 0" applies.
 2. **§7, "one date formatter": dropped.** Four formats at four sites (`Session+Screen.swift:76-79`,
    `Crash.swift:197-200`, `Trace.swift:56-58`, `ConnectKeys.swift:218-220`); a helper would save four lines.
-3. **§7, `LogFollower` base for `TouchLog` and `LogTap`: dropped; `LogStream(udid:level:predicate:)` kept.** The
-   shared part is an 8-line `stop()`; a base class is a worse shape than two copies of it.
+3. **§7, `LogFollower` base for `TouchLog` and `LogTap`: dropped.** The shared part is an 8-line `stop()`; a base
+   class is a worse shape than two copies of it. `LogStream(udid:level:predicate:)` was kept here and then cut with
+   Task 45's other one-liners (owner, 2026-11-07): two callers, eight lines; `TouchLog` and `LogTap` stay as they are.
 4. **§8, `RequestItem.process`: nil for the app's own requests, set for a helper's.** The spec says "set from the
    flow's process name or the app's executable", which would put a `process` field in every JSON report and move 23
    goldens for no agent-visible gain. With nil for the app, every existing JSON is byte-identical and only a helper's
@@ -127,15 +134,28 @@ Each is a divergence from the spec's words, with its reason; the spec wins unles
    keeps those texts; their specs carry `errorUsage`. The other 21 derive it from the synopsis.
 6. **§2, `relaunch` and `commandHook` are deleted, not moved into the environment.** Their tests can run the real
    `launchCommand` and the real `release` offline (Plan 1's seams made that possible); no environment member is needed.
-7. **Staging: the order above, and the stage split (3a/3b/3c, 4a/4b).**
+7. **Staging: the order above, and the stage split (3a/3b/3c, 4a/4b)**, with two changes from the review: 3a is
+   dispatched straight after 5 merges and before any web-views PR opens; 3b and 3c may be one PR with two §9 commits.
+   The spec's staging rows 3-5 become the plan's stages and the sentence "3a lands before the web-views plan's first
+   PR; 3b+3c and 4a/4b may interleave with it."
 8. **§6, exit 75 (`Daemon.versionMismatchExit`) stays out of `ExitCode` and the glossary.** It is the daemon-to-client
    restart signal; the client retries and the second answer is an ordinary `Output`; an agent never sees it.
 9. **§3 and Staging row 2, `EvidenceCarrier` and `TypingNetworkPass`: deleted (Task 23).** The protocol carried two
    fields for one generic caller, and `type` assigns the two fields in one line; both reports keep `requests` and
    `requestElapsedMs` as their own properties, so the JSON and the goldens are unchanged.
+10. **§8, `Frame` is the settle loop's unit, built by `Session.poll`; `AXSource.read()` keeps returning
+    `AXElement?`.** The web-views fingerprint needs `ProcessTable.children(of:named:)` and `read(pid:)`, which live
+    above the bridge wrapper so they can be tested offline against `ScriptedAX` and `FakeProcesses`; `Session` is the
+    one place that has both. A `Frame` on `read()` would make the web-views plan either teach `AXProvider` about
+    processes (untestable offline, a second thing the one wrapper does) or overwrite the fingerprint in `poll` anyway.
+11. **§8, the sweep cache lives and dies with the connection.** Today the cache is on `AXProvider`, which `drop()`
+    discards; a `Sweep` owned by `Session` would otherwise serve a completion computed before a reconnect (bars swept
+    while the bridge was poisoned, every hit nil, published childless until the raw tree changes). `drop()` forgets it.
 
 Accepted by the owner on 2026-10-29: amendment 6, amendment 9, and Task 24's reversals (`ActionContext` as data,
-`act`'s `.retry` fallback and its pin removed). Amendments 1-5, 7 and 8 wait for the Fable review of Plan 2.
+`act`'s `.retry` fallback and its pin removed). Accepted by the owner on 2026-11-07, from the Fable review of Plan 2:
+amendments 1-5 and 8 as written; 7 with the review's two changes (recorded in it above); 10 and 11 as the review
+proposed them. The spec's "Amendments accepted" section gains the 2026-11-07 line in Stage 5's PR (Task 31).
 
 ---
 
@@ -421,109 +441,138 @@ struct NextFramePass: EvidencePass {
 
 Branch `refactor-5-perception`. PR title: "Refactor 5: Frame, Sweep, the observe purpose; a request names its source".
 
-### Task 27: `Frame`
+### Task 27: `Frame` (amendment 10)
 
 **Files:**
-- Modify: `Sources/ChauffeurCore/Device/AXSource.swift` (`Frame`; `read() -> Frame?`), `Sources/ChauffeurCore/Device/AXProvider.swift:32-34`,
-  `Sources/ChauffeurCore/Engine/Session+Observe.swift` (`poll` hashes the frame), `Sources/ChauffeurCore/Doctor.swift:179`
-  (`ax.read()?.root`)
-- Test: `Tests/ChauffeurCoreTests/Support.swift` (`ScriptedAX.read() -> Frame?`), `AXSourceTests.swift:10-12`
-  (`ax.read()?.root`), `Live/AXLiveTests.swift:10,65`, `Live/InputLiveTests.swift:24` (`.root`)
+- Create: `Sources/ChauffeurCore/Perception/Frame.swift` (about ten lines)
+- Modify: `Sources/ChauffeurCore/Engine/Session+Observe.swift:6` (`observe` returns `settle: Settled<Frame>`), `:34-39`
+  (`guard let frame = result.value`; orientation reads `frame.root.frame`; `ax.complete(frame.root)` until Task 28
+  hands the sweep the frame), `:42-47` (`poll` returns `Settled<Frame>`: the closure builds the frame and returns
+  `(frame, frame.hashValue)`)
+- Test: `Tests/ChauffeurCoreTests/PerceptionTests.swift` (one case)
+- Unchanged, on purpose: `AXSource.read()` keeps returning `AXElement?`, so `AXProvider`, `ScriptedAX`, `Doctor.swift:179`,
+  `AXSourceTests`, `AXLiveTests.swift:10,65` and `InputLiveTests.swift:24` do not change. The plan's earlier shape
+  (`read() -> Frame?`, every source and four test files unwrapping `.root`) was ceremony for a wrapper only `poll`
+  hashes; the web-views fingerprint needs the process table, which only `Session` has (amendment 10).
 
 **Interfaces:**
 - Produces:
   ```swift
-  /// One read of the tree: the root, and room for what else settling may hash later (the web views' fingerprint,
-  /// which is 0 until the web-views plan computes it). Settling compares frames, not roots.
-  public struct Frame: Hashable, Sendable { public var root: AXElement; public var fingerprint: Int = 0 }
-  public protocol AXSource: AnyObject { func read() -> Frame?; … }
+  /// One read of the tree, the unit the settle loop compares: the root, and the web views' fingerprint, 0 until the
+  /// web-views plan computes it in `poll`. Equal frames hash equal, so settling is today's.
+  struct Frame: Hashable {
+      var root: AXElement
+      var fingerprint = 0
+  }
   ```
-  `poll` returns `(frame.root, frame.hashValue)`; with `fingerprint == 0` the hash differs from today's
-  `root.hashValue` as a number but settles identically (two equal frames hash equal), so no timing or verdict moves.
+  `observe`'s callers destructure `(snapshot, settle)` and read `settle.settled` and `settle.elapsedMs` only
+  (`grep -rn 'settle\.value' Sources Tests` → nothing), so `Settled<Frame>` compiles everywhere without an edit. The
+  web-views plan's change is then one line in `poll`: `Frame(root: root, fingerprint: webViews.fingerprint(root, ax))`.
 
-- [ ] **Step 1: Write the failing test** — `AXSourceTests.aFrameHashesItsRootAndItsFingerprint`: two frames with the
-  same root and different fingerprints are unequal; the same root and fingerprint are equal.
-- [ ] **Step 2: Implement**; `swift test`; goldens unchanged.
-- [ ] **Step 3: Commit** — `git commit -m "AXSource reads a Frame: the root, and room for a fingerprint"`
+- [ ] **Step 1: Write the failing test** — `PerceptionTests.aFrameHashesItsRootAndItsFingerprint`: two frames with the
+  same root and different fingerprints are unequal; the same root and fingerprint are equal (the type does not exist:
+  compile failure is the red).
+- [ ] **Step 2: Implement**; `swift test`; goldens unchanged; `SessionObserveTests` unchanged (the read counts in its
+  doc line still hold: a frame costs one read).
+- [ ] **Step 3: Commit** — `git commit -m "Frame: the settle loop's unit, built by poll; the root and room for a fingerprint"`
 
-### Task 28: `Builder` and `Sweep` are types of their own; `complete` leaves `AXSource`
+### Task 28: `Builder` and `Sweep` are types of their own; `complete` leaves `AXSource`; the cache dies with the connection (amendment 11)
 
 **Files:**
 - Create: `Sources/ChauffeurCore/Perception/Builder.swift` (`struct Builder`, moved unchanged from
-  `Perception.swift:133-194`, `private` → internal), `Sources/ChauffeurCore/Perception/Sweep.swift`
-- Modify: `Sources/ChauffeurCore/Device/AXProvider.swift:21,58-109` (`cache`, `complete`, `isSweepTarget`, `points`,
-  `merge`, `fillBars` go), `Sources/ChauffeurCore/Device/AXSource.swift` (`complete` goes),
-  `Sources/ChauffeurCore/Engine/Session.swift` (`let sweep = Sweep.bars()`), `Session+Observe.swift`
-  (`publish(sweep.complete(root) { ax.element(at: $0) }, size:)`)
+  `Perception.swift:128-184`, `private` → internal; `Perception.swift` then ends at 127), `Sources/ChauffeurCore/Perception/Sweep.swift`
+- Modify: `Sources/ChauffeurCore/Device/AXProvider.swift:23` (`cache` goes), `:60-111` (`complete`, `isSweepTarget`,
+  `points`, `merge`, `fillBars` go), `Sources/ChauffeurCore/Device/AXSource.swift:9` (`complete` goes),
+  `Sources/ChauffeurCore/Engine/Session.swift` (`let sweep = Sweep.bars()` beside `ax`; `drop()` at `:125-131` adds
+  `sweep.forget()`), `Session+Observe.swift:39` (`publish(sweep.complete(frame) { ax.element(at: $0) }, size:)`)
 - Test: `Tests/ChauffeurCoreTests/AXProviderTests.swift:7-43` (the four sweep tests move to `SweepTests.swift`, same
   assertions on `Sweep`; `dictionariesBecomeElements` stays), `Support.swift` (`ScriptedAX.complete` goes;
-  `ScriptedAX.hits: [Point: AXElement] = [:]` answers `element(at:)` for a scripted sweep), `Live/AXLiveTests.swift:22-30`
-  (`Sweep.bars().complete(root) { ax.element(at: $0) }`, the cached assertion against the same instance)
+  `var hits: [Point: AXElement] = [:]` answers `element(at:)` for a scripted sweep, and `elementCalls` counts them),
+  `SessionObserveTests.swift` (one new case, below), `Live/AXLiveTests.swift:25` (`let sweep = Sweep.bars()`;
+  `sweep.complete(Frame(root: root)) { ax.element(at: $0) }`) and `:33` (the cached assertion against the same instance)
 
 **Interfaces:**
 - Produces:
   ```swift
   /// Hit tests on a grid inside the elements `isTarget` picks, merged in as their children (M1 decision 1: the bars the
-  /// walk leaves empty). `bars` is today's sweep: a 32 pt step over childless groups up to 140 pt high. The result is
-  /// cached per raw root, so settling and a verdict compare like with like (spec §8); `purpose` is carried for the
-  /// web-views plan, which gives verdicts a fresh sweep, and changes nothing here.
+  /// walk leaves empty). `bars` is today's sweep: a 32 pt step over childless groups up to 140 pt high. One entry is
+  /// cached by the frame's hash, so settling and a verdict compare like with like (spec §8); the web-views plan is
+  /// what adds the fingerprint to that key and gives verdicts a fresh sweep.
   @MainActor final class Sweep {
       let step: Double
       let isTarget: (AXElement) -> Bool
       init(step: Double, isTarget: @escaping (AXElement) -> Bool)
       static func bars() -> Sweep
-      func complete(_ root: AXElement, purpose: ObservePurpose = .snapshot, hits: (Point) -> AXElement?) -> AXElement
+      func complete(_ frame: Frame, hits: (Point) -> AXElement?) -> AXElement
+      /// The connection is gone: the next `complete` sweeps afresh, whatever the frame (`Session.drop()`).
+      func forget()
       nonisolated static func points(in frame: Rect, step: Double) -> [Point]
       nonisolated static func merge(_ hits: [AXElement], into container: AXElement) -> AXElement
   }
   ```
-  (`ObservePurpose` is Task 29's; add it here with `.snapshot` only used, or land Task 29 first: the implementer
-  picks the order and says so.) Offline, a `ScriptedAX` with no `hits` fills every bar with nothing, which is the bar
-  unchanged (childless in, childless out), so every existing offline test sees what it saw.
+  With `fingerprint == 0` the key is a function of the root alone: today's behaviour exactly. Offline, a `ScriptedAX`
+  with no `hits` fills every bar with nothing, which is the bar unchanged (childless in, childless out), so every
+  existing offline test sees what it saw. No `purpose` parameter on `complete`: the purpose stops at `observe` (Task
+  29); the web-views plan, which knows whether a fresh sweep is a parameter or a second method, adds what it needs.
+- `forget()` (amendment 11): the cache was on `AXProvider`, which `drop()` nils, so today the first observe after a
+  reconnect sweeps afresh. A `Sweep` on `Session` without `forget()` would serve a completion computed while the
+  bridge was poisoned (every hit nil, the bars childless) for an identical raw root after healing: a snapshot without
+  its tab buttons, which `aBridgeRestartKeepsTheSessionReading` would not catch (it asks for text only).
 - The Stage 1a Finding ("Stage 5's `Sweep` should lift `complete` off `AXSource`") is done here: the sweep runs on
   top of any source and `SweepTests.aScriptedHitFillsTheBar` proves it offline (a `ScriptedAX` whose `hits` map one
   grid point of the fixture's tab bar to a button; the snapshot shows it as the bar's child).
 
-- [ ] **Step 1: Write the failing tests** (`SweepTests`: the four moved cases plus the scripted hit).
-- [ ] **Step 2: Implement**; `swift test`; goldens unchanged; `wc -l Perception.swift` about 130.
-- [ ] **Step 3: Commit** — `git commit -m "Builder and Sweep are types; the bar sweep runs on top of any AXSource"`
+- [ ] **Step 1: Write the failing tests** — `SweepTests`: the four moved cases plus the scripted hit;
+  `SessionObserveTests.aReconnectSweepsAfresh`: frames `[home, home, home, home]`, `hits` empty, `snapshot` shows the
+  tab bar childless; `s.drop()`; `hits` gains the button at one of the bar's grid points; `snapshot` on the same raw
+  root shows the button (without `forget()` the cache serves the childless bar: that is the red).
+- [ ] **Step 2: Implement**; `swift test`; goldens unchanged.
+- [ ] **Step 3: Commit** — `git commit -m "Builder and Sweep are types; the bar sweep runs on top of any AXSource and forgets its cache with the connection"`
 
 ### Task 29: `observe` takes a purpose
 
 **Files:**
-- Modify: `Sources/ChauffeurCore/Engine/Session+Observe.swift` (`observe(_ purpose: ObservePurpose, minMs:capMs:)`;
-  passes it to `sweep.complete`), and every caller: `.verdict` from `baseline` (`Session+Act.swift:7,13`), the two
-  classifiers (`Pipeline.swift`), `ScreenAgainPass`, `finishPending` (`Session+Wait.swift:68`), the `wait "<text>"`
-  poll (`:30`), `typeCommand`'s two observes (`Session+Type.swift:66,91`); `.snapshot` from `snapshotCommand`,
-  `findCommand`, `screenshotCommand`'s zoom (`Session+Screen.swift:22`), `launchCommand`'s `previous`
-  (`Session+Apps.swift:78`), `waitForApp`'s two (`:167,170`), `terminateCommand` (`:225`)
-- Test: `Tests/ChauffeurCoreTests/ActSupport.swift` and every `rig.s.observe(minMs:capMs:)` call (`.snapshot` unless
-  the test is about a verdict), `SessionObserveTests.swift` (one new case: the purpose reaches the sweep, proved by a
-  `Sweep` subclass? No: `Sweep` is final. Prove it by a counting `hits` closure: both purposes serve the cache today,
-  so a second observe of the same root makes no hit test under either purpose)
+- Modify: `Sources/ChauffeurCore/Engine/Session+Observe.swift:6` (`observe(_ purpose: ObservePurpose, minMs:capMs:)`),
+  and every caller: `.verdict` from `baseline` (`Session+Act.swift:7,12`), the two classifiers (`Pipeline.swift:38,67,69,71`),
+  `ScreenAgainPass.swift:10`, `finishPending` (`Session+Wait.swift:69`), the `wait "<text>"` poll (`:29`),
+  `typeCommand`'s two observes (`Session+Type.swift:64,84`); `.snapshot` from `snapshotCommand` and `findCommand`
+  (`Session.swift:232,244`), `screenshotCommand`'s zoom (`Session+Screen.swift:22`), `launchCommand`'s `previous`
+  (`Session+Apps.swift:81`), `waitForApp`'s two (`:167,170`), `terminateCommand` (`:227`)
+- Test: the 15 `rig.s.observe(minMs:capMs:)` sites in `ClassifierTests` and `PassTests` (`.snapshot`: they take a
+  `before`), `PassTests.swift:216` (`NextFramePass`: `.verdict`, it serves a credit), the doc line
+  `SessionObserveTests.swift:9`, and one new `SessionObserveTests` case (below)
 
 **Interfaces:**
 - Produces: `enum ObservePurpose { case snapshot, verdict }`; "an observe knows whether it serves a snapshot or a
-  verdict" (spec goal 6). In this refactor it changes nothing: the test pins that.
+  verdict" (spec goal 6). The purpose stops at `observe`: it is not passed to the sweep (Task 28). In this refactor it
+  changes nothing, which the test pins for `.snapshot` only: a second `.snapshot` observe of the same root makes no
+  hit test (`ScriptedAX.elementCalls` does not grow). The `.verdict` half is not pinned: it is the exact behaviour the
+  web-views plan inverts (every verdict a fresh sweep), so a pin would be a test the next plan deletes.
+- Why each purpose (the review's check): `.verdict` for `baseline` is necessary, not just consistent: once verdict
+  sweeps are fresh, a `before` served from the cache against a fresh `after` is the false `changed` spec §8 warns
+  about. The `wait "<text>"` poll and `type`'s two observes are `.verdict` per the web-views spec §5-6. `scroll --until`
+  reads `last` after `act`'s `.verdict` observe and needs no observe of its own.
 
 - [ ] **Step 1: Write the failing test** (the enum does not exist).
-- [ ] **Step 2: Implement; thread it through every caller**; `grep -rn "observe(minMs" Sources` → nothing.
+- [ ] **Step 2: Implement; thread it through every caller**; `grep -rn "observe(minMs" Sources Tests` → nothing.
 - [ ] **Step 3: Commit** — `git commit -m "observe says what it serves: a snapshot or a verdict"`
 
 ### Task 30: a request names its source; a record claims only the app's connection (§9 rows 6 and 7)
 
 **Files:**
-- Modify: `Sources/ChauffeurCore/Network/RequestEvidence.swift:4-27` (`process`), `:50-80` (`merge(… helpers:)`),
-  `Sources/ChauffeurCore/Network/RequestText.swift:9-11` (`target` is prefixed by `source`), `:111-127` (`json` adds
+- Modify: `Sources/ChauffeurCore/Network/RequestEvidence.swift:4-26` (`process`), `:48-77` (`merge(… helpers:)`),
+  `Sources/ChauffeurCore/Network/RequestText.swift:8-11` (`target` is prefixed by `source`), `:106-122` (`json` adds
   `process` when set), `Sources/ChauffeurCore/Engine/NetworkWatch.swift:4-16` (`NetStart` and `TapNet` gain
-  `helpers: [Int32: String]`), `:60-65` (`watchedPids` returns the helper map: the WebKit networking child under its
-  name), `:126-133` (`merge(… helpers: net.helpers)`), `:104-121` (`stillWaiting` unchanged: `target` carries the source)
+  `helpers: [Int32: String]`), `:63-68` (`watchedPids` returns the helper map: the WebKit networking child under its
+  name), `:138-140` (`netItems`: `merge(… helpers: net.helpers)`), `:108-121` (`stillWaiting` unchanged: `target`
+  carries the source)
 - Test: `Tests/ChauffeurCoreTests/RequestEvidenceTests.swift`, `RequestTextTests.swift`, `Golden/ReportCases.swift`
   (new fixture and case), `Fixtures/golden/reports/noeffect-web-view-request.{txt,json}` (recorded),
   `SessionUpgradeTests.swift` + `Fixtures/golden/sessions/tap-web-view-load.txt` (recorded), `Support.swift`
   (`FakeProcesses(alive:parent:children:)`: `parent(of:)` and `children(of:named:)` answer from maps),
-  `Live/NetworkLiveTests.swift:96-106` (`aWebViewLinkToASlowPageIsPending` also asserts
-  `contains("→ PENDING · web view · 127.0.0.1:8765")`: the live proof of the line; a ledger change by ruling)
+  `Live/NetworkLiveTests.swift:102` (`aWebViewLinkToASlowPageIsPending`: the `contains("→ PENDING")` literal is
+  **replaced** by `contains("→ PENDING · web view · 127.0.0.1:8765")`, not joined by a second `contains`, so the
+  ledger changes exactly one line: the live proof of the line, by ruling)
 - Modify: `CHANGELOG.md` (two lines), `docs/benchmark.md:200-206` (the N3 paragraph ends: "Fixed: the line now
   names its source, `request: web view · 127.0.0.1:8765 · …`."), `docs/specs/2026-10-27-web-views-in-the-tree-design.md`
   (Testing row 2: "and the request line, which names the web view as its source")
@@ -553,7 +602,10 @@ Branch `refactor-5-perception`. PR title: "Refactor 5: Frame, Sweep, the observe
 - The rule: "the app" is the launched app's executable, or the frontmost pid's process when nothing was launched, both
   being the pid `watchedPids` puts first; the helpers are the pids it adds. No process name is read from
   NetworkStatistics for this (its `processName` is the kernel's short name); the watch already found the helper by
-  name through `ProcessTable.children(of:named:)`.
+  name through `ProcessTable.children(of:named:)`. The `"<name> · "` branch for a helper other than WebKit networking
+  has no production producer today (`watchedPids` adds only `com.apple.WebKit.Networking`); it is reachable from the
+  unit test alone until another helper is watched. It stays because spec §8 asks for it ("any other helper prints its
+  process name"), and because the alternative is a branch that special-cases one name.
 - **Ruling on helper flows** (the review's §2.3): a helper's flow stays the tap's evidence. chauffeur cannot tell a
   web-view load the tap started (a link tap, whose only witness it is: `aWebViewLinkToASlowPageIsPending`) from one it
   did not (a page still loading under a dead tap); the line names the source so an agent can weigh it, which is what
@@ -585,13 +637,16 @@ Branch `refactor-5-perception`. PR title: "Refactor 5: Frame, Sweep, the observe
 
 ### Task 31: Stage 5 verification and PR
 
-- [ ] **Step 1: Counts** — `scripts/one-way.sh`: `sources-lines` at most 90 over Stage 2b's; T still 10; no new
-  file over 300.
+- [ ] **Step 1: Counts** — `scripts/one-way.sh` before and after in the PR body; T still 10; `over-300` still
+  `MCPTools.swift` only. Every added line is a declaration the spec asks for (`Frame`, `Sweep`, `ObservePurpose`,
+  `process`, `helpers`) or a pin; the PR body says so.
 - [ ] **Step 2: `scripts/check.sh`** → `check: all passed`.
 - [ ] **Step 3: Live (controller)** — `scripts/live.sh <udid>`: every suite passes (the pre-existing flags-off test
   aside); `aWebViewLinkToASlowPageIsPending` shows the `web view` line; `aDeadButtonIsPlainAndNotSlower` passes.
   `scripts/live-timing.sh <udid> main` within threshold (the sweep's cache serves both purposes: no new hit test).
 - [ ] **Step 4: Ledger** — exactly one changed line (the web-view assertion), named in the PR body.
+- [ ] **Step 4b: Spec** — `docs/specs/2026-10-27-refactor-one-way-design.md`, "Amendments accepted": one line dated
+  2026-11-07 naming amendments 1-5, 7 (with its two changes), 8, 10 and 11, pointing here as the 2026-10-29 line does.
 - [ ] **Step 5: Push and PR** — `git push -u origin refactor-5-perception && gh pr create --base main --title "Refactor 5: Frame, Sweep, the observe purpose; a request names its source"`.
 
 ---
@@ -604,7 +659,7 @@ Branch `refactor-3a-registry`. PR title: "Refactor 3a: a command is declared onc
 
 **Files:**
 - Create: `Sources/ChauffeurCore/Engine/CommandSpec.swift` (the types; under 150 lines),
-  `Sources/ChauffeurCore/Engine/Commands.swift` (the 26 specs and the registry; under 300 lines)
+  `Sources/ChauffeurCore/Engine/Commands.swift` (the 27 specs and the registry; under 300 lines)
 - Create (recorded): `Tests/ChauffeurCoreTests/Fixtures/golden/usage-errors.txt`
 - Test: `Tests/ChauffeurCoreTests/CommandsTests.swift`
 
@@ -665,13 +720,13 @@ Branch `refactor-3a-registry`. PR title: "Refactor 3a: a command is declared onc
   version, selftest (no rows). `Args.init` takes `options: [OptionSpec]` instead of a name set, so `number(_:)` and
   `integer(_:)` read their range from the spec (the explicit-range overloads at `Args.swift:70-90` go: one range per
   option, in one place); `number` clamps when the kind says so. `ArgsTests` build `OptionSpec`s.
-  Ranges, from the handlers: `tap --long 0.05...30` (`Session+Act.swift:123`), `wait --timeout 0...300 clamp`
+  Ranges, from the handlers: `tap --long 0.05...30` (`Session+Act.swift:116`), `wait --timeout 0...300 clamp`
   (`Session+Wait.swift:18` says `0...86_400` and then clamps to 300 at `:21,24`; §9 row 2 declares 300: a value over
   86,400, a usage error today, now clamps; listed in Findings as drift resolved by §9), `logs --last 1...500`
-  (`Session+Logs.swift:100`), `logs --level error|info`, `skill --agents` text, `keys` options text, `doctor --live`,
+  (`Session+Logs.swift:101`), `logs --level error|info`, `skill --agents` text, `keys` options text, `doctor --live`,
   `snapshot --all --screenshot`, `type --submit`, `swipe --edge`, `tap --edge`, `scroll --in --until`,
   `screenshot --zoom`, `wait --gone`, `launch --args` (rest), `keys --no-presence`.
-  Traits, from `Session.swift:206-211` and `Session+Batch.swift:5`: `logged` on tap, type, scroll, swipe, button, open,
+  Traits, from `Session.swift:141-146` and `Session+Batch.swift:5`: `logged` on tap, type, scroll, swipe, button, open,
   install, launch, terminate, permission, location, push, appearance; `watched` on those plus snapshot, find, wait,
   screenshot; `batchable` on those plus logs; `agent` on every daemon command but selftest, plus doctor;
   `daemonOnly` on selftest.
@@ -689,7 +744,7 @@ Branch `refactor-3a-registry`. PR title: "Refactor 3a: a command is declared onc
   - `keysIsForHumans`: `daemon["keys"] == nil`, `!spec("keys")!.traits.contains(.agent)`, `spec("selftest")!.traits.contains(.daemonOnly)`
     and `!forwarded.contains("selftest")`.
 - [ ] **Step 2: Run to verify they fail** (types undefined).
-- [ ] **Step 3: Implement the types, the 26 specs with handlers that call today's methods (`{ s, a in try s.tapCommand(a) }`
+- [ ] **Step 3: Implement the types, the 27 specs with handlers that call today's methods (`{ s, a in try s.tapCommand(a) }`
   compiles only after Task 33 changes the handlers' parameter; in this task the handler closures call
   `s.tapCommand(a.argv)`? No: give `Args` a `let argv: [String]` for this one task, or land Task 33's signature change
   first. Ruling: this task's handlers are `.daemon { s, a in try s.tapCommand(a.argv) }` with `Args.argv` added, and
@@ -699,23 +754,26 @@ Branch `refactor-3a-registry`. PR title: "Refactor 3a: a command is declared onc
 ### Task 33: handlers take `Args` from their spec; dispatch, the CLI and the traits derive; the literals go (§9 row 3)
 
 **Files:**
-- Modify: every handler (`Session.swift:297-310` snapshot, find; `Session+Act.swift:120-124,178-186`; `Session+Gestures.swift:12-18,39-44`;
-  `Session+Type.swift:4-7`; `Session+Screen.swift:14-31`; `Session+Apps.swift:37-39,69-72,182-187,215-218`;
-  `Session+Device.swift:11-30,58-74,87-90,114-117`; `Session+Logs.swift:95-104`; `Session+Wait.swift:14-21`;
-  `Session+Batch.swift:12-17`; `CLI.swift:82-124` (`use`, `doctor`, `mcp`, `skill`, `help`, `version`);
-  `ConnectKeys.swift:37-44` (`handle(_ a: Args, cwd:env:)`; the `usage` constant becomes the spec's `errorUsage`);
-  `Doctor.swift:142` (`run(udidFlag:live:env:)` unchanged; the spec's handler reads `a.flag("--live")`)):
-  each `Args(argv, …usage: "…")` becomes the `Args` the registry hands it; the range calls lose their range
-  (`a.number("--long")`, `a.integer("--last")`); the `--level` and `--timeout` validation stays where the handler
-  reads the value, through the spec's kind.
-- Modify: `Session.swift:206-211` (`logged`, `watched` go), `:219-235` (`runOne` reads `Commands.registry`),
-  `:263-285` (`dispatch` becomes `guard let spec = Commands.registry.daemon[command], case .daemon(let run) = spec.run else { unknown }; return try run(self, try spec.args(argv))`),
-  `Session+Batch.swift:5,24-27` (`Commands.registry.batchable`), `CLI.swift:5-9` (`forwarded` goes), `:82-124` (the
-  switch becomes: find the spec by name or alias; `.local` runs it; `.daemon` and not `.daemonOnly` resolves the udid
-  and sends; else unknown), `Args.swift:139-172` (`Usage.text` becomes `Commands.registry.usageText`; the header and
+- Modify: every handler: the 24 sites `grep -rn '"usage: chauffeur' Sources/ChauffeurCore` lists (`Session.swift:228-255`
+  snapshot, find; the `*Command` heads in `Session+Act`, `Session+Gestures`, `Session+Type`, `Session+Screen`,
+  `Session+Apps`, `Session+Device`, `Session+Logs.swift:97-106`, `Session+Wait`, `Session+Batch`; `CLI.swift` for
+  `use`, `doctor`, `mcp`, `skill`, `help`, `version`; `ConnectKeys.swift:37-44` (`handle(_ a: Args, cwd:env:)`; the
+  `usage` constant becomes the spec's `errorUsage`); `Doctor.run` at `Doctor.swift:136` unchanged, the spec's handler
+  reads `a.flag("--live")`): each `Args(argv, …usage: "…")` becomes the `Args` the registry hands it; the range calls
+  lose their range (`a.number("--long")`, `a.integer("--last")`); the `--level` and `--timeout` validation stays where
+  the handler reads the value, through the spec's kind.
+- Modify: `Session.swift:141-146` (`logged`, `watched` go), `:149-173` (`runOne` reads `Commands.registry`),
+  `:186-210` (`dispatch` becomes `guard let spec = Commands.registry.daemon[command], case .daemon(let run) = spec.run else { unknown }; return try run(self, try spec.args(argv))`),
+  `Session+Batch.swift:5,24-27` (`Commands.registry.batchable`), `CLI.swift:5-9` (`forwarded` goes), the CLI switch
+  (becomes: find the spec by name or alias; `.local` runs it; `.daemon` and not `.daemonOnly` resolves the udid and
+  sends; else unknown), `Args.swift` (`Usage.text`, 36 lines, becomes `Commands.registry.usageText`; the header and
   footer lines stay literal in `Registry.usageText` until Task 38 moves the last two into the glossary)
 - Modify: `scripts/check-code.sh` (rule `usage-literal`: `"usage: chauffeur` in `Sources` outside
-  `Sources/ChauffeurCore/Engine/Commands.swift`), `scripts/tests/test-check-code.sh` (one case)
+  `Sources/ChauffeurCore/Engine/Commands.swift`), `scripts/tests/test-check-code.sh` (one case),
+  `Sources/chauffeur/main.swift:8` (the daemon's own argv check prints `usage: chauffeur daemon --udid <udid> …`
+  before `CLI.handle` runs; ruling: it gets `// check-code: allow usage-literal — the daemon's own argv check runs
+  before the registry`, and `scripts/one-way.sh`'s `usage-literals` stops counting `Sources/chauffeur`. `daemon` is
+  not a command an agent or a human runs, so a hidden spec for it would be a declaration with no reader)
 - Test: `CommandsTests` (the three "todays" pins now compare against literal copies in the test, not the deleted
   constants), `Fixtures/golden/usage.txt` (re-recorded in this task's §9 commit: only the `location` and `do` rows
   change: `location <lat,lon> | clear` and `do '<command>; <command>; …'`, each padded by the rule), `CHANGELOG.md`
@@ -734,8 +792,9 @@ Branch `refactor-3a-registry`. PR title: "Refactor 3a: a command is declared onc
 
 ### Task 34: Stage 3a verification and PR
 
-- [ ] **Step 1: Counts** — `sources-lines` at most 40 over Stage 5's; `Session.swift` under 240; `Args.swift` under
-  120; `usage-literals: 0`; P is 2 for the CLI, usage, dispatch and the traits (the test says so).
+- [ ] **Step 1: Counts** — `usage-literals: 0`; P is 2 for the CLI, usage, dispatch and the traits (the test says
+  so); `Session.swift` under 240; `Args.swift` about 130 (`Usage.text` and the two ranged readers go, `OptionSpec`
+  parsing arrives). L is reported: this is the stage that grows most (27 declarations), and the PR body says so.
 - [ ] **Step 2: `scripts/check.sh`**; `scripts/live.sh <udid>` (the handlers changed: a live run);
   `scripts/live-timing.sh <udid> main`; the ledger unchanged.
 - [ ] **Step 3: Push and PR** — `git push -u origin refactor-3a-registry && gh pr create --base main --title "Refactor 3a: a command is declared once"`.
@@ -745,7 +804,9 @@ Branch `refactor-3a-registry`. PR title: "Refactor 3a: a command is declared onc
 ## Stage 3b: the MCP tools and the skill table from the registry
 
 Branch `refactor-3b-agent-surfaces`. PR title: "Refactor 3b: the MCP tools and the skill's table derive from the registry".
-No live run (Agent only); `scripts/mcp-smoke.sh` instead.
+No live run (Agent only); `scripts/mcp-smoke.sh` instead. 3b and 3c may ship as one PR (amendment 7): same two files,
+same smoke test, `skill.md` and `mcp-tools.json` re-recorded once; each stage keeps its own §9 commit, and Task 37's
+and Task 39's checks both run before that PR opens.
 
 ### Task 35: the MCP errors pinned; `ToolSpec`; the schema and the argv derived (§9 rows 1 and 2)
 
@@ -753,7 +814,7 @@ No live run (Agent only); `scripts/mcp-smoke.sh` instead.
 - Create (recorded, **before any production change**): `Tests/ChauffeurCoreTests/Fixtures/golden/mcp-errors.txt`
 - Create: `Sources/ChauffeurCore/Agent/MCPToolSpec.swift` (the types and the derivation; under 200 lines)
 - Modify: `Sources/ChauffeurCore/Agent/MCPTools.swift` (`definitions` becomes `ToolSpec.all.map(\.json)`; the second
-  switch at `:217-308` goes; `Arguments` stays; under 220 lines), `Sources/ChauffeurCore/Engine/Session+Device.swift:6-9`
+  switch at `:218-315` goes; `Arguments` stays; under 220 lines), `Sources/ChauffeurCore/Engine/Session+Device.swift:6-9`
   (`privacyServices` moves into `permission`'s `PositionalSpec.choices`; the handler reads it from its spec; Agent
   stops importing Engine's enum)
 - Test: `Tests/ChauffeurCoreTests/MCPTests.swift` (new `everyErrorIsPinned` records the golden; `everyToolMapsToTheCLI`
@@ -785,8 +846,11 @@ No live run (Agent only); `scripts/mcp-smoke.sh` instead.
       func argv(_ arguments: JSON, payloadFile: (Data) throws -> String) throws -> [String] }
   ```
   Error texts, derived, must equal the golden: `"\(tool) \(action) needs \(key)"` (or `"\(tool) needs \(key)"`),
-  `"\(tool) action must be a, b, c or d"` (the action enum, in table order), the three validate hooks' texts copied
-  from `MCPTools.swift:220,288-289` verbatim, and `Arguments`' own ("x must be a string", "… has no argument …").
+  `"\(tool) action must be a, b, c or d"` (the action enum, in table order), the two validate hooks' texts copied
+  verbatim from `MCPTools.swift:227` (`find`/`wait_for` exclusive) and `:299-301` (`push` needs an object), and
+  `Arguments`' own ("x must be a string", "… has no argument …"). The third special case is not an error text but an
+  argv shape: `launch` puts its positional bare, then `--args` and the rest (`:280-282`); that is `Binding.rest`'s
+  rule, not a hook.
   A property that serves two commands with different choices (`mode` for `permission` and `appearance`) stays untyped
   as today; `service` gets `permission`'s choices (it had the enum already); `direction`, `button`, `level` keep theirs.
   If deriving would add an enum to a property that has none today, it is drift: list it in Findings under §9's
@@ -815,17 +879,18 @@ No live run (Agent only); `scripts/mcp-smoke.sh` instead.
   (the table is rendered: `| Need | Command |`, one row per distinct `need` in registry order, examples joined by `, `)
 - Test: `SkillTests.teachesTheLoopTheBuildAndTheTrustRule` (unchanged), `CommandsTests.addingACommandIsOneSpecAndOneHandler`
   (extended: a spec with a `skillRow` appears in the table), `Fixtures/golden/skill.md` (re-recorded by ruling: the
-  rows are in registry order, so `screenshot` moves above `tap` and `doctor` to the top; the text of every row is
-  unchanged), `CHANGELOG.md` ("The skill's command table lists commands in `chauffeur help`'s order.")
+  rows are in registry order, so three rows move: `doctor` to the top, `screenshot` above `tap`, `logs` (row 12)
+  above `open` (row 16); the text of every row is unchanged), `CHANGELOG.md` ("The skill's command table lists
+  commands in `chauffeur help`'s order.")
 
 - [ ] **Step 1: Write the failing test** (the throwaway row).
-- [ ] **Step 2: Implement; re-record `skill.md`; diff it: only row order moves**; changelog.
+- [ ] **Step 2: Implement; re-record `skill.md`; diff it: exactly the three row moves**; changelog.
 - [ ] **Step 3: Commit** — `git commit -m "The skill's command table renders from the registry, in help's order (spec §9)"`
 
 ### Task 37: Stage 3b verification and PR
 
-- [ ] **Step 1: Counts** — `sources-lines` at least 40 under Stage 3a's; `MCPTools.swift` under 300 (`over-300`
-  is empty: the last of the three); P is 2 for the schema and the table (the test says so).
+- [ ] **Step 1: Counts** — `MCPTools.swift` under 300 (`over-300` is empty: the last of the three); P is 2 for the
+  schema and the table (the test says so); L reported.
 - [ ] **Step 2: `scripts/check.sh`**; `swift build -c release && scripts/mcp-smoke.sh` → the seven tools accepted.
 - [ ] **Step 3: Push and PR** — `git push -u origin refactor-3b-agent-surfaces && gh pr create --base main --title "Refactor 3b: the MCP tools and the skill's table derive from the registry"`.
 
@@ -841,8 +906,8 @@ untrusted-text rule". No live run; `scripts/mcp-smoke.sh`.
 **Files:**
 - Create: `Sources/ChauffeurCore/Glossary.swift` (beside `ExitCode.swift`; under 80 lines)
 - Modify: `Sources/ChauffeurCore/Agent/MCPTools.swift:44-45` (`untrusted` → `Glossary.untrustedText`), the `act`
-  tool's description (its outcome list → `Glossary.failedOutcomes`), `Sources/ChauffeurCore/Agent/MCPServer.swift:18-27`
-  (rendered from the glossary), `Sources/ChauffeurCore/Agent/Skill.swift:26-37` (the loop's result bullets from
+  tool's description (its outcome list → `Glossary.failedOutcomes`), `Sources/ChauffeurCore/Agent/MCPServer.swift:16-25`
+  (rendered from the glossary), `Sources/ChauffeurCore/Agent/Skill.swift:25-38` (the loop's result bullets from
   `Glossary.outcomes`), `:71-72` and `:78` (the rule and the exit-code line), `:93-95,98` (the AGENTS section),
   `Sources/ChauffeurCore/Engine/Commands.swift` (`Registry.usageText`'s last two footer lines from the glossary)
 - Test: `Tests/ChauffeurCoreTests/GlossaryTests.swift`, the five text goldens re-recorded in the §9 commit
@@ -873,14 +938,15 @@ untrusted-text rule". No live run; `scripts/mcp-smoke.sh`.
 
 - [ ] **Step 1: Write the failing tests**.
 - [ ] **Step 2: Implement**; `swift test` fails only on the five goldens.
-- [ ] **Step 3: The §9 commit** — re-record them; read each diff (the PR body lists every changed line); changelog:
+- [ ] **Step 3: The §9 commit** — re-record them; read each diff (the PR body lists every changed line, `usage.txt`'s
+  first: its footer line becomes the glossary sentence, and that is the one humans read); changelog:
   "Agent-facing text uses one wording for the untrusted-text rule, the outcome list and the exit-code line: the skill's
   exit-code line gains 6; the MCP instructions name TEXT MISMATCH and APP EXITED."
 - [ ] **Step 4: Commit** — `git commit -m "One glossary: the untrusted-text rule, the outcome list and the exit codes in one wording (spec §9)"`
 
 ### Task 39: Stage 3c verification and PR
 
-- [ ] **Step 1: Counts** — `outcome-list: 1`, `exit-code-line: 1`; `sources-lines` at most 10 over Stage 3b's.
+- [ ] **Step 1: Counts** — `outcome-list: 1`, `exit-code-line: 1`; L reported.
 - [ ] **Step 2: `scripts/check.sh`**; `scripts/mcp-smoke.sh`.
 - [ ] **Step 3: Push and PR** — `git push -u origin refactor-3c-glossary && gh pr create --base main --title "Refactor 3c: one glossary renders the outcome list, the exit codes and the untrusted-text rule"`.
 
@@ -889,25 +955,30 @@ untrusted-text rule". No live run; `scripts/mcp-smoke.sh`.
 ## Stage 4a: one way to write the bridge
 
 Branch `refactor-4a-bridge`. PR title: "Refactor 4a: one way to load, read, wait and fail in the bridge; shared keys".
+The bridge line numbers below are from `main` 81541c7's committed files (a stray reformat of two bridge files was
+dropped on 2026-11-07). Last in 4a, ruled by the owner on 2026-11-07: clang-format for the bridge: a `.clang-format`
+at swift-format's 100 columns, one commit formatting all six files, and a `clang-format --dry-run --Werror` step in
+`scripts/check.sh`; first confirm Xcode 26's toolchain ships `clang-format` (`xcrun --find`), as CI builds on 26.
 
-### Task 40: `CHInternal`: errors with codes, guarded KVC, one loader, one wait; the lint
+### Task 40: `CHInternal`: one error, guarded KVC, one loader, one wait; the lint
 
 **Files:**
 - Modify: `Sources/ChauffeurBridge/CHInternal.h` (12 lines today)
 - Create: `Sources/ChauffeurBridge/CHInternal.m` (the loader's handle cache and the non-inline helpers)
-- Modify: `Sources/ChauffeurBridge/include/ChauffeurBridge.h` (`CHBridgeErrorCode`), `scripts/check-code.sh` (four
-  rules), `scripts/tests/test-check-code.sh` (four cases)
+- Modify: `scripts/check-code.sh` (four rules), `scripts/tests/test-check-code.sh` (four cases)
+- Cut (2026-11-07): the seven-case `CHBridgeErrorCode` enum in `ChauffeurBridge.h`. No Swift reader exists or is
+  planned: `ChauffeurError.bridge(_:)` (Task 42) reads the message only. One code and a message is what §4's "one
+  error constructor" needs; a code becomes a case when something reads it.
 
 **Interfaces:**
 - Produces (`CHInternal.h`, used by every `.m`):
   ```objc
-  typedef NS_ENUM(NSInteger, CHBridgeErrorCode) { CHBridgeErrorFrameworkMissing = 1, CHBridgeErrorClassMissing, CHBridgeErrorSymbolMissing, CHBridgeErrorDeviceNotFound, CHBridgeErrorClientFailed, CHBridgeErrorReadFailed, CHBridgeErrorUnavailable };  // in ChauffeurBridge.h, public
-  NSError *CHError(CHBridgeErrorCode code, NSString *message);               // domain CHBridgeErrorDomain (the literal at CHInternal.h:6 goes)
+  NSError *CHError(NSString *message);                                       // domain CHBridgeErrorDomain, code 1 (the literal at CHInternal.h:6 goes)
   id _Nullable CHValue(id object, NSString *key);                            // valueForKey:, nil on an exception
   NSString *_Nullable CHString(id object, NSString *key);                     // a non-empty string, or a number's string
   NSNumber *_Nullable CHNumber(id object, NSString *key);
   BOOL CHSet(id object, NSString *key, id value);                            // setValue:forKey:, NO on an exception
-  void *_Nullable CHLoad(NSString *path, NSError **error);                   // dlopen RTLD_NOW, cached per path; CHError(FrameworkMissing, dlerror)
+  void *_Nullable CHLoad(NSString *path, NSError **error);                   // dlopen RTLD_NOW, cached per path; CHError(dlerror) when it fails
   void *_Nullable CHSym(void *handle, const char *name);                     // dlsym; the caller checks for NULL once
   BOOL CHWaitSync(NSTimeInterval seconds, void (^start)(void (^done)(void))); // runs start with a completion; NO when it did not complete in time
   ```
@@ -923,9 +994,10 @@ Branch `refactor-4a-bridge`. PR title: "Refactor 4a: one way to load, read, wait
   counts at 0.
 
 - [ ] **Step 1: The lint first** — the four rules and their cases; `scripts/check-code.sh` now fails on the bridge
-  (the counts in the Measure table are the failures: 12 KVC sites, 4 + 17 loads, 3 waits, 1 error constructor).
+  (the counts in the Measure table are the failures: 12 KVC sites, 4 + 17 loads, 3 waits; `bridge-error` is already 0
+  outside `CHInternal`, so that rule only keeps a second constructor from coming back).
 - [ ] **Step 2: Write `CHInternal`**; the lint still fails (nothing uses it yet).
-- [ ] **Step 3: Commit** — `git commit -m "CHInternal: errors with codes, guarded KVC, one loader, one wait; the bridge lint"`
+- [ ] **Step 3: Commit** — `git commit -m "CHInternal: one error, guarded KVC, one loader, one wait; the bridge lint"`
 
 ### Task 41: the four `.m` files through `CHInternal`; `keyUsage:` goes; `rootForTranslation:token:`
 
@@ -933,7 +1005,7 @@ Branch `refactor-4a-bridge`. PR title: "Refactor 4a: one way to load, read, wait
 - Modify: `Sources/ChauffeurBridge/CHSimulator.m:5` (the domain constant stays here, exported), `:23,33` (`CHLoad`),
   `:60-61,72-74,77,82-84` (ten `valueForKey:` calls on nine lines → `CHValue`/`CHString`/`CHNumber`; `isBooted` and
   `pointSize` become `-bootedWithError:` returning `NSNumber *` and `-pointSizeWithError:` returning `NSValue *`,
-  nil with `CHError(ReadFailed, …)`: Task 42's "a failed read throws"; `name`, `udid` and `runtimeVersion` have no Swift
+  nil with `CHError(…)`: Task 42's "a failed read throws"; `name`, `udid` and `runtimeVersion` have no Swift
   caller (`grep -rn 'sim\.\(name\|udid\|runtimeVersion\)' Sources Tests` → nothing): delete them),
   `Sources/ChauffeurBridge/CHNetStats.m:49-58` (`CHLoad`, nine `CHSym` lines), `:105-114` (`CHWaitSync(0.25, …)`),
   `Sources/ChauffeurBridge/CHHIDClient.m:58-64,70` (`CHSym`; `RTLD_DEFAULT` for the three IOKit symbols stays a handle
@@ -986,7 +1058,8 @@ Branch `refactor-4a-bridge`. PR title: "Refactor 4a: one way to load, read, wait
 
 ### Task 43: Stage 4a verification and PR
 
-- [ ] **Step 1: Counts** — the five bridge counts 0; `sources-lines` at most 30 over Stage 3c's; `scripts/check-code.sh` clean.
+- [ ] **Step 1: Counts** — the five bridge counts 0; `scripts/check-code.sh` clean; L reported (the keys and
+  `CHInternal` are declarations; the KVC, loader and semaphore sites they replace are the removals).
 - [ ] **Step 2: `scripts/check.sh`**; `scripts/live.sh <udid>` (the bridge changed: every suite, `AXLiveTests`,
   `BridgeLiveTests`, `InputLiveTests`, `NetStatsLiveTests` in particular); `scripts/live-timing.sh <udid> main`
   (`CHWaitSync` and `CHLoad` must not add time: the threshold says so).
@@ -1004,9 +1077,9 @@ Branch `refactor-4b-helpers`. PR title: "Refactor 4b: small helpers, each replac
 
 **Files:**
 - Create: `Sources/ChauffeurCore/ScreenText.swift` (`quote`, `escape`, moved from `Perception.swift:93-130`),
-  `Sources/ChauffeurCore/Screen/Shot.swift` (`Shot` with `line` and `json`, moved from `Session+Screen.swift:41-65`,
+  `Sources/ChauffeurCore/Screen/Shot.swift` (`Shot` with `line` and `json`, moved from `Session+Screen.swift:36-59`,
   no longer nested in `Session`)
-- Modify: every `Perception.quote(`/`Perception.escape(` caller (44 sites in 22 files: one `sed`, no forwarder; the
+- Modify: every `Perception.quote(`/`Perception.escape(` caller (45 sites, `one-way.sh`'s `quote-callers`: one `sed`, no forwarder; the
   spec allows `Perception.quote` to forward "until its callers move", and moving them in the same commit is the one-way
   choice), `Sources/ChauffeurCore/Engine/Session+Apps.swift:153-159` (`describe` → `ScreenKind.description`,
   `CustomStringConvertible`, same text: not `Snapshot.header`'s quoted form), `Sources/ChauffeurCore/Perception/Snapshot.swift:38-46`
@@ -1017,32 +1090,31 @@ Branch `refactor-4b-helpers`. PR title: "Refactor 4b: small helpers, each replac
   `ScreenText.` now (rename the measure in the script).
 - [ ] **Step 3: Commit** — `git commit -m "ScreenText owns quoting; Shot lives in Screen; ScreenKind describes itself"`
 
-### Task 45: `Blocking`, `Proc`, `Plist`, `Endpoint`, `LogStream(level:predicate:)`, the found line, numbers, a ref
+### Task 45: `Blocking`, `Proc`, `Endpoint`; then the found line and numbers (two commits)
 
 **Files:**
 - Create: `Sources/ChauffeurCore/Blocking.swift`, `Sources/ChauffeurCore/Device/Proc.swift` (`Proc.isAlive` from
   `Logs/Crash.swift:5-15` and `Proc+Tree.swift` fold into it; one `info(_ pid:) -> kinfo_proc?` behind `isAlive` and
-  `parent`), `Sources/ChauffeurCore/Plist.swift`, `Sources/ChauffeurCore/Network/Endpoint.swift`
+  `parent`), `Sources/ChauffeurCore/Network/Endpoint.swift`
 - Delete: `Sources/ChauffeurCore/Device/Proc+Tree.swift`
-- Modify: `Sources/ChauffeurCore/Shell.swift:30-31,48-51` (`Blocking<Void>` for the exit), `Sources/ChauffeurCore/Engine/Session+Clipboard.swift:23-41`
+- Modify (commit 1): `Sources/ChauffeurCore/Shell.swift:30-31,48-51` (`Blocking<Void>` for the exit), `Sources/ChauffeurCore/Engine/Session+Clipboard.swift:23-41`
   (`Background` goes: `Blocking<ClipboardMark?>` fulfilled from the queue), `Sources/ChauffeurCore/Connect/ConnectTransport.swift:130-146`
   (`ConnectOutcome` goes), `Sources/ChauffeurCore/Connect/KeyStore.swift:54-62,70-91` (`Outcome` goes),
-  `Sources/ChauffeurCore/Device/AXSettings.swift:12-13`, `Sources/ChauffeurCore/Device/SimApps.swift:13-15,59-61`
-  (`Plist.dict`), `Sources/ChauffeurCore/Network/Flow.swift:43-48` and `Sources/ChauffeurCore/Network/RequestLog.swift:56-61,129-137`
+  `Sources/ChauffeurCore/Network/Flow.swift:41-48` and `Sources/ChauffeurCore/Network/RequestLog.swift:53-58,126-136`
   (`Endpoint.parse(_ authority:)`: host and port, IPv6 brackets; `RequestLog.Endpoint` becomes `Endpoint` + scheme
-  and path where it needs them; `RequestText.hostPort` formats through `Endpoint.description`),
-  `Sources/ChauffeurCore/Device/LogStream.swift:39-43` (`init(udid:level:predicate:handler:)`),
-  `Sources/ChauffeurCore/Logs/LogTap.swift:142-149`, `Sources/ChauffeurCore/Device/TouchLog.swift:40-47`,
-  `Sources/ChauffeurCore/Engine/Session+Act.swift:203-205,217-219`, `Session.swift` (`findCommand`), `Session+Wait.swift:35-38`
-  (`snap.found(hit)`: the line without its indentation; four copies of `line(_:all:).trimmingCharacters` go),
-  `Sources/ChauffeurCore/Engine/Session+Gestures.swift:5-10`, `Session+Screen.swift:5-13`, `Session+Device.swift:65-74`
-  (`Geometry.numbers(_ text: String, count: Int) -> [Double]?`: one comma-separated parse; `Geometry.point`,
-  `Geometry.rect` on top of it; the handlers' own messages stay), `Session+Act.swift:101`, `Session+Screen.swift:21`
-  (`RefTable.isRef(_:)`)
-- Test: `BlockingTests`, `ProcTests` (`isAlive(getpid())`, `parent(getpid()) != nil`), `PlistTests`, `EndpointTests`
-  (`FlowTests` and `RequestLogTests` keep their assertions), `LogStreamTests` (the arguments one init builds),
-  `GeometryTests` (`numbers`), the existing `ShellTests`, `ClipboardTests`, `ConnectTransportTests`, `KeyStoreTests`
-  (unchanged assertions)
+  and path where it needs them; `RequestText.hostPort` formats through `Endpoint.description`)
+- Modify (commit 2): `Sources/ChauffeurCore/Engine/Session+Act.swift:197,211`, `Session.swift` (`findCommand`),
+  `Session+Wait.swift:35-38` (`snap.found(hit)`: the line without its indentation; four copies of
+  `line(_:all:).trimmingCharacters` go), `Sources/ChauffeurCore/Engine/Session+Gestures.swift:5-10`,
+  `Session+Screen.swift:5-13`, `Session+Device.swift:65-74` (`Geometry.numbers(_ text: String, count: Int) -> [Double]?`:
+  one comma-separated parse; `Geometry.point`, `Geometry.rect` on top of it; the handlers' own messages stay)
+- Cut (2026-11-07, the review's §4.3): `Plist.dict` (two lines saved at each of three sites), `RefTable.isRef` (one
+  regex at two sites), `LogStream(udid:level:predicate:handler:)` (two callers, eight lines; amendment 3). Three
+  similar lines beat a helper; `AXSettings`, `SimApps`, `LogStream`, `LogTap`, `TouchLog`, `Session+Act.swift:94`
+  and `Session+Screen.swift:21` stay as they are.
+- Test: `BlockingTests`, `ProcTests` (`isAlive(getpid())`, `parent(getpid()) != nil`), `EndpointTests` (`FlowTests`
+  and `RequestLogTests` keep their assertions), `GeometryTests` (`numbers`), the existing `ShellTests`,
+  `ClipboardTests`, `ConnectTransportTests`, `KeyStoreTests` (unchanged assertions)
 
 **Interfaces:**
 - Produces:
@@ -1050,22 +1122,23 @@ Branch `refactor-4b-helpers`. PR title: "Refactor 4b: small helpers, each replac
   /// A value another thread will deliver: `fulfil` once, `wait` at most `seconds`. The four semaphore boxes
   /// (`Shell.run`, the clipboard's `Background`, `ConnectTransport`, `LocalPresence`) are this.
   final class Blocking<T: Sendable>: @unchecked Sendable { init(); func fulfil(_ value: T); func wait(_ seconds: Double) -> T? }
-  enum Plist { static func dict(_ data: Data) -> [String: Any]?; static func dict(_ text: String) -> [String: Any]? }
   /// `host:port` as the network layers spell it: `localhost:8765`, `[::1]:8765`; a port of nil when there is none.
   struct Endpoint: Equatable, Sendable, CustomStringConvertible { var host: String; var port: Int?; static func parse(_ authority: String) -> Endpoint }
   extension Snapshot { func found(_ node: Node) -> String }
   extension Geometry { static func numbers(_ text: String, count: Int) -> [Double]?; static func point(_ text: String) -> Point?; static func rect(_ text: String) -> Rect? }
-  extension RefTable { static func isRef(_ text: String) -> Bool }
   ```
 
-- [ ] **Step 1: Write the failing tests** for each helper (one file per helper, small).
+- [ ] **Step 1: Write the failing tests** for `Blocking`, `Proc` and `Endpoint` (one file each, small).
 - [ ] **Step 2: Implement, replacing each copy**; `swift test`; goldens unchanged.
-- [ ] **Step 3: Commit** — `git commit -m "Blocking, Proc, Plist, Endpoint, LogStream(level:predicate:), the found line, numbers and isRef: each replaces its copies"`
+- [ ] **Step 3: Commit** — `git commit -m "Blocking, Proc and Endpoint: each replaces its copies"`
+- [ ] **Step 4: Write the failing tests** for `Snapshot.found` and `Geometry.numbers`.
+- [ ] **Step 5: Implement, replacing the four found lines and the three parsers**; `swift test`; goldens unchanged.
+- [ ] **Step 6: Commit** — `git commit -m "The found line and the number parse: one copy each"`
 
 ### Task 46: Stage 4b verification and PR
 
-- [ ] **Step 1: Counts** — `sources-lines` at least 60 under Stage 4a's and under 9,222 overall; `over-300` empty;
-  T 10; `one-way.sh` pasted; the plan's final numbers go in Findings.
+- [ ] **Step 1: Counts** — `over-300` empty; T 10; `quote-callers` counts `ScreenText.` only; `one-way.sh` pasted;
+  the plan's final numbers, L included, go in Findings.
 - [ ] **Step 2: `scripts/check.sh`**; `scripts/live.sh <udid>` (Engine, Device and Screen changed);
   `scripts/live-timing.sh <udid> main`; the ledger unchanged.
 - [ ] **Step 3: Changelog** — "Internal: the refactor's last stage; no result changes." and the "Done when" list
@@ -1105,3 +1178,17 @@ Branch `refactor-4b-helpers`. PR title: "Refactor 4b: small helpers, each replac
 - **Timing baseline** (`scripts/live-timing.sh`, debug builds, warm-up then base/branch/branch/base, loads 3.7-4.9):
   base 7f456a8 vs branch 86e4dfd: tap 746 → 748 ms (+2), dead 1,114 → 1,121 ms (+6), type 1,372 → 1,350 ms (−22).
   Exit 0. The suite needed a fix on its first live run (86e4dfd: wait for each element before its ref, untimed).
+
+### Refresh before Stage 5 (`main` 81541c7, 2026-11-07)
+
+- The Fable review of Plan 2 (`fable-review-plan-2-report.md` beside the Stage 2 review) found the Measure table's
+  ceilings summed to +10, not −90, and contradicted the tasks' own file budgets (3a alone is +200 to +300 of
+  declarations). Owner's ruling: no line budget; "no unnecessary line" instead, with L reported in every PR (Measure).
+- Amendments 1-5 and 8 accepted as written; 7 with two changes; 10 and 11 added and accepted ("Spec amendments
+  proposed"). Tasks 27 and 28 rewritten for 10 and 11: `Frame` is built by `poll`, `AXSource.read()` is unchanged,
+  `Sweep.complete` takes the frame and `drop()` forgets the cache.
+- Cut for having no reader: `purpose` on `Sweep.complete` (Task 28), the `.verdict` half of Task 29's cache pin,
+  `CHBridgeErrorCode`'s seven codes (Task 40), `Plist.dict`, `RefTable.isRef` and `LogStream(level:predicate:)`
+  (Task 45); a hidden `daemon` spec was not added for `main.swift:8` (Task 33).
+- Every file:line in Stages 5, 3 and 4 re-taken from 81541c7; the counts corrected: 27 specs, 45 quote callers,
+  three skill-table rows move, 25 usage literals at the baseline.
