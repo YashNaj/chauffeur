@@ -9,7 +9,6 @@ extension Session {
     func observe(_ purpose: ObservePurpose, minMs: Int, capMs: Int) throws
         -> (snapshot: Snapshot, settle: Settled<Frame>)
     {
-        _ = purpose
         let started = clock.nowMs()
         var (device, ax) = try connect()
         var result = poll(ax, minMs: minMs, capMs: capMs)

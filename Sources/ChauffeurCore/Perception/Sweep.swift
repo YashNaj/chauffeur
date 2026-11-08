@@ -1,5 +1,3 @@
-import Foundation
-
 /// Hit tests on a grid inside the elements `isTarget` picks, merged in as their children (M1 decision 1: the bars the
 /// walk leaves empty). `bars` is today's sweep: a 32 pt step over childless groups up to 140 pt high. One entry is
 /// cached by the frame's hash, so settling and a verdict compare like with like (spec §8); the web-views plan is

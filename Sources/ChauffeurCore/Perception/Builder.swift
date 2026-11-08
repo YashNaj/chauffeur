@@ -1,5 +1,3 @@
-import Foundation
-
 struct Builder {
     let screen: Rect
     var refs: RefTable
